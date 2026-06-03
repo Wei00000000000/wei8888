@@ -136,6 +136,11 @@
     .score-badge.bull { color: var(--bull); border-color: rgba(0,224,164,.32); }
     .score-badge.bear { color: var(--bear); border-color: rgba(255,85,119,.34); }
     .score-badge.warn { color: var(--warn); border-color: rgba(255,177,59,.34); }
+    .score-pill { min-height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 7px; border: 1px solid var(--line); background: rgba(255,255,255,.045); color: var(--muted); font: 950 12px var(--mono); }
+    .score-pill.bull { color: var(--bull); border-color: rgba(0,224,164,.34); background: var(--bull-soft); }
+    .score-pill.warn { color: var(--warn); border-color: rgba(255,177,59,.36); background: var(--warn-soft); }
+    .score-pill.bear { color: var(--bear); border-color: rgba(255,85,119,.36); background: var(--bear-soft); }
+    .score-pill small { color: var(--muted); font: 850 10px var(--mono); }
     .signal-card { border: 1px solid rgba(91,158,255,.16); border-radius: 14px; background: #111a2a; padding: 19px; min-height: 552px; cursor: pointer; }
     .signal-card.bull { border-color: rgba(0,224,164,.2); }
     .signal-card.bear { border-color: rgba(255,85,119,.22); }
@@ -170,7 +175,7 @@
     .level.tp span { color: var(--bull); }
     .level b { display: block; margin-top: 9px; color: #f5fbff; font: 900 19px var(--mono); }
     .copy { position: absolute; right: 14px; bottom: 13px; color: #708195; font-style: normal; }
-    .history-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; border-top: 1px solid var(--line); margin-top: 12px; }
+    .history-stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 0; border-top: 1px solid var(--line); margin-top: 12px; }
     .history-stat-cell { padding-top: 10px; border-right: 1px solid var(--line); text-align: center; }
     .history-stat-cell:last-child { border-right: 0; }
     .history-stat-value { font: 900 13px var(--mono); }
@@ -366,7 +371,7 @@
         <div class="modal-stats" id="modalMarket"></div>
         <div class="kicker">近期訊號</div>
         <div class="subline" id="modalHint">只顯示最近 20 筆。</div>
-        <div class="table-wrap"><table><thead><tr><th>狀態</th><th>時間框架</th><th>方向</th><th>策略</th><th>觸發時間</th><th>累計盈虧</th></tr></thead><tbody id="modalRows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>狀態</th><th>時間框架</th><th>方向</th><th>策略</th><th>觸發時間</th><th>評分</th><th>累計盈虧</th></tr></thead><tbody id="modalRows"></tbody></table></div>
       </div>
     </section>
   </div>
@@ -441,6 +446,7 @@
         const data = await staticBook();
         return {...data, new_signals: [], scanned: [], total_symbols: MAIN_WATCH_SYMBOLS.length};
       }
+      if (endpoint === "prices") return staticPrices(query);
       if (endpoint === "markets" || endpoint === "prices") {
         const res = await fetch(`data/markets.json?ts=${Date.now()}`);
         const data = await res.json();
@@ -466,6 +472,29 @@
       } catch {
         const res = await fetch(`data/book.json?ts=${Date.now()}`);
         return res.json();
+      }
+    }
+    async function staticPrices(query = "") {
+      const params = new URLSearchParams(String(query || ""));
+      const wanted = new Set((params.get("symbols") || "").split(",").map(clean).filter(Boolean));
+      const fallbackRes = await fetch(`data/markets.json?ts=${Date.now()}`);
+      const fallbackData = fallbackRes.ok ? await fallbackRes.json() : {rows: []};
+      try {
+        const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/price");
+        if (!res.ok) throw new Error("Binance ticker unavailable");
+        const tickers = await res.json();
+        const prices = {};
+        const liveRows = tickers
+          .filter(row => wanted.has(clean(row.symbol)))
+          .map(row => {
+            prices[clean(row.symbol)] = Number(row.price);
+            const prev = (fallbackData.rows || []).find(m => clean(m.symbol) === clean(row.symbol)) || {};
+            return {...prev, symbol: row.symbol, price: Number(row.price), live_price: true};
+          });
+        return {markets: liveRows.length ? liveRows : (fallbackData.rows || []), prices};
+      } catch (err) {
+        rememberError(err, "Live price unavailable");
+        return {markets: fallbackData.rows || [], prices: {}};
       }
     }
 
@@ -710,11 +739,12 @@
       const pnl = pnlPct(s, isLivePricedSignal(s));
       const current = currentPrice(s);
       const rPct = riskPct(s);
+      const score = signalScore(s);
       return `<article class="signal-card ${kind}" data-symbol="${clean(s.symbol)}">
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
           <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyName(s.signal_type)}</div></div>
-          <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="state-tag ${stateKind(s)}">${stateLabel(s.reached_state)}</span></div><div class="tf-row"><span class="tf-pill hot">1H</span><span class="tf-pill">4H</span><span class="tf-pill">1D</span></div></div>
+          <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">1H</span><span class="tf-pill">4H</span><span class="tf-pill">1D</span></div></div>
         </div>
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">觸發價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
@@ -731,6 +761,7 @@
           <div class="history-stat-cell"><div class="history-stat-value ${numClass(s.oi_change_pct)}">${signed(s.oi_change_pct)}</div><div class="history-stat-label">OI Chg</div></div>
           <div class="history-stat-cell"><div class="history-stat-value ${numClass(s.price_change_pct)}">${signed(s.price_change_pct)}</div><div class="history-stat-label">Price</div></div>
           <div class="history-stat-cell"><div class="history-stat-value">${fmt(s.taker_buy_ratio, 2)}</div><div class="history-stat-label">Taker</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value ${score.kind}-text">${score.value}</div><div class="history-stat-label">${score.label}</div></div>
         </div>
       </article>`;
     }
@@ -850,11 +881,13 @@
       const decided = wins + losses;
       const rate = decided ? wins / decided * 100 : 0;
       const pnl = rows.reduce((sum, s) => sum + pnlPct(s, isLivePricedSignal(s)), 0);
+      const avgScore = rows.length ? rows.reduce((sum, s) => sum + signalScore(s).value, 0) / rows.length : 0;
       $("modalTier").textContent = rate >= 70 ? "高等" : rate >= 50 ? "中等" : "低等";
       $("modalStats").innerHTML = [
         ["訊號總數", rows.length, `${rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length} 進行中`],
         ["平倉勝率", `${fmt(rate,1)}%`, `${wins}W / ${losses}L`],
-        ["累計盈虧", signed(pnl), `${rows.length} 筆`]
+        ["累計盈虧", signed(pnl), `${rows.length} 筆`],
+        ["平均評分", fmt(avgScore, 0), rows.length ? scoreGrade(avgScore).label : "尚無樣本"]
       ].map(metricCard).join("");
       const hh = rows.filter(s => s.signal_type === "reversal_bullish");
       const ct = rows.filter(s => s.signal_type === "reversal_bearish");
@@ -866,8 +899,9 @@
       ].map(metricCard).join("") : `<div class="modal-card"><div class="subline">市場快照</div><div class="stat-value warn-text">尚無資料</div><div class="subline">等待下一輪掃描</div></div>`;
       $("modalRows").innerHTML = rows.slice(0, 20).map(s => {
         const pnlValue = pnlPct(s, isLivePricedSignal(s));
-        return `<tr><td><span class="pill ${stateKind(s)}">${stateLabel(s.reached_state)}</span></td><td>15M</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${s.signal_type === "reversal_bullish" ? "多" : "空"}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${strategyName(s.signal_type)}</td><td class="mono">${shortTime(s.triggered_at)}</td><td class="${pnlValue >= 0 ? "bull-text" : "bear-text"}">${signed(pnlValue)}</td></tr>`;
-      }).join("") || `<tr><td colspan="6" class="empty">尚無 ${symbol} 訊號。</td></tr>`;
+        const score = signalScore(s);
+        return `<tr><td><span class="pill ${stateKind(s)}">${stateLabel(displayState(s))}</span></td><td>15M</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${s.signal_type === "reversal_bullish" ? "多" : "空"}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${strategyName(s.signal_type)}</td><td class="mono">${shortTime(s.triggered_at)}</td><td><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span></td><td class="${pnlValue >= 0 ? "bull-text" : "bear-text"}">${signed(pnlValue)}</td></tr>`;
+      }).join("") || `<tr><td colspan="7" class="empty">尚無 ${symbol} 訊號。</td></tr>`;
       $("symbolModal").classList.add("open");
     }
     function closeSymbolModal() { $("symbolModal").classList.remove("open"); }
@@ -1017,6 +1051,34 @@
       ];
     }
 
+    function signalScore(s) {
+      const isBull = s.signal_type === "reversal_bullish";
+      const dir = isBull ? 1 : -1;
+      const oiPct = clamp(Number(s.oi_percentile) || 0, 0, 100);
+      const oiMove = (Number(s.oi_change_pct) || 0) * dir;
+      const priceMove = (Number(s.price_change_pct) || 0) * dir;
+      const taker = Number(s.taker_buy_ratio);
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
+      const risk = riskPct(s);
+      const statusBoost = isOpenSignal(s) ? 6 : isPartialActiveSignal(s) ? 4 : ["tp1","tp2","tp3","ftp"].includes(s.reached_state) ? 3 : 0;
+      let score = 0;
+      score += clamp(oiPct / 100 * 28, 0, 28);
+      score += clamp(oiMove * 7, 0, 18);
+      score += clamp(priceMove * 8, 0, 18);
+      score += clamp(takerBias / 2, 0, 12);
+      score += Number.isFinite(risk) ? clamp(14 - Math.abs(risk - 3) * 2.4, 0, 14) : 4;
+      score += statusBoost;
+      score = Math.round(clamp(score, 0, 100));
+      return {...scoreGrade(score), value: score};
+    }
+    function scoreGrade(score) {
+      if (score >= 82) return {label: "A+", kind: "bull"};
+      if (score >= 70) return {label: "A", kind: "bull"};
+      if (score >= 58) return {label: "B", kind: "warn"};
+      if (score >= 45) return {label: "C", kind: "warn"};
+      return {label: "D", kind: "bear"};
+    }
+
     function sortSignals(rows) {
       return rows.filter(Boolean).filter(r => !r.error).sort((a,b) => {
         const ar = signalRank(a), br = signalRank(b);
@@ -1069,7 +1131,12 @@
       const state = s.reached_state;
       if (!order[target]) return false;
       if (state === "ftp") return true;
-      return (order[state] || 0) >= order[target];
+      if ((order[state] || 0) >= order[target]) return true;
+      if (!isLivePricedSignal(s)) return false;
+      const current = Number(currentMarketPrice(s));
+      const targetPrice = Number(s[`${target}_price`]);
+      if (!Number.isFinite(current) || !Number.isFinite(targetPrice)) return false;
+      return s.signal_type === "reversal_bullish" ? current >= targetPrice : current <= targetPrice;
     }
     function latestOpenSignal(symbol) {
       return sortSignals(state.signals).find(s => clean(s.symbol) === clean(symbol) && (isOpenSignal(s) || isPartialActiveSignal(s)));
@@ -1116,8 +1183,23 @@
       const market = marketFor(s.symbol);
       return market ? Number(market.price) : NaN;
     }
+    function displayState(s) {
+      const saved = s.reached_state;
+      if (!isLivePricedSignal(s)) return saved;
+      const current = Number(currentMarketPrice(s));
+      if (!Number.isFinite(current)) return saved;
+      const bullish = s.signal_type === "reversal_bullish";
+      const hit = price => Number.isFinite(Number(price)) && (bullish ? current >= Number(price) : current <= Number(price));
+      const stopped = Number.isFinite(Number(s.sl_price)) && (bullish ? current <= Number(s.sl_price) : current >= Number(s.sl_price));
+      if (stopped) return "sl";
+      if (hit(s.ftp_price)) return "ftp";
+      if (hit(s.tp3_price)) return "tp3";
+      if (hit(s.tp2_price)) return "tp2";
+      if (hit(s.tp1_price)) return "tp1";
+      return saved || "holding";
+    }
     function stateKind(s) {
-      const stateValue = typeof s === "string" ? s : s.reached_state;
+      const stateValue = typeof s === "string" ? s : displayState(s);
       if (["tp1","tp2","tp3","ftp"].includes(stateValue)) return "bull";
       if (stateValue === "sl") return "bear";
       if (stateValue === "holding" || !stateValue) return "warn";
