@@ -7,11 +7,11 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #080d13;
-      --deep: #050910;
-      --panel: #111821;
-      --panel-2: #151e2b;
-      --panel-3: #0c121a;
+      --bg: #060a0f;
+      --deep: #04080d;
+      --panel: #0e151d;
+      --panel-2: #121d28;
+      --panel-3: #070d13;
       --line: rgba(255,255,255,.08);
       --line-2: rgba(255,255,255,.14);
       --text: #eef5ff;
@@ -30,7 +30,13 @@
       --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font); }
+    body { margin: 0; min-height: 100vh; background:
+      linear-gradient(rgba(102,167,255,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(102,167,255,.028) 1px, transparent 1px),
+      radial-gradient(circle at 80% 0%, rgba(0,224,164,.08), transparent 28%),
+      var(--bg);
+      background-size: 34px 34px, 34px 34px, auto, auto;
+      color: var(--text); font-family: var(--font); }
     button, input, select { font: inherit; }
     button { cursor: pointer; }
     .top { position: sticky; top: 0; z-index: 50; background: rgba(8,13,19,.94); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
@@ -50,7 +56,7 @@
     .main { max-width: 1680px; margin: 0 auto; padding: 20px 18px 70px; }
     .view { display: none; }
     .view.active { display: block; }
-    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .panel { background: linear-gradient(180deg, rgba(20,32,44,.96), rgba(10,16,24,.96)); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
     .panel-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 14px; }
     .kicker { color: var(--faint); font: 800 10px var(--mono); text-transform: uppercase; letter-spacing: .8px; }
     h2 { margin: 3px 0 0; font-size: 18px; line-height: 1.2; }
@@ -215,7 +221,23 @@
     th { color: var(--faint); background: var(--panel-3); position: sticky; top: 0; z-index: 1; }
     .empty { padding: 34px; text-align: center; color: var(--faint); font-size: 13px; }
     .ghost-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 14px; margin-top: 14px; }
-    .ghost-card { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 16px; min-height: 130px; }
+    .ghost-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 16px; min-height: 130px; }
+    .radar-strip { position: relative; overflow: hidden; border: 1px solid rgba(102,167,255,.16); border-radius: 8px; background: rgba(5,10,15,.82); min-height: 88px; padding: 16px; }
+    .radar-strip::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(0,224,164,.14), transparent); animation: sweep 4.5s linear infinite; pointer-events: none; }
+    @keyframes sweep { to { transform: translateX(100%); } }
+    .terminal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px,1fr)); gap: 14px; }
+    .stable-card { border: 1px solid rgba(102,167,255,.15); border-left: 3px solid var(--info); border-radius: 8px; background: rgba(10,17,25,.94); padding: 16px; cursor: pointer; }
+    .stable-card.bull { border-left-color: var(--bull); }
+    .stable-card.bear { border-left-color: var(--bear); }
+    .stable-card.warn { border-left-color: var(--warn); }
+    .stable-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .stable-symbol { font-size: 20px; font-weight: 950; }
+    .stable-score { font: 950 28px var(--mono); }
+    .stable-rule { margin-top: 12px; color: #dbe8f8; line-height: 1.65; font-size: 14px; }
+    .stable-matrix { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-top: 14px; }
+    .matrix-cell { border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); padding: 10px; min-height: 58px; }
+    .matrix-label { color: var(--faint); font: 800 10px var(--mono); }
+    .matrix-value { margin-top: 4px; font: 900 13px var(--mono); }
     @media (max-width: 1120px) {
       .toolbar { grid-template-columns: repeat(2,1fr); }
       .stats-row, .watch-stats { grid-template-columns: repeat(2,1fr); }
@@ -247,6 +269,7 @@
       <nav class="nav">
         <button class="active" data-view="dashboard">儀表板</button>
         <button data-view="signals">數據交易訊號</button>
+        <button data-view="stable">穩如老狗</button>
         <button data-view="harmonic">諧波交易訊號</button>
       </nav>
       <div class="top-actions">
@@ -263,7 +286,7 @@
         <div>
           <div class="kicker">Sentiment Scanner</div>
           <h2>數據交易訊號系統</h2>
-          <div class="subline">15M OI percentile · Headhunter / Contemplator · 自動輪巡掃描</div>
+          <div class="subline">15M OI percentile · 嘎空 / 嘎多 · 終端雷達掃描</div>
         </div>
         <span class="pill accent" id="statusPill">Live</span>
       </div>
@@ -286,7 +309,7 @@
     </section>
 
     <section id="dashboard" class="view active">
-      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>諧波交易訊號</span></div>
+      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>諧波交易訊號</span></div>
       <div class="section-head">
         <div><span class="watch-title">我的觀察清單</span><span class="watch-sub" id="watchMeta">0 SYMBOLS</span></div>
         <div class="section-actions">
@@ -326,6 +349,28 @@
         </div>
       </div>
       <div class="signals-grid" id="signalCards"></div>
+    </section>
+
+    <section id="stable" class="view">
+      <section class="radar-strip">
+        <div class="kicker">Conservative Contract Matrix</div>
+        <h2>穩如老狗</h2>
+        <div class="subline">獨立計算區域：依 OI、價格、Taker 代理 CVD、風險距離與訊號狀態做保守共振評分，不混入數據交易訊號清單。</div>
+      </section>
+      <div class="section-head">
+        <h2 class="section-title">穩健共振清單 <span id="stableCount" class="section-count">(0)</span></h2>
+        <div class="section-actions">
+          <input id="stableSearch" class="search-input" placeholder="搜尋幣種，例如 BTC">
+          <select id="stableSideFilter">
+            <option value="all">全部</option>
+            <option value="bull">嘎空</option>
+            <option value="bear">嘎多</option>
+            <option value="neutral">觀望</option>
+          </select>
+        </div>
+      </div>
+      <div class="watch-stats" id="stableStats"></div>
+      <div class="terminal-grid" id="stableCards"></div>
     </section>
 
     <section id="harmonic" class="view">
@@ -415,6 +460,8 @@
     $("notifyClear").addEventListener("click", markNotificationsRead);
     $("symbolSearch").addEventListener("input", () => syncSearch("symbolSearch"));
     $("signalSearch").addEventListener("input", () => syncSearch("signalSearch"));
+    $("stableSearch").addEventListener("input", renderStable);
+    $("stableSideFilter").addEventListener("change", renderStable);
     $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
     $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
     $("modalClose").addEventListener("click", closeSymbolModal);
@@ -634,6 +681,7 @@
       renderStats();
       renderWatchDashboard();
       renderSignals();
+      renderStable();
       renderNotifications();
       renderHealth();
     }
@@ -732,6 +780,45 @@
       $("signalCards").innerHTML = allHtml;
       $("dashboardSignalCards").innerHTML = dashHtml;
       document.querySelectorAll(".signal-card").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
+    }
+    function renderStable() {
+      const q = $("stableSearch").value.trim().toUpperCase();
+      const sideFilter = $("stableSideFilter").value;
+      const rows = watchMarkets()
+        .map(m => stableSetup(m))
+        .filter(s => !q || s.symbol.includes(q))
+        .filter(s => sideFilter === "all" || s.side === sideFilter)
+        .sort((a,b) => b.score - a.score || b.oiPercentile - a.oiPercentile);
+      $("stableCount").textContent = `(${rows.length})`;
+      const tradable = rows.filter(s => s.score >= 72).length;
+      const wait = rows.filter(s => s.side === "neutral").length;
+      const avg = rows.length ? rows.reduce((sum, s) => sum + s.score, 0) / rows.length : 0;
+      $("stableStats").innerHTML = [
+        ["穩健候選", tradable, "bull-text"],
+        ["平均分數", fmt(avg, 0), "accent-text"],
+        ["嘎空機會", rows.filter(s => s.side === "bull").length, "bull-text"],
+        ["嘎多機會", rows.filter(s => s.side === "bear").length, "bear-text"],
+        ["觀望", wait, "warn-text"],
+        ["樣本", rows.length, ""]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      $("stableCards").innerHTML = rows.map(stableCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩健共振。</div></section>`;
+      $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
+    }
+    function stableCard(s) {
+      return `<article class="stable-card ${s.kind}" data-stable-symbol="${s.symbol}">
+        <div class="stable-head">
+          <div><div class="stable-symbol">${s.symbol}</div><div class="watch-analysis-pair">${s.symbol}/USDT · 穩如老狗</div></div>
+          <div class="stable-score ${s.kind}-text">${s.score}</div>
+        </div>
+        <div class="watch-status-pill ${s.kind}">${s.label}</div>
+        <div class="stable-rule">${s.reason}</div>
+        <div class="stable-matrix">
+          <div class="matrix-cell"><div class="matrix-label">OI</div><div class="matrix-value ${numClass(s.oiChange)}">${signed(s.oiChange)}</div></div>
+          <div class="matrix-cell"><div class="matrix-label">PRICE</div><div class="matrix-value ${numClass(s.priceChange)}">${signed(s.priceChange)}</div></div>
+          <div class="matrix-cell"><div class="matrix-label">TAKER</div><div class="matrix-value">${fmt(s.taker, 2)}</div></div>
+          <div class="matrix-cell"><div class="matrix-label">RISK</div><div class="matrix-value">${s.riskText}</div></div>
+        </div>
+      </article>`;
     }
     function signalCard(s) {
       const kind = s.signal_type === "reversal_bullish" ? "bull" : "bear";
@@ -841,7 +928,7 @@
         addNotification({
           kind: s.signal_type === "reversal_bullish" ? "bull" : "bear",
           symbol: clean(s.symbol),
-          title: s.signal_type === "reversal_bullish" ? "新獵頭者" : "新沉思者",
+          title: s.signal_type === "reversal_bullish" ? "新嘎空" : "新嘎多",
           body: `${shortTime(s.triggered_at)} · OI ${signed(s.oi_change_pct)} · Price ${signed(s.price_change_pct)}`
         });
       }
@@ -891,7 +978,7 @@
       ].map(metricCard).join("");
       const hh = rows.filter(s => s.signal_type === "reversal_bullish");
       const ct = rows.filter(s => s.signal_type === "reversal_bearish");
-      $("modalStrategies").innerHTML = [modalStrategy("獵頭者", hh, "bull"), modalStrategy("沉思者", ct, "bear")].join("");
+      $("modalStrategies").innerHTML = [modalStrategy("嘎空", hh, "bull"), modalStrategy("嘎多", ct, "bear")].join("");
       $("modalMarket").innerHTML = market ? [
         ["目前價格", fmt(market.price, 6), `Price ${signed(market.price_change_pct)}`],
         ["OI 變化", signed(market.oi_change_pct), `Percentile ${fmt(market.oi_percentile,1)}`],
@@ -971,8 +1058,8 @@
           advice: "依原訊號 SL / TP 階梯管理"
         };
       }
-      if (m.signal_type === "reversal_bullish") return {kind:"bull", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速擴張 ${signed(oi)}，價格同步上行，OI 百分位 ${fmt(pct,1)}，觸發獵頭者多方訊號。`, advice:"順勢做多 / 回檔進場"};
-      if (m.signal_type === "reversal_bearish") return {kind:"bear", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速收縮 ${signed(oi)}，價格同步走弱，OI 百分位 ${fmt(pct,1)}，觸發沉思者空方訊號。`, advice:"順勢做空 / 反彈觀察"};
+      if (m.signal_type === "reversal_bullish") return {kind:"bull", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速擴張 ${signed(oi)}，價格同步上行，OI 百分位 ${fmt(pct,1)}，觸發嘎空多方訊號。`, advice:"順勢做多 / 回檔進場"};
+      if (m.signal_type === "reversal_bearish") return {kind:"bear", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速收縮 ${signed(oi)}，價格同步走弱，OI 百分位 ${fmt(pct,1)}，觸發嘎多空方訊號。`, advice:"順勢做空 / 反彈觀察"};
       if (oi > 0 && price > 0 && pct > 80) return {kind:"bull", label:"健康多頭", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 位於高分位，價格與資金同步推進，Taker 買盤 ${Number.isFinite(taker) ? fmt(taker,2) : "未知"}，多方結構偏健康。`, advice:"順勢做多 / 回檔進場"};
       if (oi < 0 && price < 0 && pct > 70) return {kind:"bear", label:"趨勢空頭", tf1:"↘", tf4:"-", tfD:"-", reason:"OI 與價格同時下行，槓桿多頭退場，短線結構偏空。", advice:"觀望 / 等明確訊號"};
       if (Math.abs(oi) > 0.5 && Math.abs(price) < 0.1) return {kind:"warn", label:"過熱警戒", tf1:"↘", tf4:"-", tfD:"-", reason:"OI 有明顯變化但價格尚未跟進，可能正在累積槓桿部位。", advice:"降低追價 / 等待突破"};
@@ -1055,7 +1142,7 @@
       const isBull = s.signal_type === "reversal_bullish";
       const dir = isBull ? 1 : -1;
       const oiPct = clamp(Number(s.oi_percentile) || 0, 0, 100);
-      const oiMove = (Number(s.oi_change_pct) || 0) * dir;
+      const oiMove = Math.abs(Number(s.oi_change_pct) || 0);
       const priceMove = (Number(s.price_change_pct) || 0) * dir;
       const taker = Number(s.taker_buy_ratio);
       const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
@@ -1070,6 +1157,46 @@
       score += statusBoost;
       score = Math.round(clamp(score, 0, 100));
       return {...scoreGrade(score), value: score};
+    }
+    function stableSetup(m) {
+      const symbol = clean(m.symbol);
+      const signal = latestSignalFor(symbol);
+      const open = latestOpenSignal(symbol);
+      const oi = Number(m.oi_change_pct) || 0;
+      const price = Number(m.price_change_pct) || 0;
+      const pct = Number(m.oi_percentile) || 0;
+      const taker = Number(m.taker_buy_ratio);
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 : 0;
+      const risk = signal ? riskPct(signal) : NaN;
+      const bullPoints = [
+        pct >= 80 ? 18 : pct >= 65 ? 10 : 3,
+        oi > 0.35 ? 18 : oi > 0 ? 9 : 0,
+        price > 0.18 ? 16 : price > 0 ? 8 : 0,
+        takerBias > 4 ? 12 : takerBias > 0 ? 6 : 0,
+        Number.isFinite(risk) ? clamp(14 - Math.abs(risk - 2.5) * 2.2, 0, 14) : 6,
+        open && open.signal_type === "reversal_bullish" ? 12 : 0
+      ];
+      const bearPoints = [
+        pct >= 80 ? 18 : pct >= 65 ? 10 : 3,
+        Math.abs(oi) > 0.35 ? 14 : Math.abs(oi) > 0 ? 7 : 0,
+        price < -0.18 ? 16 : price < 0 ? 8 : 0,
+        takerBias < -4 ? 12 : takerBias < 0 ? 6 : 0,
+        Number.isFinite(risk) ? clamp(14 - Math.abs(risk - 2.5) * 2.2, 0, 14) : 6,
+        open && open.signal_type === "reversal_bearish" ? 12 : 0
+      ];
+      const bullScore = Math.round(clamp(bullPoints.reduce((a,b) => a + b, 0), 0, 100));
+      const bearScore = Math.round(clamp(bearPoints.reduce((a,b) => a + b, 0), 0, 100));
+      const side = bullScore >= bearScore && bullScore >= 55 ? "bull" : bearScore > bullScore && bearScore >= 55 ? "bear" : "neutral";
+      const score = side === "bull" ? bullScore : side === "bear" ? bearScore : Math.max(bullScore, bearScore);
+      const kind = side === "bull" ? "bull" : side === "bear" ? "bear" : "warn";
+      const label = side === "bull" ? "嘎空候選" : side === "bear" ? "嘎多候選" : "保守觀望";
+      const riskText = Number.isFinite(risk) ? `${fmt(risk, 2)}%` : "N/A";
+      const reason = side === "bull"
+        ? `OI 與價格同步偏多，Taker 主動買盤 ${Number.isFinite(taker) ? fmt(taker,2) : "未知"}，屬於保守做多/嘎空觀察。`
+        : side === "bear"
+          ? `價格走弱且槓桿退潮，Taker 偏賣，屬於保守做空/嘎多觀察。`
+          : `共振不足，等待 OI、價格、Taker 三者方向更一致。`;
+      return {symbol, side, kind, label, score, reason, oiChange: oi, priceChange: price, oiPercentile: pct, taker, riskText};
     }
     function scoreGrade(score) {
       if (score >= 82) return {label: "A+", kind: "bull"};
@@ -1213,7 +1340,7 @@
       if (s === "ftp") return "觸發 FTP";
       return "持倉中";
     }
-    function strategyName(type) { return type === "reversal_bullish" ? "獵頭者" : "沉思者"; }
+    function strategyName(type) { return type === "reversal_bullish" ? "嘎空" : "嘎多"; }
     function winsOf(rows) { return rows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length; }
     function lossesOf(rows) { return rows.filter(s => s.reached_state === "sl").length; }
     function setView(view) {
