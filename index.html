@@ -438,8 +438,7 @@
         return data;
       }
       if (endpoint === "book" || endpoint === "tick" || endpoint === "scan" || endpoint === "backtest") {
-        const res = await fetch(`data/book.json?ts=${Date.now()}`);
-        const data = await res.json();
+        const data = await staticBook();
         return {...data, new_signals: [], scanned: [], total_symbols: MAIN_WATCH_SYMBOLS.length};
       }
       if (endpoint === "markets" || endpoint === "prices") {
@@ -448,6 +447,26 @@
         return endpoint === "prices" ? {markets: data.rows || [], prices: {}} : data;
       }
       throw new Error("Static mode does not support this endpoint.");
+    }
+    async function staticBook() {
+      try {
+        const manifestRes = await fetch(`data/manifest.json?ts=${Date.now()}`);
+        if (!manifestRes.ok) throw new Error("manifest missing");
+        const manifest = await manifestRes.json();
+        const chunkNames = manifest.signal_chunks || [];
+        const chunks = await Promise.all(chunkNames.map(async name => {
+          const res = await fetch(`data/${name}?ts=${Date.now()}`);
+          if (!res.ok) return {rows: []};
+          return res.json();
+        }));
+        const rows = chunks.flatMap(chunk => chunk.rows || []);
+        const marketsRes = await fetch(`data/${manifest.markets || "markets.json"}?ts=${Date.now()}`);
+        const marketsData = marketsRes.ok ? await marketsRes.json() : {rows: []};
+        return {rows, markets: marketsData.rows || []};
+      } catch {
+        const res = await fetch(`data/book.json?ts=${Date.now()}`);
+        return res.json();
+      }
     }
 
     function params() {
