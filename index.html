@@ -432,13 +432,15 @@
       lastPriceAt: null,
       lastMarketAt: null,
       lastError: "",
-      busy: false
+      busy: false,
+      currentView: "dashboard"
     };
     const MAIN_WATCH_SYMBOLS = [
       "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
       "TRX","BCH","LTC","DOT","NEAR","UNI","APT","SUI","OP","ARB"
     ];
     const STATIC_MODE = location.hostname.endsWith("github.io") || location.protocol === "file:";
+    const STABLE_THRESHOLD = 88;
     const seenSignals = new Set();
     const seenStates = new Map();
     const controls = {
@@ -640,6 +642,7 @@
         renderVisibleNumbers();
         renderStats();
         renderWatchDashboard();
+        renderStable();
         renderHealth();
         if ($("symbolModal").classList.contains("open")) openSymbolModal($("modalSymbol").textContent);
       } catch (err) {
@@ -696,22 +699,32 @@
       renderAll();
     }
     function renderStats() {
-      const open = state.signals.filter(isOpenSignal);
-      const partial = state.signals.filter(isPartialActiveSignal);
-      const closed = state.signals.filter(s => !isOpenSignal(s) && !isPartialActiveSignal(s));
-      const decided = state.signals.filter(s => s.reached_state && s.reached_state !== "holding");
+      const stableMode = state.currentView === "stable";
+      const sourceRows = stableMode ? stableSignals() : state.signals;
+      const open = sourceRows.filter(isOpenSignal);
+      const partial = sourceRows.filter(isPartialActiveSignal);
+      const closed = sourceRows.filter(s => !isOpenSignal(s) && !isPartialActiveSignal(s));
+      const decided = sourceRows.filter(s => s.reached_state && s.reached_state !== "holding");
       const wins = decided.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length;
       const winRate = decided.length ? wins / decided.length * 100 : 0;
       const realized = closed.reduce((sum, s) => sum + pnlPct(s, false), 0);
       const unrealized = [...open, ...partial].reduce((sum, s) => sum + pnlPct(s, true), 0);
       const total = realized + unrealized;
-      const hot = state.markets.filter(m => m.signal_type).length;
-      const cells = [
+      const hot = stableMode ? sourceRows.filter(s => stableTradeMeta(s).score >= 80).length : state.markets.filter(m => m.signal_type).length;
+      const avgScore = sourceRows.length ? sourceRows.reduce((sum, s) => sum + (stableMode ? stableTradeMeta(s).score : signalScore(s).value), 0) / sourceRows.length : 0;
+      const cells = stableMode ? [
+        ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
+        ["穩狗平倉勝率", `${fmt(winRate, 1)}%`, `${wins}W / ${Math.max(0, decided.length - wins)}L`],
+        ["穩狗已實現", signed(realized), `${closed.length} 筆平倉`],
+        ["穩狗未實現", signed(unrealized), `${open.length + partial.length} 筆浮動`],
+        ["穩狗累積盈虧", signed(total), `${sourceRows.length} 筆訊號`],
+        ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
+      ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
         ["平倉勝率", `${fmt(winRate, 1)}%`, `${wins}W / ${Math.max(0, decided.length - wins)}L`],
         ["已實現盈虧", signed(realized), `${closed.length} 筆平倉`],
         ["未實現盈虧", signed(unrealized), `${open.length + partial.length} 筆浮動`],
-        ["總累積盈虧", signed(total), `${state.signals.length} 筆訊號`],
+        ["總累積盈虧", signed(total), `${sourceRows.length} 筆訊號`],
         ["市場熱點", hot, `${watchMarkets().length} 個觀察中`]
       ];
       $("stats").innerHTML = cells.map(([label, value, detail]) => `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value ${String(value).startsWith("-") ? "bear-text" : "bull-text"}">${value}</div><div class="subline">${detail || ""}</div></div>`).join("");
@@ -784,24 +797,24 @@
     function renderStable() {
       const q = $("stableSearch").value.trim().toUpperCase();
       const sideFilter = $("stableSideFilter").value;
-      const rows = watchMarkets()
-        .map(m => stableSetup(m))
+      const rows = stableSignals()
         .filter(s => !q || s.symbol.includes(q))
-        .filter(s => sideFilter === "all" || s.side === sideFilter)
-        .sort((a,b) => b.score - a.score || b.oiPercentile - a.oiPercentile);
+        .filter(s => sideFilter === "all" || stableTradeMeta(s).side === sideFilter)
+        .sort((a,b) => signalRank(b) - signalRank(a) || stableTradeMeta(b).score - stableTradeMeta(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
       $("stableCount").textContent = `(${rows.length})`;
-      const tradable = rows.filter(s => s.score >= 72).length;
-      const wait = rows.filter(s => s.side === "neutral").length;
-      const avg = rows.length ? rows.reduce((sum, s) => sum + s.score, 0) / rows.length : 0;
+      const metas = rows.map(stableTradeMeta);
+      const tradable = metas.filter(s => s.score >= 92).length;
+      const wait = metas.filter(s => s.side === "neutral").length;
+      const avg = metas.length ? metas.reduce((sum, s) => sum + s.score, 0) / metas.length : 0;
       $("stableStats").innerHTML = [
-        ["穩健候選", tradable, "bull-text"],
+        ["穩狗訊號", rows.length, "bull-text"],
         ["平均分數", fmt(avg, 0), "accent-text"],
-        ["嘎空機會", rows.filter(s => s.side === "bull").length, "bull-text"],
-        ["嘎多機會", rows.filter(s => s.side === "bear").length, "bear-text"],
+        ["嘎空方向", metas.filter(s => s.side === "bull").length, "bull-text"],
+        ["嘎多方向", metas.filter(s => s.side === "bear").length, "bear-text"],
         ["觀望", wait, "warn-text"],
-        ["樣本", rows.length, ""]
+        ["高分", tradable, ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
-      $("stableCards").innerHTML = rows.map(stableCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩健共振。</div></section>`;
+      $("stableCards").innerHTML = rows.map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
       $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
     }
     function stableCard(s) {
@@ -818,6 +831,31 @@
           <div class="matrix-cell"><div class="matrix-label">TAKER</div><div class="matrix-value">${fmt(s.taker, 2)}</div></div>
           <div class="matrix-cell"><div class="matrix-label">RISK</div><div class="matrix-value">${s.riskText}</div></div>
         </div>
+      </article>`;
+    }
+    function stableTradeCard(s) {
+      const meta = stableTradeMeta(s);
+      const isBull = s.signal_type === "reversal_bullish";
+      const pnl = pnlPct(s, isLivePricedSignal(s));
+      const current = currentPrice(s);
+      const rPct = riskPct(s);
+      return `<article class="signal-card ${meta.kind}" data-stable-symbol="${clean(s.symbol)}">
+        <div class="signal-main">
+          <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div></div>
+          <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
+        </div>
+        <div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
+        <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
+        <div class="levels">
+          <div class="level"><span>R</span><b>${fmt(rPct, 2)}%</b><i class="copy">▢</i></div>
+          <div class="level"><span>SL</span><b>${fmt(s.sl_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp1") ? "hit" : ""}"><span>TP1</span><b>${fmt(s.tp1_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp2") ? "hit" : ""}"><span>TP2</span><b>${fmt(s.tp2_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp3") ? "hit" : ""}"><span>TP3</span><b>${fmt(s.tp3_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "ftp") ? "hit" : ""}"><span>FTP</span><b>${fmt(s.ftp_price, 6)}</b><i class="copy">▢</i></div>
+        </div>
+        <div class="stable-rule">${meta.reason}</div>
       </article>`;
     }
     function signalCard(s) {
@@ -844,10 +882,10 @@
           <div class="level tp ${targetHit(s, "ftp") ? "hit" : ""}"><span>FTP</span><b>${fmt(s.ftp_price, 6)}</b><i class="copy">▢</i></div>
         </div>
         <div class="history-stats">
-          <div class="history-stat-cell"><div class="history-stat-value">${fmt(s.oi_percentile, 1)}</div><div class="history-stat-label">OI %ile</div></div>
-          <div class="history-stat-cell"><div class="history-stat-value ${numClass(s.oi_change_pct)}">${signed(s.oi_change_pct)}</div><div class="history-stat-label">OI Chg</div></div>
-          <div class="history-stat-cell"><div class="history-stat-value ${numClass(s.price_change_pct)}">${signed(s.price_change_pct)}</div><div class="history-stat-label">Price</div></div>
-          <div class="history-stat-cell"><div class="history-stat-value">${fmt(s.taker_buy_ratio, 2)}</div><div class="history-stat-label">Taker</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "oi_percentile"), 1)}</div><div class="history-stat-label">OI %ile</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "oi_change_pct"))}">${signed(signalMetric(s, "oi_change_pct"))}</div><div class="history-stat-label">OI Chg</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "price_change_pct"))}">${signed(signalMetric(s, "price_change_pct"))}</div><div class="history-stat-label">Price</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "taker_buy_ratio"), 2)}</div><div class="history-stat-label">Taker</div></div>
           <div class="history-stat-cell"><div class="history-stat-value ${score.kind}-text">${score.value}</div><div class="history-stat-label">${score.label}</div></div>
         </div>
       </article>`;
@@ -1033,11 +1071,11 @@
           return {
             symbol: `${symbol}USDT`,
             price: signal ? currentPrice(signal) : NaN,
-            oi_value_usdt: signal ? Number(signal.oi_value_usdt) : NaN,
-            oi_change_pct: signal ? Number(signal.oi_change_pct) : 0,
-            oi_percentile: signal ? Number(signal.oi_percentile) : 0,
-            price_change_pct: signal ? Number(signal.price_change_pct) : 0,
-            taker_buy_ratio: signal ? Number(signal.taker_buy_ratio) : NaN,
+            oi_value_usdt: signal ? Number(signalMetric(signal, "oi_value_usdt")) : NaN,
+            oi_change_pct: signal ? Number(signalMetric(signal, "oi_change_pct")) : 0,
+            oi_percentile: signal ? Number(signalMetric(signal, "oi_percentile")) : 0,
+            price_change_pct: signal ? Number(signalMetric(signal, "price_change_pct")) : 0,
+            taker_buy_ratio: signal ? Number(signalMetric(signal, "taker_buy_ratio")) : NaN,
             signal_type: signal ? signal.signal_type : null,
             fallback: true
           };
@@ -1141,10 +1179,10 @@
     function signalScore(s) {
       const isBull = s.signal_type === "reversal_bullish";
       const dir = isBull ? 1 : -1;
-      const oiPct = clamp(Number(s.oi_percentile) || 0, 0, 100);
-      const oiMove = Math.abs(Number(s.oi_change_pct) || 0);
-      const priceMove = (Number(s.price_change_pct) || 0) * dir;
-      const taker = Number(s.taker_buy_ratio);
+      const oiPct = clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100);
+      const oiMove = Math.abs(Number(signalMetric(s, "oi_change_pct")) || 0);
+      const priceMove = (Number(signalMetric(s, "price_change_pct")) || 0) * dir;
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
       const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
       const risk = riskPct(s);
       const statusBoost = isOpenSignal(s) ? 6 : isPartialActiveSignal(s) ? 4 : ["tp1","tp2","tp3","ftp"].includes(s.reached_state) ? 3 : 0;
@@ -1197,6 +1235,44 @@
           ? `價格走弱且槓桿退潮，Taker 偏賣，屬於保守做空/嘎多觀察。`
           : `共振不足，等待 OI、價格、Taker 三者方向更一致。`;
       return {symbol, side, kind, label, score, reason, oiChange: oi, priceChange: price, oiPercentile: pct, taker, riskText};
+    }
+    function stableSignals(applyThreshold = true) {
+      return sortSignals(state.signals)
+        .filter(s => {
+          const meta = stableTradeMeta(s);
+          return !applyThreshold || meta.score >= STABLE_THRESHOLD;
+        });
+    }
+    function stableTradeMeta(s) {
+      const isBull = s.signal_type === "reversal_bullish";
+      const dir = isBull ? 1 : -1;
+      const oiPct = clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100);
+      const oiAbs = Math.abs(Number(signalMetric(s, "oi_change_pct")) || 0);
+      const priceAligned = (Number(signalMetric(s, "price_change_pct")) || 0) * dir;
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
+      const risk = riskPct(s);
+      const statusBoost = isOpenSignal(s) ? 8 : isPartialActiveSignal(s) ? 6 : ["tp1","tp2","tp3","ftp"].includes(s.reached_state) ? 4 : 0;
+      let score = 0;
+      score += clamp(oiPct / 100 * 24, 0, 24);
+      score += clamp(oiAbs * 8, 0, 22);
+      score += clamp(priceAligned * 9, 0, 18);
+      score += clamp(takerBias / 2, 0, 12);
+      score += Number.isFinite(risk) ? clamp(16 - Math.abs(risk - 2.5) * 2.5, 0, 16) : 5;
+      score += statusBoost;
+      score = Math.round(clamp(score, 0, 100));
+      const kind = isBull ? "bull" : "bear";
+      const side = isBull ? "bull" : "bear";
+      const label = isBull ? "嘎空方向" : "嘎多方向";
+      const reason = isBull
+        ? `穩如老狗條件成立：OI 極端分位 ${fmt(oiPct,1)}，價格與 OI 偏多共振，進場沿用訊號觸發價。`
+        : `穩如老狗條件成立：OI 極端分位 ${fmt(oiPct,1)}，價格轉弱且槓桿退潮，進場沿用訊號觸發價。`;
+      return {score, kind, side, label, reason};
+    }
+    function signalMetric(s, name) {
+      if (s && s[name] !== undefined && s[name] !== null) return s[name];
+      if (s && s.snapshot_data && s.snapshot_data[name] !== undefined && s.snapshot_data[name] !== null) return s.snapshot_data[name];
+      return undefined;
     }
     function scoreGrade(score) {
       if (score >= 82) return {label: "A+", kind: "bull"};
@@ -1344,8 +1420,11 @@
     function winsOf(rows) { return rows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length; }
     function lossesOf(rows) { return rows.filter(s => s.reached_state === "sl").length; }
     function setView(view) {
+      state.currentView = view;
       document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
       document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === view));
+      renderStats();
+      renderHealth();
     }
     function renderHealth() {
       const parts = [
