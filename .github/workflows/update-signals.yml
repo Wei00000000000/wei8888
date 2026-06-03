@@ -1,0 +1,45 @@
+name: Update live signals
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-live-signals
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip
+      - name: Scan Binance futures
+        env:
+          SCAN_TOP: "0"
+          SCAN_WORKERS: "8"
+          OI_PERCENTILE: "99"
+          MAX_SEED_ROWS: "3000"
+        run: python scripts/update_seed_signals.py
+      - name: Export GitHub Pages data
+        run: python scripts/export_github_pages.py
+      - name: Commit updated signals
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp -r site/* .
+          git add sentiment_scanner/seed_signals.json data index.html
+          if git diff --cached --quiet; then
+            echo "No signal updates"
+          else
+            git commit -m "Update live sentiment signals"
+            git push
+          fi

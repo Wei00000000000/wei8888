@@ -466,7 +466,7 @@
     $("jumpSignals").addEventListener("click", () => setView("signals"));
     $("autoScan").addEventListener("click", toggleAutoScan);
     $("focusSearch").addEventListener("click", () => $("symbolSearch").focus());
-    $("bellBtn").addEventListener("click", event => { event.stopPropagation(); toggleNotifyPanel(); });
+    $("bellBtn").addEventListener("click", event => { event.stopPropagation(); requestNotifyPermission(); toggleNotifyPanel(); });
     $("notifyClear").addEventListener("click", markNotificationsRead);
     $("symbolSearch").addEventListener("input", () => syncSearch("symbolSearch"));
     $("signalSearch").addEventListener("input", () => syncSearch("signalSearch"));
@@ -949,7 +949,24 @@
       state.notifications.unshift({...note, read: false, at: new Date()});
       state.notifications = state.notifications.slice(0, 50);
       showToast(note);
+      showSystemNotification(note);
       updateBell();
+    }
+    function requestNotifyPermission() {
+      if (!("Notification" in window)) return;
+      if (Notification.permission === "default") Notification.requestPermission().catch(() => {});
+    }
+    function showSystemNotification(note) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      const title = `${note.symbol} ${note.title}`;
+      const body = note.body || "Sentiment Lens 訊號更新";
+      try {
+        navigator.serviceWorker?.ready
+          .then(reg => reg.showNotification(title, {body, icon: "icon-192.png", badge: "icon-192.png", tag: `${note.symbol}-${note.title}`}))
+          .catch(() => new Notification(title, {body, icon: "icon-192.png"}));
+      } catch {
+        try { new Notification(title, {body, icon: "icon-192.png"}); } catch {}
+      }
     }
     function showToast({kind, symbol, title, body}) {
       const node = document.createElement("div");
@@ -1054,6 +1071,7 @@
       const filter = $("signalFilter").value;
       return sortSignals(state.signals).filter(s => {
         if (q && !clean(s.symbol).includes(q)) return false;
+        if (filter !== "sl" && s.reached_state === "sl") return false;
         if (filter === "open" && !(isOpenSignal(s) || isPartialActiveSignal(s))) return false;
         if (filter === "tp" && !["tp1","tp2","tp3","ftp"].includes(s.reached_state)) return false;
         if (filter === "sl" && s.reached_state !== "sl") return false;
@@ -1246,6 +1264,7 @@
     }
     function stableSignals(applyThreshold = true) {
       return sortSignals(state.signals)
+        .filter(s => s.reached_state !== "sl")
         .filter(s => {
           const meta = stableTradeMeta(s);
           return !applyThreshold || meta.score >= STABLE_THRESHOLD;

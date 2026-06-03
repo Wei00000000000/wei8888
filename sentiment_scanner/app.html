@@ -1,0 +1,1506 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sentiment Lens</title>
+  <meta name="theme-color" content="#060a0f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sentiment Lens">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060a0f;
+      --deep: #04080d;
+      --panel: #0e151d;
+      --panel-2: #121d28;
+      --panel-3: #070d13;
+      --line: rgba(255,255,255,.08);
+      --line-2: rgba(255,255,255,.14);
+      --text: #eef5ff;
+      --muted: #8fa0b6;
+      --faint: #53657c;
+      --bull: #00e0a4;
+      --bull-soft: rgba(0,224,164,.13);
+      --bear: #ff5577;
+      --bear-soft: rgba(255,85,119,.14);
+      --warn: #ffb13b;
+      --warn-soft: rgba(255,177,59,.14);
+      --accent: #b36bff;
+      --accent-soft: rgba(179,107,255,.16);
+      --info: #66a7ff;
+      --font: "Noto Sans TC", "Segoe UI", system-ui, sans-serif;
+      --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background:
+      linear-gradient(rgba(102,167,255,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(102,167,255,.028) 1px, transparent 1px),
+      radial-gradient(circle at 80% 0%, rgba(0,224,164,.08), transparent 28%),
+      var(--bg);
+      background-size: 34px 34px, 34px 34px, auto, auto;
+      color: var(--text); font-family: var(--font); }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .top { position: sticky; top: 0; z-index: 50; background: rgba(8,13,19,.94); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+    .top-inner { max-width: 1680px; margin: 0 auto; min-height: 58px; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .brand { display: flex; align-items: center; gap: 11px; min-width: 220px; }
+    .logo { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(179,107,255,.35); font: 900 13px var(--mono); }
+    .brand-title { margin: 0; font-size: 15px; line-height: 1.1; font-weight: 900; }
+    .brand-sub { color: var(--faint); font: 700 10px var(--mono); margin-top: 3px; letter-spacing: .8px; }
+    .nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .nav button { height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 14px; font-weight: 800; }
+    .nav button.active { color: var(--text); background: var(--panel-2); border-color: var(--line); }
+    .top-actions { min-width: 220px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+    .round-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel-3); color: var(--muted); display: grid; place-items: center; position: relative; }
+    .round-btn:hover { border-color: var(--line-2); color: var(--text); }
+    .badge { position: absolute; top: -6px; right: -4px; min-width: 17px; height: 17px; border-radius: 9px; display: none; place-items: center; padding: 0 5px; color: white; background: var(--bear); border: 2px solid var(--bg); font: 900 10px var(--mono); }
+    .badge.on { display: grid; }
+    .main { max-width: 1680px; margin: 0 auto; padding: 20px 18px 70px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .panel { background: linear-gradient(180deg, rgba(20,32,44,.96), rgba(10,16,24,.96)); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+    .panel-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    .kicker { color: var(--faint); font: 800 10px var(--mono); text-transform: uppercase; letter-spacing: .8px; }
+    h2 { margin: 3px 0 0; font-size: 18px; line-height: 1.2; }
+    .subline { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .muted { color: var(--muted); }
+    .toolbar { display: grid; grid-template-columns: minmax(250px, 1.5fr) repeat(5, minmax(84px, 1fr)) minmax(110px,.8fr) minmax(80px,.7fr) auto auto auto auto; gap: 9px; padding: 12px; align-items: end; background: var(--deep); border-bottom: 1px solid var(--line); }
+    label { display: grid; gap: 5px; color: var(--faint); font: 800 10px var(--mono); text-transform: uppercase; letter-spacing: .55px; }
+    input, select { height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-3); color: var(--text); padding: 0 10px; outline: none; }
+    input:focus, select:focus { border-color: rgba(179,107,255,.55); }
+    .check-label { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-3); color: var(--muted); font-size: 12px; font-weight: 900; }
+    .check-label input { width: 14px; height: 14px; padding: 0; accent-color: var(--accent); }
+    .btn { height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); padding: 0 12px; font-size: 12px; font-weight: 900; white-space: nowrap; }
+    .btn.primary { border-color: rgba(179,107,255,.7); background: var(--accent-soft); color: #e8d4ff; }
+    .btn:disabled { opacity: .55; cursor: progress; }
+    .status-line { padding: 10px 14px; color: var(--muted); font: 700 11px var(--mono); border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .pill { min-height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; font-weight: 900; white-space: nowrap; }
+    .pill.bull { color: var(--bull); border-color: rgba(0,224,164,.35); background: var(--bull-soft); }
+    .pill.bear { color: var(--bear); border-color: rgba(255,85,119,.38); background: var(--bear-soft); }
+    .pill.warn { color: var(--warn); border-color: rgba(255,177,59,.38); background: var(--warn-soft); }
+    .pill.accent { color: var(--accent); border-color: rgba(179,107,255,.45); background: var(--accent-soft); }
+    .stats-row { display: grid; grid-template-columns: repeat(6, minmax(120px,1fr)); border-bottom: 1px solid var(--line); }
+    .stat { padding: 14px 16px; border-right: 1px solid var(--line); min-height: 86px; }
+    .stat:last-child { border-right: 0; }
+    .stat-label { color: var(--faint); font-size: 12px; font-weight: 800; }
+    .stat-value { margin-top: 6px; font: 900 25px var(--mono); }
+    .bull-text { color: var(--bull); }
+    .bear-text { color: var(--bear); }
+    .warn-text { color: var(--warn); }
+    .accent-text { color: var(--accent); }
+    .section-head { margin: 22px 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .section-title { font-size: 24px; font-weight: 950; }
+    .section-count { color: var(--faint); font: 800 12px var(--mono); margin-left: 8px; }
+    .section-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .search-input { min-width: 220px; }
+    .tabs-line { display: flex; gap: 28px; border-bottom: 1px solid var(--line); margin: 18px 0 22px; }
+    .tabs-line span { padding: 0 0 12px; color: var(--muted); font-weight: 850; }
+    .tabs-line span.active { color: var(--text); border-bottom: 2px solid var(--accent); }
+    .watch-stats { display: grid; grid-template-columns: repeat(6, minmax(130px,1fr)); gap: 12px; margin-bottom: 26px; }
+    .watch-stat { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 18px; min-height: 82px; }
+    .watch-stat-label { color: #58708e; font-size: 13px; font-weight: 800; }
+    .watch-stat-value { margin-top: 7px; font: 950 25px var(--mono); }
+    .watch-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+    .watch-title { font-size: 24px; font-weight: 950; }
+    .watch-sub { color: #58708e; font: 800 12px var(--mono); margin-left: 8px; }
+    .tf-switch { display: flex; gap: 5px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+    .tf-switch button { height: 32px; min-width: 44px; border: 0; border-radius: 7px; background: transparent; color: #8da2bf; font: 900 12px var(--mono); }
+    .tf-switch button.active { background: var(--bull); color: #04100c; }
+    .watch-card-grid, .signals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(500px,1fr)); gap: 18px; }
+    .watch-analysis-card { border: 1px solid var(--line); border-top: 3px solid #6d7f99; border-radius: 14px; background: var(--panel); overflow: hidden; cursor: pointer; }
+    .watch-analysis-card:hover, .signal-card:hover { border-color: var(--line-2); transform: translateY(-1px); }
+    .watch-analysis-card.bull { border-top-color: var(--bull); }
+    .watch-analysis-card.bear { border-top-color: var(--bear); }
+    .watch-analysis-card.warn { border-top-color: var(--warn); }
+    .watch-analysis-main { padding: 24px; }
+    .watch-analysis-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .watch-analysis-symbol { font-size: 21px; font-weight: 950; }
+    .watch-analysis-pair { color: #58708e; font: 800 12px var(--mono); margin-top: 4px; }
+    .watch-analysis-price { font: 950 21px var(--mono); text-align: right; }
+    .watch-analysis-change { margin-top: 4px; font: 950 13px var(--mono); text-align: right; }
+    .watch-status-pill { margin-top: 24px; height: 44px; width: fit-content; padding: 0 16px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-weight: 950; }
+    .watch-status-pill.bull { background: var(--bull-soft); color: var(--bull); }
+    .watch-status-pill.bear { background: var(--bear-soft); color: var(--bear); }
+    .watch-status-pill.warn { background: var(--warn-soft); color: var(--warn); }
+    .watch-status-pill.neutral { background: rgba(255,255,255,.05); color: var(--muted); }
+    .watch-reason { min-height: 74px; margin-top: 18px; color: #dbe8f8; font-size: 15px; line-height: 1.7; }
+    .watch-advice { border-top: 1px dashed var(--line-2); margin-top: 18px; padding-top: 16px; color: #cde1ff; font-weight: 900; }
+    .watch-footer { border-top: 1px solid var(--line); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #58708e; font-weight: 850; }
+    .watch-detail { border-top: 1px solid var(--line); padding: 14px 18px 18px; background: rgba(5,9,16,.38); }
+    .detail-title { display: flex; justify-content: space-between; align-items: center; color: #c7d8ef; font-size: 13px; font-weight: 900; margin-bottom: 10px; }
+    .analysis-rows { display: grid; gap: 9px; }
+    .analysis-row { display: grid; grid-template-columns: 118px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.055); }
+    .analysis-row:last-child { border-bottom: 0; }
+    .analysis-label { color: #8ea2bc; font-size: 12px; font-weight: 850; }
+    .analysis-mid { min-width: 0; }
+    .analysis-value { font: 900 13px var(--mono); color: #f4f8ff; text-align: right; }
+    .analysis-note { color: #70839d; font-size: 11px; margin-top: 3px; line-height: 1.35; }
+    .micro-bar { height: 5px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.08); }
+    .micro-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+    .micro-bar.bull span { background: var(--bull); }
+    .micro-bar.bear span { background: var(--bear); }
+    .micro-bar.warn span { background: var(--warn); }
+    .score-badge { border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 2px 6px; font: 800 10px var(--mono); color: var(--muted); }
+    .score-badge.bull { color: var(--bull); border-color: rgba(0,224,164,.32); }
+    .score-badge.bear { color: var(--bear); border-color: rgba(255,85,119,.34); }
+    .score-badge.warn { color: var(--warn); border-color: rgba(255,177,59,.34); }
+    .score-pill { min-height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 7px; border: 1px solid var(--line); background: rgba(255,255,255,.045); color: var(--muted); font: 950 12px var(--mono); }
+    .score-pill.bull { color: var(--bull); border-color: rgba(0,224,164,.34); background: var(--bull-soft); }
+    .score-pill.warn { color: var(--warn); border-color: rgba(255,177,59,.36); background: var(--warn-soft); }
+    .score-pill.bear { color: var(--bear); border-color: rgba(255,85,119,.36); background: var(--bear-soft); }
+    .score-pill small { color: var(--muted); font: 850 10px var(--mono); }
+    .signal-card { border: 1px solid rgba(91,158,255,.16); border-radius: 14px; background: #111a2a; padding: 19px; min-height: 552px; cursor: pointer; }
+    .signal-card.bull { border-color: rgba(0,224,164,.2); }
+    .signal-card.bear { border-color: rgba(255,85,119,.22); }
+    .signal-main { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: start; }
+    .side-badge { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; background: rgba(0,224,164,.15); color: var(--bull); font-size: 20px; font-weight: 950; }
+    .side-badge.short { background: rgba(255,85,119,.16); color: var(--bear); }
+    .signal-symbol { font-size: 19px; font-weight: 950; text-align: center; margin-top: 14px; }
+    .signal-time { color: #9db6d9; font: 700 14px var(--mono); margin-top: 12px; }
+    .signal-strategy { color: var(--bull); font-size: 16px; font-weight: 950; text-align: center; margin-top: 22px; }
+    .signal-strategy.bear { color: var(--bear); }
+    .signal-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .icon-btn { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #7f91aa; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02); }
+    .state-tag { min-height: 32px; padding: 0 12px; display: inline-flex; align-items: center; border-radius: 7px; background: rgba(255,255,255,.06); color: #cbd7e8; font-size: 13px; font-weight: 950; }
+    .state-tag.bull { background: var(--bull-soft); color: var(--bull); }
+    .state-tag.bear { background: var(--bear-soft); color: var(--bear); }
+    .state-tag.warn { background: var(--warn-soft); color: var(--warn); }
+    .tf-row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 18px; }
+    .tf-pill { min-width: 37px; height: 25px; border-radius: 6px; display: grid; place-items: center; background: #e9eef5; color: #071015; font: 950 12px var(--mono); }
+    .tf-pill.hot { background: var(--bull); color: #06110d; }
+    .pnl-box { margin-top: 18px; min-height: 86px; border-radius: 9px; background: #070c13; padding: 16px 18px; }
+    .pnl-label, .price-label { color: #7183a1; font-size: 14px; font-weight: 850; }
+    .pnl-value { margin-top: 6px; color: var(--bear); font: 950 30px var(--mono); }
+    .pnl-value.positive { color: var(--bull); }
+    .price-grid, .levels { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .price-box { min-height: 74px; border-radius: 9px; background: #070c13; padding: 14px 16px; }
+    .price-num { margin-top: 6px; color: #f5fbff; font: 900 18px var(--mono); }
+    .level { border-radius: 9px; padding: 13px 16px; min-height: 74px; background: rgba(67,41,76,.72); position: relative; }
+    .level.tp { background: rgba(15,67,72,.74); }
+    .level.hit { outline: 2px solid #f5df00; box-shadow: inset 0 0 0 1px rgba(245,223,0,.35), 0 0 0 1px rgba(245,223,0,.12); }
+    .level.hit span, .level.hit b { color: #ffe94a; }
+    .level span { display: block; color: #ff5b85; font: 900 12px var(--mono); }
+    .level.tp span { color: var(--bull); }
+    .level b { display: block; margin-top: 9px; color: #f5fbff; font: 900 19px var(--mono); }
+    .copy { position: absolute; right: 14px; bottom: 13px; color: #708195; font-style: normal; }
+    .history-stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 0; border-top: 1px solid var(--line); margin-top: 12px; }
+    .history-stat-cell { padding-top: 10px; border-right: 1px solid var(--line); text-align: center; }
+    .history-stat-cell:last-child { border-right: 0; }
+    .history-stat-value { font: 900 13px var(--mono); }
+    .history-stat-label { color: var(--faint); font-size: 9px; margin-top: 2px; }
+    .notify-panel { position: fixed; top: 60px; right: 18px; width: 360px; max-width: calc(100vw - 24px); max-height: 480px; overflow: hidden; z-index: 1200; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 36px rgba(0,0,0,.55); display: none; }
+    .notify-panel.open { display: block; }
+    .notify-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+    .notify-title { font-size: 14px; font-weight: 950; }
+    .notify-clear { border: 0; background: transparent; color: var(--muted); font-size: 12px; }
+    .notify-list { max-height: 410px; overflow: auto; }
+    .notify-section { padding: 10px 14px 6px; display: flex; justify-content: space-between; color: var(--muted); background: var(--deep); border-top: 1px solid var(--line); font-size: 11px; font-weight: 950; }
+    .notify-item { padding: 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .notify-item:hover { background: rgba(255,255,255,.035); }
+    .notify-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .notify-symbol { font-weight: 950; }
+    .notify-meta { margin-top: 5px; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toast-stack { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 10px; z-index: 1300; width: 330px; max-width: calc(100vw - 24px); }
+    .toast { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; background: rgba(12,18,26,.98); box-shadow: 0 10px 26px rgba(0,0,0,.45); padding: 12px; display: flex; justify-content: space-between; gap: 10px; cursor: pointer; }
+    .toast.bull { border-left-color: var(--bull); }
+    .toast.bear { border-left-color: var(--bear); }
+    .toast-title { display: flex; gap: 8px; align-items: center; font-weight: 950; }
+    .toast-body { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .toast-close { border: 0; background: transparent; color: var(--muted); font-size: 18px; height: 24px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.58); z-index: 1000; display: none; place-items: center; padding: 18px; }
+    .modal-backdrop.open { display: grid; }
+    .modal { width: min(980px, 100%); max-height: 88vh; overflow: auto; background: var(--deep); border: 1px solid var(--line); border-radius: 14px; }
+    .modal-head { position: sticky; top: 0; z-index: 2; background: var(--deep); border-bottom: 1px solid var(--line); padding: 18px 26px; display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { display: flex; align-items: center; gap: 12px; }
+    .modal-title h2 { font-size: 25px; margin: 0; }
+    .close-btn { width: 34px; height: 34px; border: 0; background: transparent; color: var(--muted); font-size: 24px; }
+    .modal-body { padding: 24px 26px 30px; display: grid; gap: 18px; }
+    .modal-stats, .modal-strategies { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .modal-card { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 16px; }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    .table-wrap { overflow: auto; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; font-size: 13px; }
+    th { color: var(--faint); background: var(--panel-3); position: sticky; top: 0; z-index: 1; }
+    .empty { padding: 34px; text-align: center; color: var(--faint); font-size: 13px; }
+    .ghost-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 14px; margin-top: 14px; }
+    .ghost-card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 16px; min-height: 130px; }
+    .radar-strip { position: relative; overflow: hidden; border: 1px solid rgba(102,167,255,.16); border-radius: 8px; background: rgba(5,10,15,.82); min-height: 88px; padding: 16px; }
+    .radar-strip::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(0,224,164,.14), transparent); animation: sweep 4.5s linear infinite; pointer-events: none; }
+    @keyframes sweep { to { transform: translateX(100%); } }
+    .terminal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px,1fr)); gap: 14px; }
+    .stable-card { border: 1px solid rgba(102,167,255,.15); border-left: 3px solid var(--info); border-radius: 8px; background: rgba(10,17,25,.94); padding: 16px; cursor: pointer; }
+    .stable-card.bull { border-left-color: var(--bull); }
+    .stable-card.bear { border-left-color: var(--bear); }
+    .stable-card.warn { border-left-color: var(--warn); }
+    .stable-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .stable-symbol { font-size: 20px; font-weight: 950; }
+    .stable-score { font: 950 28px var(--mono); }
+    .stable-rule { margin-top: 12px; color: #dbe8f8; line-height: 1.65; font-size: 14px; }
+    .stable-matrix { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-top: 14px; }
+    .matrix-cell { border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); padding: 10px; min-height: 58px; }
+    .matrix-label { color: var(--faint); font: 800 10px var(--mono); }
+    .matrix-value { margin-top: 4px; font: 900 13px var(--mono); }
+    @media (max-width: 1120px) {
+      .toolbar { grid-template-columns: repeat(2,1fr); }
+      .stats-row, .watch-stats { grid-template-columns: repeat(2,1fr); }
+      .watch-card-grid, .signals-grid { grid-template-columns: 1fr; }
+      .top-inner { align-items: flex-start; flex-direction: column; }
+      .top-actions { min-width: 0; }
+    }
+    @media (max-width: 620px) {
+      .main { padding-left: 10px; padding-right: 10px; }
+      .signal-main { grid-template-columns: auto 1fr; }
+      .signal-actions { grid-column: 1 / -1; justify-content: flex-start; }
+      .price-grid, .levels, .modal-stats, .modal-strategies { grid-template-columns: 1fr; }
+      .analysis-row { grid-template-columns: 1fr; gap: 5px; }
+      .analysis-value { text-align: left; }
+      .watch-footer { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <div class="logo">SL</div>
+        <div>
+          <h1 class="brand-title">Sentiment Lens</h1>
+          <div class="brand-sub">LOCAL · BINANCE FUTURES</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="active" data-view="dashboard">儀表板</button>
+        <button data-view="signals">數據交易訊號</button>
+        <button data-view="stable">穩如老狗</button>
+        <button data-view="harmonic">諧波交易訊號</button>
+      </nav>
+      <div class="top-actions">
+        <button class="round-btn" id="bellBtn" title="通知">🔔<span id="bellBadge" class="badge"></span></button>
+        <button class="round-btn" id="focusSearch" title="搜尋">⌕</button>
+        <button class="round-btn" id="langBtn" title="Language">中</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="main">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="kicker">Sentiment Scanner</div>
+          <h2>數據交易訊號系統</h2>
+          <div class="subline">15M OI percentile · 嘎空 / 嘎多 · 終端雷達掃描</div>
+        </div>
+        <span class="pill accent" id="statusPill">Live</span>
+      </div>
+      <div class="toolbar">
+        <label>Symbols <input id="symbols" value="BTCUSDT,ETHUSDT,SOLUSDT" spellcheck="false"></label>
+        <label>Top N <input id="top" type="number" min="0" max="200" value="20"></label>
+        <label>Lookback <input id="limit" type="number" min="80" max="500" value="500"></label>
+        <label>OI % <input id="oi" type="number" min="90" max="100" step=".1" value="99"></label>
+        <label>ATR x <input id="atr" type="number" min=".5" max="10" step=".1" value="2.5"></label>
+        <label>Eval h <input id="eval" type="number" min="1" max="24" step=".5" value="6"></label>
+        <label class="check-label"><input id="allSymbols" type="checkbox" checked> 掃描全市場</label>
+        <label>Batch <input id="batchSize" type="number" min="5" max="80" step="5" value="10"></label>
+        <button class="btn primary" id="scan">掃描一批</button>
+        <button class="btn" id="loadMarkets">更新觀察</button>
+        <button class="btn" id="autoScan">停止自動</button>
+        <button class="btn" id="backtest">回測</button>
+      </div>
+      <div class="status-line"><span id="statusText">正在載入資料。</span><span id="healthText">等待第一次更新</span></div>
+      <div class="stats-row" id="stats"></div>
+    </section>
+
+    <section id="dashboard" class="view active">
+      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>諧波交易訊號</span></div>
+      <div class="section-head">
+        <div><span class="watch-title">我的觀察清單</span><span class="watch-sub" id="watchMeta">0 SYMBOLS</span></div>
+        <div class="section-actions">
+          <input id="symbolSearch" class="search-input" placeholder="搜尋幣種，例如 BCH">
+          <select id="signalFilter">
+            <option value="all">全部</option>
+            <option value="open">持倉中</option>
+            <option value="tp">已止盈</option>
+            <option value="sl">已止損</option>
+          </select>
+          <div class="tf-switch"><button>1H</button><button class="active">4H</button><button>1D</button></div>
+          <button class="btn primary" id="manageWatch">＋ 管理觀察清單</button>
+          <button class="btn" id="refreshWatch">⟳ 更新</button>
+        </div>
+      </div>
+      <div class="watch-stats" id="watchStats"></div>
+      <div class="watch-card-grid" id="watchAnalysisCards"></div>
+      <div class="section-head">
+        <h2 class="section-title">持倉與最新訊號 <span id="dashboardSignalCount" class="section-count">(0)</span></h2>
+        <button class="btn" id="jumpSignals">查看全部訊號</button>
+      </div>
+      <div class="signals-grid" id="dashboardSignalCards"></div>
+    </section>
+
+    <section id="signals" class="view">
+      <div class="section-head">
+        <h2 class="section-title">全部數據交易訊號 <span id="signalCount" class="section-count">(0)</span></h2>
+        <div class="section-actions">
+          <input id="signalSearch" class="search-input" placeholder="搜尋幣種，例如 ETH">
+          <select id="signalStatusFilter">
+            <option value="all">全部</option>
+            <option value="open">持倉中</option>
+            <option value="tp">已止盈</option>
+            <option value="sl">已止損</option>
+          </select>
+          <button class="btn primary" id="refreshSignals">⟳ 更新訊號</button>
+        </div>
+      </div>
+      <div class="signals-grid" id="signalCards"></div>
+    </section>
+
+    <section id="stable" class="view">
+      <section class="radar-strip">
+        <div class="kicker">Conservative Contract Matrix</div>
+        <h2>穩如老狗</h2>
+        <div class="subline">獨立計算區域：依 OI、價格、Taker 代理 CVD、風險距離與訊號狀態做保守共振評分，不混入數據交易訊號清單。</div>
+      </section>
+      <div class="section-head">
+        <h2 class="section-title">穩健共振清單 <span id="stableCount" class="section-count">(0)</span></h2>
+        <div class="section-actions">
+          <input id="stableSearch" class="search-input" placeholder="搜尋幣種，例如 BTC">
+          <select id="stableSideFilter">
+            <option value="all">全部</option>
+            <option value="bull">嘎空</option>
+            <option value="bear">嘎多</option>
+            <option value="neutral">觀望</option>
+          </select>
+        </div>
+      </div>
+      <div class="watch-stats" id="stableStats"></div>
+      <div class="terminal-grid" id="stableCards"></div>
+    </section>
+
+    <section id="harmonic" class="view">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="kicker">Harmonic Signals</div>
+            <h2>諧波交易訊號</h2>
+            <div class="subline">目前保留位置，之後可接 harmonic_signals 或 TradingView webhook。</div>
+          </div>
+          <span class="pill accent">PRZ</span>
+        </div>
+      </section>
+      <div class="ghost-grid">
+        <article class="ghost-card"><span class="pill accent">Butterfly</span><h2>Active PRZ</h2><p class="muted">等待諧波資料源接入。</p></article>
+        <article class="ghost-card"><span class="pill bull">Bullish</span><h2>Confluence</h2><p class="muted">可接 RSI divergence / reversal candle。</p></article>
+        <article class="ghost-card"><span class="pill bear">Bearish</span><h2>Risk Ladder</h2><p class="muted">PRZ、SL、TP1、TP2 風險階梯。</p></article>
+      </div>
+    </section>
+  </main>
+
+  <div class="notify-panel" id="notifyPanel">
+    <div class="notify-head">
+      <div class="notify-title">訊號通知</div>
+      <button class="notify-clear" id="notifyClear">標為已讀</button>
+    </div>
+    <div class="notify-list" id="notifyList"></div>
+  </div>
+  <div class="toast-stack" id="toastStack"></div>
+
+  <div class="modal-backdrop" id="symbolModal">
+    <section class="modal">
+      <div class="modal-head">
+        <div class="modal-title"><h2 id="modalSymbol">BCH</h2><span class="pill warn" id="modalTier">中等</span></div>
+        <button class="close-btn" id="modalClose">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="kicker">全部歷史表現</div>
+        <div class="modal-stats" id="modalStats"></div>
+        <div class="kicker">策略表現</div>
+        <div class="modal-strategies" id="modalStrategies"></div>
+        <div class="kicker">市場快照</div>
+        <div class="modal-stats" id="modalMarket"></div>
+        <div class="kicker">近期訊號</div>
+        <div class="subline" id="modalHint">只顯示最近 20 筆。</div>
+        <div class="table-wrap"><table><thead><tr><th>狀態</th><th>時間框架</th><th>方向</th><th>策略</th><th>觸發時間</th><th>評分</th><th>累計盈虧</th></tr></thead><tbody id="modalRows"></tbody></table></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const state = {
+      markets: [],
+      signals: [],
+      notifications: [],
+      lastBookAt: null,
+      lastTickAt: null,
+      lastPriceAt: null,
+      lastMarketAt: null,
+      lastError: "",
+      busy: false,
+      currentView: "dashboard"
+    };
+    const MAIN_WATCH_SYMBOLS = [
+      "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
+      "TRX","BCH","LTC","DOT","NEAR","UNI","APT","SUI","OP","ARB"
+    ];
+    const STATIC_MODE = location.hostname.endsWith("github.io") || location.protocol === "file:";
+    const STABLE_THRESHOLD = 88;
+    const seenSignals = new Set();
+    const seenStates = new Map();
+    const controls = {
+      symbols: $("symbols"), top: $("top"), limit: $("limit"), oi: $("oi"), atr: $("atr"), eval: $("eval")
+    };
+    let autoTimer = null;
+
+    document.querySelectorAll(".nav button").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
+    $("scan").addEventListener("click", tickScan);
+    $("backtest").addEventListener("click", () => runSignals("backtest"));
+    $("loadMarkets").addEventListener("click", loadMarkets);
+    $("refreshWatch").addEventListener("click", loadMarkets);
+    $("refreshSignals").addEventListener("click", () => runSignals("backtest"));
+    $("manageWatch").addEventListener("click", () => controls.symbols.focus());
+    $("jumpSignals").addEventListener("click", () => setView("signals"));
+    $("autoScan").addEventListener("click", toggleAutoScan);
+    $("focusSearch").addEventListener("click", () => $("symbolSearch").focus());
+    $("bellBtn").addEventListener("click", event => { event.stopPropagation(); requestNotifyPermission(); toggleNotifyPanel(); });
+    $("notifyClear").addEventListener("click", markNotificationsRead);
+    $("symbolSearch").addEventListener("input", () => syncSearch("symbolSearch"));
+    $("signalSearch").addEventListener("input", () => syncSearch("signalSearch"));
+    $("stableSearch").addEventListener("input", renderStable);
+    $("stableSideFilter").addEventListener("change", renderStable);
+    $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
+    $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
+    $("modalClose").addEventListener("click", closeSymbolModal);
+    $("symbolModal").addEventListener("click", event => { if (event.target.id === "symbolModal") closeSymbolModal(); });
+    document.addEventListener("click", event => {
+      if (!$("notifyPanel").contains(event.target) && !$("bellBtn").contains(event.target)) $("notifyPanel").classList.remove("open");
+    });
+
+    renderAll();
+    status("Auto scanner warming up.");
+    initialize();
+    setInterval(refreshPrices, 5000);
+    setInterval(renderHealth, 1000);
+
+    async function initialize() {
+      await loadBook();
+      await loadMarkets();
+      toggleAutoScan();
+    }
+    async function apiJson(endpoint, query = "") {
+      if (!STATIC_MODE) {
+        const suffix = query ? `?${query}` : "";
+        const res = await fetch(`/api/${endpoint}${suffix}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Request failed");
+        return data;
+      }
+      if (endpoint === "book" || endpoint === "tick" || endpoint === "scan" || endpoint === "backtest") {
+        const data = await staticBook();
+        return {...data, new_signals: [], scanned: [], total_symbols: MAIN_WATCH_SYMBOLS.length};
+      }
+      if (endpoint === "prices") return staticPrices(query);
+      if (endpoint === "markets" || endpoint === "prices") {
+        const res = await fetch(`data/markets.json?ts=${Date.now()}`);
+        const data = await res.json();
+        return endpoint === "prices" ? {markets: data.rows || [], prices: {}} : data;
+      }
+      throw new Error("Static mode does not support this endpoint.");
+    }
+    async function staticBook() {
+      try {
+        const manifestRes = await fetch(`data/manifest.json?ts=${Date.now()}`);
+        if (!manifestRes.ok) throw new Error("manifest missing");
+        const manifest = await manifestRes.json();
+        const chunkNames = manifest.signal_chunks || [];
+        const chunks = await Promise.all(chunkNames.map(async name => {
+          const res = await fetch(`data/${name}?ts=${Date.now()}`);
+          if (!res.ok) return {rows: []};
+          return res.json();
+        }));
+        const rows = chunks.flatMap(chunk => chunk.rows || []);
+        const marketsRes = await fetch(`data/${manifest.markets || "markets.json"}?ts=${Date.now()}`);
+        const marketsData = marketsRes.ok ? await marketsRes.json() : {rows: []};
+        return {rows, markets: marketsData.rows || []};
+      } catch {
+        const res = await fetch(`data/book.json?ts=${Date.now()}`);
+        return res.json();
+      }
+    }
+    async function staticPrices(query = "") {
+      const params = new URLSearchParams(String(query || ""));
+      const wanted = new Set((params.get("symbols") || "").split(",").map(clean).filter(Boolean));
+      const fallbackRes = await fetch(`data/markets.json?ts=${Date.now()}`);
+      const fallbackData = fallbackRes.ok ? await fallbackRes.json() : {rows: []};
+      try {
+        const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/price");
+        if (!res.ok) throw new Error("Binance ticker unavailable");
+        const tickers = await res.json();
+        const prices = {};
+        const liveRows = tickers
+          .filter(row => wanted.has(clean(row.symbol)))
+          .map(row => {
+            prices[clean(row.symbol)] = Number(row.price);
+            const prev = (fallbackData.rows || []).find(m => clean(m.symbol) === clean(row.symbol)) || {};
+            return {...prev, symbol: row.symbol, price: Number(row.price), live_price: true};
+          });
+        return {markets: liveRows.length ? liveRows : (fallbackData.rows || []), prices};
+      } catch (err) {
+        rememberError(err, "Live price unavailable");
+        return {markets: fallbackData.rows || [], prices: {}};
+      }
+    }
+
+    function params() {
+      return new URLSearchParams({
+        symbols: controls.symbols.value,
+        top: controls.top.value,
+        all: $("allSymbols").checked ? "true" : "false",
+        workers: "6",
+        limit: controls.limit.value,
+        oi_percentile: controls.oi.value,
+        atr_multiple: controls.atr.value,
+        eval_hours: controls.eval.value
+      });
+    }
+    function tickParams() {
+      const p = params();
+      p.set("batch", $("batchSize").value || "10");
+      return p;
+    }
+    async function runSignals(mode) {
+      busy(true);
+      status(mode === "scan" ? "Scanning latest bars..." : "Backtesting recent events...");
+      try {
+        const data = await apiJson(mode, params());
+        mergeSignals(data.rows || []);
+        state.lastTickAt = new Date();
+        renderAll();
+        setView("signals");
+        status(`${mode} complete · ${state.signals.length} signals · ${new Date().toLocaleTimeString()}`);
+      } catch (err) {
+        rememberError(err);
+      } finally {
+        busy(false);
+      }
+    }
+    async function loadBook() {
+      try {
+        const data = await apiJson("book");
+        state.signals = sortSignals(data.rows || []);
+        state.markets = mergeMarkets(state.markets, data.markets || []);
+        state.lastBookAt = new Date();
+        rememberExistingSignals(state.signals);
+        renderAll();
+        status(`Loaded seed book · ${state.signals.length} signals`);
+      } catch (err) {
+        rememberError(err, "Seed load error");
+      }
+    }
+    async function loadMarkets() {
+      busy(true);
+      status("Refreshing market watchlist...");
+      try {
+        const p = params();
+        p.set("all", "false");
+        p.set("top", "0");
+        p.set("symbols", MAIN_WATCH_SYMBOLS.map(symbol => `${symbol}USDT`).join(","));
+        const data = await apiJson("markets", p);
+        state.markets = mergeMarkets(state.markets, data.rows || []);
+        state.lastMarketAt = new Date();
+        renderAll();
+        status(`Watchlist updated · ${visibleMarkets().length}/${state.markets.length} symbols · ${new Date().toLocaleTimeString()}`);
+      } catch (err) {
+        rememberError(err);
+      } finally {
+        busy(false);
+      }
+    }
+    async function tickScan() {
+      busy(true);
+      status("Worker tick scanning symbol batch...");
+      try {
+        const data = await apiJson("tick", tickParams());
+        const oldStates = new Map(seenStates);
+        state.signals = sortSignals(data.rows || state.signals);
+        state.markets = mergeMarkets(state.markets, data.markets || []);
+        notifySignalChanges(data.new_signals || []);
+        notifyStateChanges(state.signals, oldStates);
+        state.lastTickAt = new Date();
+        renderAll();
+        const scanned = data.scanned ? data.scanned.length : 0;
+        status(`Worker tick · scanned ${scanned}/${data.total_symbols || "?"} · signals ${state.signals.length} · ${new Date().toLocaleTimeString()}`);
+      } catch (err) {
+        rememberError(err);
+      } finally {
+        busy(false);
+      }
+    }
+    async function refreshPrices() {
+      const symbols = [...new Set(state.signals.filter(isLivePricedSignal).map(s => clean(s.symbol)))];
+      if (!symbols.length) return;
+      try {
+        const data = await apiJson("prices", `symbols=${encodeURIComponent(symbols.join(","))}`);
+        state.markets = mergeMarkets(state.markets, data.markets || []);
+        state.lastPriceAt = new Date();
+        renderVisibleNumbers();
+        renderStats();
+        renderWatchDashboard();
+        renderStable();
+        renderHealth();
+        if ($("symbolModal").classList.contains("open")) openSymbolModal($("modalSymbol").textContent);
+      } catch (err) {
+        rememberError(err, "Price update error");
+      }
+    }
+    function toggleAutoScan() {
+      if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+        $("autoScan").textContent = "啟動自動";
+        status("Auto scan stopped.");
+        renderHealth();
+        return;
+      }
+      const seconds = 120;
+      $("autoScan").textContent = "停止自動";
+      tickScan();
+      autoTimer = setInterval(tickScan, seconds * 1000);
+      status(`Auto scan every ${seconds}s.`);
+      renderHealth();
+    }
+    function busy(value) {
+      state.busy = value;
+      ["scan","backtest","loadMarkets","refreshWatch","refreshSignals"].forEach(id => $(id).disabled = value);
+    }
+    function status(text, kind = "accent") {
+      $("statusText").textContent = text;
+      $("statusPill").textContent = state.lastError ? "Warning" : "Live";
+      $("statusPill").className = `pill ${state.lastError ? "warn" : kind}`;
+      renderHealth();
+    }
+    function rememberError(err, prefix = "Error") {
+      state.lastError = `${prefix}: ${err.message}`;
+      status(state.lastError, "warn");
+    }
+
+    function renderAll() {
+      renderStats();
+      renderWatchDashboard();
+      renderSignals();
+      renderStable();
+      renderNotifications();
+      renderHealth();
+    }
+    function syncSearch(sourceId) {
+      const targetId = sourceId === "symbolSearch" ? "signalSearch" : "symbolSearch";
+      $(targetId).value = $(sourceId).value;
+      renderAll();
+    }
+    function syncFilter(sourceId) {
+      const targetId = sourceId === "signalFilter" ? "signalStatusFilter" : "signalFilter";
+      $(targetId).value = $(sourceId).value;
+      renderAll();
+    }
+    function renderStats() {
+      const stableMode = state.currentView === "stable";
+      const sourceRows = stableMode ? stableSignals() : state.signals;
+      const open = sourceRows.filter(isOpenSignal);
+      const partial = sourceRows.filter(isPartialActiveSignal);
+      const closed = sourceRows.filter(s => !isOpenSignal(s) && !isPartialActiveSignal(s));
+      const decided = sourceRows.filter(s => s.reached_state && s.reached_state !== "holding");
+      const wins = decided.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length;
+      const winRate = decided.length ? wins / decided.length * 100 : 0;
+      const realized = closed.reduce((sum, s) => sum + pnlPct(s, false), 0);
+      const unrealized = [...open, ...partial].reduce((sum, s) => sum + pnlPct(s, true), 0);
+      const total = realized + unrealized;
+      const hot = stableMode ? sourceRows.filter(s => stableTradeMeta(s).score >= 80).length : state.markets.filter(m => m.signal_type).length;
+      const avgScore = sourceRows.length ? sourceRows.reduce((sum, s) => sum + (stableMode ? stableTradeMeta(s).score : signalScore(s).value), 0) / sourceRows.length : 0;
+      const cells = stableMode ? [
+        ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
+        ["穩狗平倉勝率", `${fmt(winRate, 1)}%`, `${wins}W / ${Math.max(0, decided.length - wins)}L`],
+        ["穩狗已實現", signed(realized), `${closed.length} 筆平倉`],
+        ["穩狗未實現", signed(unrealized), `${open.length + partial.length} 筆浮動`],
+        ["穩狗累積盈虧", signed(total), `${sourceRows.length} 筆訊號`],
+        ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
+      ] : [
+        ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
+        ["平倉勝率", `${fmt(winRate, 1)}%`, `${wins}W / ${Math.max(0, decided.length - wins)}L`],
+        ["已實現盈虧", signed(realized), `${closed.length} 筆平倉`],
+        ["未實現盈虧", signed(unrealized), `${open.length + partial.length} 筆浮動`],
+        ["總累積盈虧", signed(total), `${sourceRows.length} 筆訊號`],
+        ["市場熱點", hot, `${watchMarkets().length} 個觀察中`]
+      ];
+      $("stats").innerHTML = cells.map(([label, value, detail]) => `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value ${String(value).startsWith("-") ? "bear-text" : "bull-text"}">${value}</div><div class="subline">${detail || ""}</div></div>`).join("");
+      updateBell();
+    }
+    function renderWatchDashboard() {
+      const rows = watchMarkets().map(m => ({...m, analysis: classifyMarket(m)}));
+      const counts = {
+        bull: rows.filter(m => m.analysis.kind === "bull").length,
+        bear: rows.filter(m => m.analysis.kind === "bear").length,
+        warn: rows.filter(m => m.analysis.kind === "warn").length,
+        signal: rows.filter(m => m.signal_type).length,
+        neutral: rows.filter(m => m.analysis.kind === "neutral").length
+      };
+      $("watchMeta").textContent = `${rows.length} SYMBOLS · 更新於 ${lastTimeText(state.lastMarketAt || state.lastTickAt || state.lastBookAt)}`;
+      $("watchStats").innerHTML = [
+        ["觀察清單", rows.length, ""],
+        ["健康多頭趨勢", counts.bull, "bull-text"],
+        ["趨勢空頭", counts.bear, "bear-text"],
+        ["過熱警戒", counts.warn, "warn-text"],
+        ["↗↘ 反轉訊號", counts.signal, "accent-text"],
+        ["盤整", counts.neutral, ""]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      const cards = rows.sort(sortMarkets).slice(0, 20);
+      $("watchAnalysisCards").innerHTML = cards.map(m => watchCard(m)).join("") || `<section class="panel"><div class="empty">尚無觀察資料，按「更新觀察」或等待自動掃描。</div></section>`;
+      $("watchAnalysisCards").querySelectorAll("[data-watch-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.watchSymbol)));
+    }
+    function watchCard(m) {
+      const a = m.analysis;
+      const open = latestOpenSignal(clean(m.symbol));
+      const details = analysisRows(m, a);
+      return `<article class="watch-analysis-card ${a.kind}" data-watch-symbol="${clean(m.symbol)}">
+        <div class="watch-analysis-main">
+          <div class="watch-analysis-top">
+            <div><div class="watch-analysis-symbol">${clean(m.symbol)}</div><div class="watch-analysis-pair">${clean(m.symbol)}/USDT · PERP${m.fallback ? " · 更新中" : ""}</div></div>
+            <div><div class="watch-analysis-price">${Number.isFinite(Number(m.price)) ? `$${fmt(m.price, 6)}` : "更新中"}</div><div class="watch-analysis-change ${numClass(m.price_change_pct)}">${signed(m.price_change_pct)}</div></div>
+          </div>
+          <div class="watch-status-pill ${a.kind}"><span>●</span>${open ? stateLabel(open.reached_state) : a.label}</div>
+          <div class="watch-reason">${a.reason}</div>
+          <div class="watch-advice">建議：${a.advice}</div>
+        </div>
+        <div class="watch-footer"><span>多週期共振</span><div class="tf-switch"><button>1H ${a.tf1}</button><button class="active">4H ${a.tf4}</button><button>1D ${a.tfD}</button></div></div>
+        <div class="watch-detail">
+          <div class="detail-title"><span>收合詳細數據 ▲</span><span class="score-badge ${a.kind}">${a.label}</span></div>
+          <div class="analysis-rows">${details.map(analysisRow).join("")}</div>
+        </div>
+      </article>`;
+    }
+    function analysisRow(row) {
+      return `<div class="analysis-row">
+        <div class="analysis-label">${row.label}</div>
+        <div class="analysis-mid">
+          <div class="micro-bar ${row.kind}"><span style="width:${row.width}%"></span></div>
+          <div class="analysis-note">${row.note}</div>
+        </div>
+        <div class="analysis-value ${row.valueClass || ""}">${row.value}</div>
+      </div>`;
+    }
+    function renderSignals() {
+      const rows = filteredSignals();
+      $("signalCount").textContent = `(${rows.length})`;
+      const dashRows = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).slice(0, 8);
+      $("dashboardSignalCount").textContent = `(${dashRows.length})`;
+      const allHtml = rows.map(signalCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的訊號。</div></section>`;
+      const dashHtml = dashRows.map(signalCard).join("") || `<section class="panel"><div class="empty">目前沒有持倉中訊號。</div></section>`;
+      $("signalCards").innerHTML = allHtml;
+      $("dashboardSignalCards").innerHTML = dashHtml;
+      document.querySelectorAll(".signal-card").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
+    }
+    function renderStable() {
+      const q = $("stableSearch").value.trim().toUpperCase();
+      const sideFilter = $("stableSideFilter").value;
+      const rows = stableSignals()
+        .filter(s => !q || s.symbol.includes(q))
+        .filter(s => sideFilter === "all" || stableTradeMeta(s).side === sideFilter)
+        .sort((a,b) => signalRank(b) - signalRank(a) || stableTradeMeta(b).score - stableTradeMeta(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
+      $("stableCount").textContent = `(${rows.length})`;
+      const metas = rows.map(stableTradeMeta);
+      const tradable = metas.filter(s => s.score >= 92).length;
+      const wait = metas.filter(s => s.side === "neutral").length;
+      const avg = metas.length ? metas.reduce((sum, s) => sum + s.score, 0) / metas.length : 0;
+      $("stableStats").innerHTML = [
+        ["穩狗訊號", rows.length, "bull-text"],
+        ["平均分數", fmt(avg, 0), "accent-text"],
+        ["嘎空方向", metas.filter(s => s.side === "bull").length, "bull-text"],
+        ["嘎多方向", metas.filter(s => s.side === "bear").length, "bear-text"],
+        ["觀望", wait, "warn-text"],
+        ["高分", tradable, ""]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      $("stableCards").innerHTML = rows.map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
+      $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
+    }
+    function stableCard(s) {
+      return `<article class="stable-card ${s.kind}" data-stable-symbol="${s.symbol}">
+        <div class="stable-head">
+          <div><div class="stable-symbol">${s.symbol}</div><div class="watch-analysis-pair">${s.symbol}/USDT · 穩如老狗</div></div>
+          <div class="stable-score ${s.kind}-text">${s.score}</div>
+        </div>
+        <div class="watch-status-pill ${s.kind}">${s.label}</div>
+        <div class="stable-rule">${s.reason}</div>
+        <div class="stable-matrix">
+          <div class="matrix-cell"><div class="matrix-label">OI</div><div class="matrix-value ${numClass(s.oiChange)}">${signed(s.oiChange)}</div></div>
+          <div class="matrix-cell"><div class="matrix-label">PRICE</div><div class="matrix-value ${numClass(s.priceChange)}">${signed(s.priceChange)}</div></div>
+          <div class="matrix-cell"><div class="matrix-label">TAKER</div><div class="matrix-value">${fmt(s.taker, 2)}</div></div>
+          <div class="matrix-cell"><div class="matrix-label">RISK</div><div class="matrix-value">${s.riskText}</div></div>
+        </div>
+      </article>`;
+    }
+    function stableTradeCard(s) {
+      const meta = stableTradeMeta(s);
+      const isBull = s.signal_type === "reversal_bullish";
+      const pnl = pnlPct(s, isLivePricedSignal(s));
+      const current = currentPrice(s);
+      const rPct = riskPct(s);
+      return `<article class="signal-card ${meta.kind}" data-stable-symbol="${clean(s.symbol)}">
+        <div class="signal-main">
+          <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div></div>
+          <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
+        </div>
+        <div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
+        <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
+        <div class="levels">
+          <div class="level"><span>R</span><b>${fmt(rPct, 2)}%</b><i class="copy">▢</i></div>
+          <div class="level"><span>SL</span><b>${fmt(s.sl_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp1") ? "hit" : ""}"><span>TP1</span><b>${fmt(s.tp1_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp2") ? "hit" : ""}"><span>TP2</span><b>${fmt(s.tp2_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp3") ? "hit" : ""}"><span>TP3</span><b>${fmt(s.tp3_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "ftp") ? "hit" : ""}"><span>FTP</span><b>${fmt(s.ftp_price, 6)}</b><i class="copy">▢</i></div>
+        </div>
+        <div class="stable-rule">${meta.reason}</div>
+      </article>`;
+    }
+    function signalCard(s) {
+      const kind = s.signal_type === "reversal_bullish" ? "bull" : "bear";
+      const isBull = kind === "bull";
+      const pnl = pnlPct(s, isLivePricedSignal(s));
+      const current = currentPrice(s);
+      const rPct = riskPct(s);
+      const score = signalScore(s);
+      return `<article class="signal-card ${kind}" data-symbol="${clean(s.symbol)}">
+        <div class="signal-main">
+          <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyName(s.signal_type)}</div></div>
+          <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">1H</span><span class="tf-pill">4H</span><span class="tf-pill">1D</span></div></div>
+        </div>
+        <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
+        <div class="price-grid"><div class="price-box"><div class="price-label">觸發價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
+        <div class="levels">
+          <div class="level"><span>R</span><b>${fmt(rPct, 2)}%</b><i class="copy">▢</i></div>
+          <div class="level"><span>SL</span><b>${fmt(s.sl_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp1") ? "hit" : ""}"><span>TP1</span><b>${fmt(s.tp1_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp2") ? "hit" : ""}"><span>TP2</span><b>${fmt(s.tp2_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "tp3") ? "hit" : ""}"><span>TP3</span><b>${fmt(s.tp3_price, 6)}</b><i class="copy">▢</i></div>
+          <div class="level tp ${targetHit(s, "ftp") ? "hit" : ""}"><span>FTP</span><b>${fmt(s.ftp_price, 6)}</b><i class="copy">▢</i></div>
+        </div>
+        <div class="history-stats">
+          <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "oi_percentile"), 1)}</div><div class="history-stat-label">OI %ile</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "oi_change_pct"))}">${signed(signalMetric(s, "oi_change_pct"))}</div><div class="history-stat-label">OI Chg</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "price_change_pct"))}">${signed(signalMetric(s, "price_change_pct"))}</div><div class="history-stat-label">Price</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "taker_buy_ratio"), 2)}</div><div class="history-stat-label">Taker</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value ${score.kind}-text">${score.value}</div><div class="history-stat-label">${score.label}</div></div>
+        </div>
+      </article>`;
+    }
+    function renderVisibleNumbers() {
+      document.querySelectorAll("[data-current]").forEach(node => {
+        const market = marketFor(node.dataset.current);
+        if (market && Number.isFinite(Number(market.price))) node.textContent = fmt(market.price, 6);
+      });
+      document.querySelectorAll("[data-pnl]").forEach(node => {
+        const s = state.signals.find(row => signalKey(row) === node.dataset.pnl);
+        if (!s) return;
+        const pnl = pnlPct(s, isLivePricedSignal(s));
+        node.textContent = signed(pnl);
+        node.classList.toggle("positive", pnl >= 0);
+      });
+    }
+    function renderNotifications() {
+      const recentSignals = sortSignals(state.signals).slice(0, 12);
+      const liveNotes = state.notifications.slice(0, 12);
+      $("notifyList").innerHTML = `
+        <div class="notify-section"><span>即時提示</span><span>${liveNotes.length}</span></div>
+        ${liveNotes.map(note => `<div class="notify-item" data-symbol="${note.symbol}"><div class="notify-row"><span class="notify-symbol">${note.symbol}</span><span class="pill ${note.kind}">${note.title}</span></div><div class="notify-meta">${note.body}</div></div>`).join("") || `<div class="empty">暫無新的即時提示。</div>`}
+        <div class="notify-section"><span>數據交易訊號</span><span>${recentSignals.length}</span></div>
+        ${recentSignals.map(s => `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${s.signal_type === "reversal_bullish" ? "bull" : "bear"}">${strategyName(s.signal_type)}</span></div><div class="notify-meta">${stateLabel(s.reached_state)} · ${shortTime(s.triggered_at)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}</div></div>`).join("")}
+        <div class="notify-section"><span>諧波交易訊號</span><span>0</span></div>
+        <div class="empty" style="padding:16px">尚未接入諧波訊號來源。</div>`;
+      $("notifyList").querySelectorAll(".notify-item").forEach(item => item.addEventListener("click", () => {
+        $("symbolSearch").value = item.dataset.symbol;
+        setView("signals");
+        renderAll();
+        openSymbolModal(item.dataset.symbol);
+        $("notifyPanel").classList.remove("open");
+      }));
+      updateBell();
+    }
+    function toggleNotifyPanel() {
+      renderNotifications();
+      $("notifyPanel").classList.toggle("open");
+    }
+    function markNotificationsRead() {
+      state.notifications.forEach(n => n.read = true);
+      updateBell();
+      $("notifyPanel").classList.remove("open");
+    }
+    function updateBell() {
+      const unread = state.notifications.filter(n => !n.read).length;
+      const open = state.signals.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length;
+      $("bellBadge").textContent = unread || open || "";
+      $("bellBadge").classList.toggle("on", unread > 0 || open > 0);
+    }
+    function addNotification(note) {
+      state.notifications.unshift({...note, read: false, at: new Date()});
+      state.notifications = state.notifications.slice(0, 50);
+      showToast(note);
+      showSystemNotification(note);
+      updateBell();
+    }
+    function requestNotifyPermission() {
+      if (!("Notification" in window)) return;
+      if (Notification.permission === "default") Notification.requestPermission().catch(() => {});
+    }
+    function showSystemNotification(note) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      const title = `${note.symbol} ${note.title}`;
+      const body = note.body || "Sentiment Lens 訊號更新";
+      try {
+        navigator.serviceWorker?.ready
+          .then(reg => reg.showNotification(title, {body, icon: "icon-192.png", badge: "icon-192.png", tag: `${note.symbol}-${note.title}`}))
+          .catch(() => new Notification(title, {body, icon: "icon-192.png"}));
+      } catch {
+        try { new Notification(title, {body, icon: "icon-192.png"}); } catch {}
+      }
+    }
+    function showToast({kind, symbol, title, body}) {
+      const node = document.createElement("div");
+      node.className = `toast ${kind || ""}`;
+      node.innerHTML = `<div><div class="toast-title"><span>${symbol}</span><span class="pill ${kind || "accent"}">${title}</span></div><div class="toast-body">${body || ""}</div></div><button class="toast-close">×</button>`;
+      node.addEventListener("click", event => {
+        if (event.target.classList.contains("toast-close")) return;
+        $("symbolSearch").value = symbol;
+        renderAll();
+        openSymbolModal(symbol);
+      });
+      node.querySelector(".toast-close").addEventListener("click", event => { event.stopPropagation(); node.remove(); });
+      $("toastStack").prepend(node);
+      setTimeout(() => node.remove(), 6500);
+    }
+    function notifySignalChanges(rows) {
+      for (const s of rows) {
+        const key = signalKey(s);
+        if (seenSignals.has(key)) continue;
+        seenSignals.add(key);
+        seenStates.set(key, s.reached_state || s.status || "active");
+        addNotification({
+          kind: s.signal_type === "reversal_bullish" ? "bull" : "bear",
+          symbol: clean(s.symbol),
+          title: s.signal_type === "reversal_bullish" ? "新嘎空" : "新嘎多",
+          body: `${shortTime(s.triggered_at)} · OI ${signed(s.oi_change_pct)} · Price ${signed(s.price_change_pct)}`
+        });
+      }
+    }
+    function notifyStateChanges(rows, oldStates) {
+      for (const s of rows) {
+        const key = signalKey(s);
+        const next = s.reached_state || s.status || "active";
+        const prev = oldStates.get(key);
+        seenStates.set(key, next);
+        if (!prev || prev === next) continue;
+        if (["tp1","tp2","tp3","ftp","sl"].includes(next)) {
+          addNotification({
+            kind: next === "sl" ? "bear" : "bull",
+            symbol: clean(s.symbol),
+            title: stateLabel(next),
+            body: `${strategyName(s.signal_type)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}`
+          });
+        }
+      }
+    }
+    function rememberExistingSignals(rows) {
+      rows.forEach(s => {
+        const key = signalKey(s);
+        seenSignals.add(key);
+        seenStates.set(key, s.reached_state || s.status || "active");
+      });
+    }
+
+    function openSymbolModal(symbol) {
+      symbol = clean(symbol);
+      const rows = state.signals.filter(s => clean(s.symbol) === symbol).sort((a,b) => new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
+      const market = marketFor(symbol);
+      $("modalSymbol").textContent = symbol;
+      const wins = winsOf(rows);
+      const losses = lossesOf(rows);
+      const decided = wins + losses;
+      const rate = decided ? wins / decided * 100 : 0;
+      const pnl = rows.reduce((sum, s) => sum + pnlPct(s, isLivePricedSignal(s)), 0);
+      const avgScore = rows.length ? rows.reduce((sum, s) => sum + signalScore(s).value, 0) / rows.length : 0;
+      $("modalTier").textContent = rate >= 70 ? "高等" : rate >= 50 ? "中等" : "低等";
+      $("modalStats").innerHTML = [
+        ["訊號總數", rows.length, `${rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length} 進行中`],
+        ["平倉勝率", `${fmt(rate,1)}%`, `${wins}W / ${losses}L`],
+        ["累計盈虧", signed(pnl), `${rows.length} 筆`],
+        ["平均評分", fmt(avgScore, 0), rows.length ? scoreGrade(avgScore).label : "尚無樣本"]
+      ].map(metricCard).join("");
+      const hh = rows.filter(s => s.signal_type === "reversal_bullish");
+      const ct = rows.filter(s => s.signal_type === "reversal_bearish");
+      $("modalStrategies").innerHTML = [modalStrategy("嘎空", hh, "bull"), modalStrategy("嘎多", ct, "bear")].join("");
+      $("modalMarket").innerHTML = market ? [
+        ["目前價格", fmt(market.price, 6), `Price ${signed(market.price_change_pct)}`],
+        ["OI 變化", signed(market.oi_change_pct), `Percentile ${fmt(market.oi_percentile,1)}`],
+        ["Taker / OI USD", fmt(market.taker_buy_ratio, 2), compact(market.oi_value_usdt)]
+      ].map(metricCard).join("") : `<div class="modal-card"><div class="subline">市場快照</div><div class="stat-value warn-text">尚無資料</div><div class="subline">等待下一輪掃描</div></div>`;
+      $("modalRows").innerHTML = rows.slice(0, 20).map(s => {
+        const pnlValue = pnlPct(s, isLivePricedSignal(s));
+        const score = signalScore(s);
+        return `<tr><td><span class="pill ${stateKind(s)}">${stateLabel(displayState(s))}</span></td><td>15M</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${s.signal_type === "reversal_bullish" ? "多" : "空"}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${strategyName(s.signal_type)}</td><td class="mono">${shortTime(s.triggered_at)}</td><td><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span></td><td class="${pnlValue >= 0 ? "bull-text" : "bear-text"}">${signed(pnlValue)}</td></tr>`;
+      }).join("") || `<tr><td colspan="7" class="empty">尚無 ${symbol} 訊號。</td></tr>`;
+      $("symbolModal").classList.add("open");
+    }
+    function closeSymbolModal() { $("symbolModal").classList.remove("open"); }
+    function modalStrategy(name, rows, kind) {
+      const wins = winsOf(rows);
+      const losses = lossesOf(rows);
+      const rate = wins + losses ? wins / (wins + losses) * 100 : 0;
+      const pnl = rows.reduce((sum, s) => sum + pnlPct(s, isLivePricedSignal(s)), 0);
+      return `<div class="modal-card"><strong class="${kind}-text">${name}</strong><span class="subline"> ${rows.length} 筆</span><div class="mini-grid"><div class="mini">勝率 <b class="accent-text">${fmt(rate,1)}%</b><span>${wins}W / ${losses}L</span></div><div class="mini">累計盈虧 <b class="${pnl >= 0 ? "bull-text" : "bear-text"}">${signed(pnl)}</b></div></div></div>`;
+    }
+    function metricCard([a,b,c]) {
+      return `<div class="modal-card"><div class="subline">${a}</div><div class="stat-value ${String(b).startsWith("-") ? "bear-text" : "bull-text"}">${b}</div><div class="subline">${c || ""}</div></div>`;
+    }
+
+    function filteredSignals() {
+      const q = querySymbol();
+      const filter = $("signalFilter").value;
+      return sortSignals(state.signals).filter(s => {
+        if (q && !clean(s.symbol).includes(q)) return false;
+        if (filter !== "sl" && s.reached_state === "sl") return false;
+        if (filter === "open" && !(isOpenSignal(s) || isPartialActiveSignal(s))) return false;
+        if (filter === "tp" && !["tp1","tp2","tp3","ftp"].includes(s.reached_state)) return false;
+        if (filter === "sl" && s.reached_state !== "sl") return false;
+        return true;
+      });
+    }
+    function visibleMarkets() {
+      const q = querySymbol();
+      const mainSet = new Set(MAIN_WATCH_SYMBOLS);
+      return state.markets
+        .filter(m => m && !m.error && Number.isFinite(Number(m.price)))
+        .filter(m => mainSet.has(clean(m.symbol)))
+        .filter(m => !q || clean(m.symbol).includes(q));
+    }
+    function watchMarkets() {
+      const q = querySymbol();
+      return MAIN_WATCH_SYMBOLS
+        .filter(symbol => !q || symbol.includes(q))
+        .map(symbol => {
+          const market = marketFor(symbol);
+          if (market && !market.error) return market;
+          const signal = latestSignalFor(symbol);
+          return {
+            symbol: `${symbol}USDT`,
+            price: signal ? currentPrice(signal) : NaN,
+            oi_value_usdt: signal ? Number(signalMetric(signal, "oi_value_usdt")) : NaN,
+            oi_change_pct: signal ? Number(signalMetric(signal, "oi_change_pct")) : 0,
+            oi_percentile: signal ? Number(signalMetric(signal, "oi_percentile")) : 0,
+            price_change_pct: signal ? Number(signalMetric(signal, "price_change_pct")) : 0,
+            taker_buy_ratio: signal ? Number(signalMetric(signal, "taker_buy_ratio")) : NaN,
+            signal_type: signal ? signal.signal_type : null,
+            fallback: true
+          };
+        });
+    }
+    function classifyMarket(m) {
+      const oi = Number(m.oi_change_pct) || 0;
+      const price = Number(m.price_change_pct) || 0;
+      const pct = Number(m.oi_percentile) || 0;
+      const taker = Number(m.taker_buy_ratio);
+      const open = latestOpenSignal(clean(m.symbol));
+      if (open) {
+        return {
+          kind: open.signal_type === "reversal_bullish" ? "bull" : "bear",
+          label: stateLabel(open.reached_state),
+          tf1: "●", tf4: "●", tfD: "-",
+          reason: `此幣目前有${strategyName(open.signal_type)}持倉，觸發價 ${fmt(open.trigger_price, 6)}，即時盈虧 ${signed(pnlPct(open, true))}。`,
+          advice: "依原訊號 SL / TP 階梯管理"
+        };
+      }
+      if (m.signal_type === "reversal_bullish") return {kind:"bull", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速擴張 ${signed(oi)}，價格同步上行，OI 百分位 ${fmt(pct,1)}，觸發嘎空多方訊號。`, advice:"順勢做多 / 回檔進場"};
+      if (m.signal_type === "reversal_bearish") return {kind:"bear", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速收縮 ${signed(oi)}，價格同步走弱，OI 百分位 ${fmt(pct,1)}，觸發嘎多空方訊號。`, advice:"順勢做空 / 反彈觀察"};
+      if (oi > 0 && price > 0 && pct > 80) return {kind:"bull", label:"健康多頭", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 位於高分位，價格與資金同步推進，Taker 買盤 ${Number.isFinite(taker) ? fmt(taker,2) : "未知"}，多方結構偏健康。`, advice:"順勢做多 / 回檔進場"};
+      if (oi < 0 && price < 0 && pct > 70) return {kind:"bear", label:"趨勢空頭", tf1:"↘", tf4:"-", tfD:"-", reason:"OI 與價格同時下行，槓桿多頭退場，短線結構偏空。", advice:"觀望 / 等明確訊號"};
+      if (Math.abs(oi) > 0.5 && Math.abs(price) < 0.1) return {kind:"warn", label:"過熱警戒", tf1:"↘", tf4:"-", tfD:"-", reason:"OI 有明顯變化但價格尚未跟進，可能正在累積槓桿部位。", advice:"降低追價 / 等待突破"};
+      return {kind:"neutral", label:"盤整", tf1:"-", tf4:"-", tfD:"-", reason:"市場結構暫無明確共振，OI 與價格未形成高分位趨勢訊號。", advice:"觀望 / 等明確訊號"};
+    }
+    function analysisRows(m, analysis) {
+      const oi = Number(m.oi_change_pct) || 0;
+      const price = Number(m.price_change_pct) || 0;
+      const pct = Number(m.oi_percentile) || 0;
+      const taker = Number(m.taker_buy_ratio);
+      const oiUsd = Number(m.oi_value_usdt);
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 : 0;
+      const absOi = Math.abs(oi);
+      const absPrice = Math.abs(price);
+      const kindFrom = value => value > 0.15 ? "bull" : value < -0.15 ? "bear" : "warn";
+      const crowdKind = oi > 0 && price < 0 ? "bear" : oi > 0 && price > 0 ? "bull" : "warn";
+      return [
+        {
+          label: "資金費率代理",
+          value: signed(price / 20),
+          valueClass: numClass(price),
+          kind: kindFrom(price),
+          width: clamp(45 + price * 8, 10, 95),
+          note: price > 0 ? "價格推進偏多，注意追價風險。" : price < 0 ? "價格承壓，短線資金偏保守。" : "價格變化不大，等待方向。"
+        },
+        {
+          label: "持倉量",
+          value: compact(oiUsd),
+          kind: pct > 85 ? "warn" : "bull",
+          width: clamp(pct, 8, 100),
+          note: `OI 百分位 ${fmt(pct, 1)}，數值越高代表槓桿部位越擁擠。`
+        },
+        {
+          label: "持倉變化",
+          value: signed(oi),
+          valueClass: numClass(oi),
+          kind: oi > 0 ? "bull" : oi < 0 ? "bear" : "warn",
+          width: clamp(40 + absOi * 18, 8, 100),
+          note: oi > 0 ? "OI 增加，市場正在加槓桿。" : oi < 0 ? "OI 下降，部位正在退場。" : "OI 變化平緩。"
+        },
+        {
+          label: "散戶多空比",
+          value: fmt(0.75 + Math.max(-0.35, Math.min(0.35, takerBias / 120)), 2),
+          kind: takerBias > 8 ? "bull" : takerBias < -8 ? "bear" : "warn",
+          width: clamp(50 + takerBias, 10, 95),
+          note: "由 taker buy ratio 推估短線主動買賣傾向。"
+        },
+        {
+          label: "大戶多空比",
+          value: fmt(0.75 + Math.max(-0.35, Math.min(0.35, (oi + price) / 20)), 2),
+          kind: oi + price > 0.5 ? "bull" : oi + price < -0.5 ? "bear" : "warn",
+          width: clamp(50 + (oi + price) * 8, 10, 95),
+          note: "用 OI 與價格共振估算大型部位方向。"
+        },
+        {
+          label: "現貨買賣差",
+          value: price > 0 ? "偏買" : price < 0 ? "偏賣" : "持平",
+          kind: kindFrom(price),
+          width: clamp(50 + price * 12, 10, 95),
+          note: "目前後端未接現貨逐筆，先以價格變化作為代理。"
+        },
+        {
+          label: "合約買賣差",
+          value: takerBias > 5 ? "買盤" : takerBias < -5 ? "賣盤" : "均衡",
+          kind: takerBias > 5 ? "bull" : takerBias < -5 ? "bear" : "warn",
+          width: clamp(50 + takerBias, 10, 95),
+          note: "依 taker 主動買入比例判斷合約買賣壓。"
+        },
+        {
+          label: "清算壓力",
+          value: absOi > 1.5 && absPrice > 0.8 ? "偏高" : absOi > 0.6 ? "中等" : "平靜",
+          kind: absOi > 1.5 ? "bear" : absOi > 0.6 ? "warn" : "bull",
+          width: clamp(20 + absOi * 25 + absPrice * 8, 8, 100),
+          note: analysis.kind === "bear" ? "空方訊號成立時，反彈容易觸發部位再平衡。" : analysis.kind === "bull" ? "多方訊號成立時，回檔可觀察承接。" : "暫無明顯單邊清算壓力。"
+        }
+      ];
+    }
+
+    function signalScore(s) {
+      const isBull = s.signal_type === "reversal_bullish";
+      const dir = isBull ? 1 : -1;
+      const oiPct = clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100);
+      const oiMove = Math.abs(Number(signalMetric(s, "oi_change_pct")) || 0);
+      const priceMove = (Number(signalMetric(s, "price_change_pct")) || 0) * dir;
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
+      const risk = riskPct(s);
+      const statusBoost = isOpenSignal(s) ? 6 : isPartialActiveSignal(s) ? 4 : ["tp1","tp2","tp3","ftp"].includes(s.reached_state) ? 3 : 0;
+      let score = 0;
+      score += clamp(oiPct / 100 * 28, 0, 28);
+      score += clamp(oiMove * 7, 0, 18);
+      score += clamp(priceMove * 8, 0, 18);
+      score += clamp(takerBias / 2, 0, 12);
+      score += Number.isFinite(risk) ? clamp(14 - Math.abs(risk - 3) * 2.4, 0, 14) : 4;
+      score += statusBoost;
+      score = Math.round(clamp(score, 0, 100));
+      return {...scoreGrade(score), value: score};
+    }
+    function stableSetup(m) {
+      const symbol = clean(m.symbol);
+      const signal = latestSignalFor(symbol);
+      const open = latestOpenSignal(symbol);
+      const oi = Number(m.oi_change_pct) || 0;
+      const price = Number(m.price_change_pct) || 0;
+      const pct = Number(m.oi_percentile) || 0;
+      const taker = Number(m.taker_buy_ratio);
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 : 0;
+      const risk = signal ? riskPct(signal) : NaN;
+      const bullPoints = [
+        pct >= 80 ? 18 : pct >= 65 ? 10 : 3,
+        oi > 0.35 ? 18 : oi > 0 ? 9 : 0,
+        price > 0.18 ? 16 : price > 0 ? 8 : 0,
+        takerBias > 4 ? 12 : takerBias > 0 ? 6 : 0,
+        Number.isFinite(risk) ? clamp(14 - Math.abs(risk - 2.5) * 2.2, 0, 14) : 6,
+        open && open.signal_type === "reversal_bullish" ? 12 : 0
+      ];
+      const bearPoints = [
+        pct >= 80 ? 18 : pct >= 65 ? 10 : 3,
+        Math.abs(oi) > 0.35 ? 14 : Math.abs(oi) > 0 ? 7 : 0,
+        price < -0.18 ? 16 : price < 0 ? 8 : 0,
+        takerBias < -4 ? 12 : takerBias < 0 ? 6 : 0,
+        Number.isFinite(risk) ? clamp(14 - Math.abs(risk - 2.5) * 2.2, 0, 14) : 6,
+        open && open.signal_type === "reversal_bearish" ? 12 : 0
+      ];
+      const bullScore = Math.round(clamp(bullPoints.reduce((a,b) => a + b, 0), 0, 100));
+      const bearScore = Math.round(clamp(bearPoints.reduce((a,b) => a + b, 0), 0, 100));
+      const side = bullScore >= bearScore && bullScore >= 55 ? "bull" : bearScore > bullScore && bearScore >= 55 ? "bear" : "neutral";
+      const score = side === "bull" ? bullScore : side === "bear" ? bearScore : Math.max(bullScore, bearScore);
+      const kind = side === "bull" ? "bull" : side === "bear" ? "bear" : "warn";
+      const label = side === "bull" ? "嘎空候選" : side === "bear" ? "嘎多候選" : "保守觀望";
+      const riskText = Number.isFinite(risk) ? `${fmt(risk, 2)}%` : "N/A";
+      const reason = side === "bull"
+        ? `OI 與價格同步偏多，Taker 主動買盤 ${Number.isFinite(taker) ? fmt(taker,2) : "未知"}，屬於保守做多/嘎空觀察。`
+        : side === "bear"
+          ? `價格走弱且槓桿退潮，Taker 偏賣，屬於保守做空/嘎多觀察。`
+          : `共振不足，等待 OI、價格、Taker 三者方向更一致。`;
+      return {symbol, side, kind, label, score, reason, oiChange: oi, priceChange: price, oiPercentile: pct, taker, riskText};
+    }
+    function stableSignals(applyThreshold = true) {
+      return sortSignals(state.signals)
+        .filter(s => s.reached_state !== "sl")
+        .filter(s => {
+          const meta = stableTradeMeta(s);
+          return !applyThreshold || meta.score >= STABLE_THRESHOLD;
+        });
+    }
+    function stableTradeMeta(s) {
+      const isBull = s.signal_type === "reversal_bullish";
+      const dir = isBull ? 1 : -1;
+      const oiPct = clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100);
+      const oiAbs = Math.abs(Number(signalMetric(s, "oi_change_pct")) || 0);
+      const priceAligned = (Number(signalMetric(s, "price_change_pct")) || 0) * dir;
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
+      const risk = riskPct(s);
+      const statusBoost = isOpenSignal(s) ? 8 : isPartialActiveSignal(s) ? 6 : ["tp1","tp2","tp3","ftp"].includes(s.reached_state) ? 4 : 0;
+      let score = 0;
+      score += clamp(oiPct / 100 * 24, 0, 24);
+      score += clamp(oiAbs * 8, 0, 22);
+      score += clamp(priceAligned * 9, 0, 18);
+      score += clamp(takerBias / 2, 0, 12);
+      score += Number.isFinite(risk) ? clamp(16 - Math.abs(risk - 2.5) * 2.5, 0, 16) : 5;
+      score += statusBoost;
+      score = Math.round(clamp(score, 0, 100));
+      const kind = isBull ? "bull" : "bear";
+      const side = isBull ? "bull" : "bear";
+      const label = isBull ? "嘎空方向" : "嘎多方向";
+      const reason = isBull
+        ? `穩如老狗條件成立：OI 極端分位 ${fmt(oiPct,1)}，價格與 OI 偏多共振，進場沿用訊號觸發價。`
+        : `穩如老狗條件成立：OI 極端分位 ${fmt(oiPct,1)}，價格轉弱且槓桿退潮，進場沿用訊號觸發價。`;
+      return {score, kind, side, label, reason};
+    }
+    function signalMetric(s, name) {
+      if (s && s[name] !== undefined && s[name] !== null) return s[name];
+      if (s && s.snapshot_data && s.snapshot_data[name] !== undefined && s.snapshot_data[name] !== null) return s.snapshot_data[name];
+      return undefined;
+    }
+    function scoreGrade(score) {
+      if (score >= 82) return {label: "A+", kind: "bull"};
+      if (score >= 70) return {label: "A", kind: "bull"};
+      if (score >= 58) return {label: "B", kind: "warn"};
+      if (score >= 45) return {label: "C", kind: "warn"};
+      return {label: "D", kind: "bear"};
+    }
+
+    function sortSignals(rows) {
+      return rows.filter(Boolean).filter(r => !r.error).sort((a,b) => {
+        const ar = signalRank(a), br = signalRank(b);
+        if (ar !== br) return br - ar;
+        return new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0);
+      });
+    }
+    function signalRank(s) {
+      if (isOpenSignal(s)) return 4;
+      if (isPartialActiveSignal(s)) return 3;
+      if (["tp1","tp2","tp3","ftp"].includes(s.reached_state)) return 2;
+      if (s.reached_state === "sl") return 1;
+      return 0;
+    }
+    function sortMarkets(a,b) {
+      const as = latestOpenSignal(clean(a.symbol));
+      const bs = latestOpenSignal(clean(b.symbol));
+      if (Boolean(as) !== Boolean(bs)) return Boolean(bs) - Boolean(as);
+      if (Boolean(a.signal_type) !== Boolean(b.signal_type)) return Boolean(b.signal_type) - Boolean(a.signal_type);
+      const rank = {bull:4,bear:3,warn:2,neutral:1};
+      const analysisRank = (rank[classifyMarket(b).kind] || 0) - (rank[classifyMarket(a).kind] || 0);
+      if (analysisRank !== 0) return analysisRank;
+      return MAIN_WATCH_SYMBOLS.indexOf(clean(a.symbol)) - MAIN_WATCH_SYMBOLS.indexOf(clean(b.symbol));
+    }
+    function mergeSignals(rows) {
+      const book = new Map(state.signals.map(s => [signalKey(s), s]));
+      for (const row of rows) book.set(signalKey(row), {...book.get(signalKey(row)), ...row});
+      state.signals = sortSignals([...book.values()]);
+    }
+    function mergeMarkets(existing, rows) {
+      const book = new Map(existing.map(m => [clean(m.symbol), m]));
+      for (const row of rows) {
+        if (!row || row.error || !row.symbol) continue;
+        const key = clean(row.symbol);
+        book.set(key, {...book.get(key), ...row});
+      }
+      return [...book.values()].sort((a,b) => Number(b.oi_value_usdt || 0) - Number(a.oi_value_usdt || 0));
+    }
+    function isOpenSignal(s) {
+      return (s.reached_state === "holding" || !s.reached_state) && (s.status === "active" || s.reached_state === "holding");
+    }
+    function isPartialActiveSignal(s) {
+      return s.status === "active" && ["tp1","tp2","tp3"].includes(s.reached_state);
+    }
+    function isLivePricedSignal(s) {
+      return isOpenSignal(s) || isPartialActiveSignal(s);
+    }
+    function targetHit(s, target) {
+      const order = {tp1: 1, tp2: 2, tp3: 3, ftp: 4};
+      const state = s.reached_state;
+      if (!order[target]) return false;
+      if (state === "ftp") return true;
+      if ((order[state] || 0) >= order[target]) return true;
+      if (!isLivePricedSignal(s)) return false;
+      const current = Number(currentMarketPrice(s));
+      const targetPrice = Number(s[`${target}_price`]);
+      if (!Number.isFinite(current) || !Number.isFinite(targetPrice)) return false;
+      return s.signal_type === "reversal_bullish" ? current >= targetPrice : current <= targetPrice;
+    }
+    function latestOpenSignal(symbol) {
+      return sortSignals(state.signals).find(s => clean(s.symbol) === clean(symbol) && (isOpenSignal(s) || isPartialActiveSignal(s)));
+    }
+    function latestSignalFor(symbol) {
+      return sortSignals(state.signals).find(s => clean(s.symbol) === clean(symbol));
+    }
+    function marketFor(symbol) {
+      return state.markets.find(m => clean(m.symbol) === clean(symbol));
+    }
+    function currentPrice(s) {
+      const market = marketFor(s.symbol);
+      if (market && Number.isFinite(Number(market.price))) return Number(market.price);
+      const entry = Number(s.trigger_price);
+      const pnl = pnlPct(s, false) / 100;
+      if (!Number.isFinite(entry)) return NaN;
+      return s.signal_type === "reversal_bullish" ? entry * (1 + pnl) : entry * (1 - pnl);
+    }
+    function riskPct(s) {
+      const entry = Number(s.trigger_price);
+      const risk = Math.abs(Number(s.trigger_price) - Number(s.sl_price));
+      return entry ? risk / entry * 100 : NaN;
+    }
+    function pnlPct(s, live = false) {
+      const entry = Number(s.trigger_price);
+      const livePrice = Number(currentMarketPrice(s));
+      if (live && Number.isFinite(entry) && Number.isFinite(livePrice) && entry > 0) {
+        return s.signal_type === "reversal_bullish" ? (livePrice - entry) / entry * 100 : (entry - livePrice) / entry * 100;
+      }
+      const r = riskPct(s);
+      if (!Number.isFinite(r)) return 0;
+      if (s.reached_state === "sl") return -r;
+      if (s.reached_state === "tp1") return r;
+      if (s.reached_state === "tp2") return r * 2;
+      if (s.reached_state === "tp3") return r * 3;
+      if (s.reached_state === "ftp") return r * 5;
+      const maxGain = Number(s.max_gain_pct);
+      const maxDrawdown = Number(s.max_drawdown_pct);
+      if (Number.isFinite(maxGain) && maxGain > 0) return Math.min(maxGain, r * 5);
+      if (Number.isFinite(maxDrawdown) && maxDrawdown > 0) return -Math.min(maxDrawdown, r);
+      return 0;
+    }
+    function currentMarketPrice(s) {
+      const market = marketFor(s.symbol);
+      return market ? Number(market.price) : NaN;
+    }
+    function displayState(s) {
+      const saved = s.reached_state;
+      if (!isLivePricedSignal(s)) return saved;
+      const current = Number(currentMarketPrice(s));
+      if (!Number.isFinite(current)) return saved;
+      const bullish = s.signal_type === "reversal_bullish";
+      const hit = price => Number.isFinite(Number(price)) && (bullish ? current >= Number(price) : current <= Number(price));
+      const stopped = Number.isFinite(Number(s.sl_price)) && (bullish ? current <= Number(s.sl_price) : current >= Number(s.sl_price));
+      if (stopped) return "sl";
+      if (hit(s.ftp_price)) return "ftp";
+      if (hit(s.tp3_price)) return "tp3";
+      if (hit(s.tp2_price)) return "tp2";
+      if (hit(s.tp1_price)) return "tp1";
+      return saved || "holding";
+    }
+    function stateKind(s) {
+      const stateValue = typeof s === "string" ? s : displayState(s);
+      if (["tp1","tp2","tp3","ftp"].includes(stateValue)) return "bull";
+      if (stateValue === "sl") return "bear";
+      if (stateValue === "holding" || !stateValue) return "warn";
+      return "accent";
+    }
+    function stateLabel(s) {
+      if (s === "sl") return "觸發止損";
+      if (s === "tp1") return "觸發 TP1";
+      if (s === "tp2") return "觸發 TP2";
+      if (s === "tp3") return "觸發 TP3";
+      if (s === "ftp") return "觸發 FTP";
+      return "持倉中";
+    }
+    function strategyName(type) { return type === "reversal_bullish" ? "嘎空" : "嘎多"; }
+    function winsOf(rows) { return rows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length; }
+    function lossesOf(rows) { return rows.filter(s => s.reached_state === "sl").length; }
+    function setView(view) {
+      state.currentView = view;
+      document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+      document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === view));
+      renderStats();
+      renderHealth();
+    }
+    function renderHealth() {
+      const parts = [
+        autoTimer ? "自動掃描中" : "自動掃描停止",
+        state.busy ? "請求中" : "待命",
+        `book ${lastTimeText(state.lastBookAt)}`,
+        `tick ${lastTimeText(state.lastTickAt)}`,
+        `price ${lastTimeText(state.lastPriceAt)}`
+      ];
+      $("healthText").textContent = parts.join(" · ");
+    }
+    function querySymbol() { return $("symbolSearch").value.trim().toUpperCase(); }
+    function signalKey(s) { return `${clean(s.symbol)}|${s.signal_type}|${s.triggered_at || s.triggered_at_ms || ""}`; }
+    function clean(s) { return String(s || "").toUpperCase().replace(/USDT$/,""); }
+    function numClass(v) { return Number(v) > 0 ? "bull-text" : Number(v) < 0 ? "bear-text" : "muted"; }
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, Number(value) || 0)); }
+    function signed(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return "-";
+      return `${n >= 0 ? "+" : ""}${fmt(n, 2)}%`;
+    }
+    function fmt(v, d) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return "-";
+      return n.toFixed(d).replace(/\.?0+$/, "");
+    }
+    function compact(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return "-";
+      if (n >= 1e9) return `${(n/1e9).toFixed(2)}B`;
+      if (n >= 1e6) return `${(n/1e6).toFixed(1)}M`;
+      if (n >= 1e3) return `${(n/1e3).toFixed(1)}K`;
+      return n.toFixed(0);
+    }
+    function shortTime(s) {
+      if (!s) return "-";
+      const d = new Date(s);
+      if (Number.isNaN(d.getTime())) return String(s).replace("+00:00", "Z");
+      return `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    }
+    function lastTimeText(d) {
+      return d ? d.toLocaleTimeString() : "尚未更新";
+    }
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
