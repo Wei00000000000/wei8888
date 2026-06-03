@@ -484,6 +484,7 @@
     status("Auto scanner warming up.");
     initialize();
     setInterval(refreshPrices, 5000);
+    setInterval(loadBook, 120000);
     setInterval(renderHealth, 1000);
 
     async function initialize() {
@@ -591,10 +592,18 @@
     async function loadBook() {
       try {
         const data = await apiJson("book");
+        const firstLoad = !state.lastBookAt;
+        const oldStates = new Map(seenStates);
         state.signals = sortSignals(data.rows || []);
         state.markets = mergeMarkets(state.markets, data.markets || []);
         state.lastBookAt = new Date();
-        rememberExistingSignals(state.signals);
+        if (firstLoad) {
+          rememberExistingSignals(state.signals);
+        } else {
+          notifySignalChanges(state.signals);
+          notifyStateChanges(state.signals, oldStates);
+          rememberExistingSignals(state.signals);
+        }
         renderAll();
         status(`Loaded seed book · ${state.signals.length} signals`);
       } catch (err) {
@@ -645,13 +654,12 @@
       if (!symbols.length) return;
       try {
         const data = await apiJson("prices", `symbols=${encodeURIComponent(symbols.join(","))}`);
+        const oldStates = new Map(seenStates);
         state.markets = mergeMarkets(state.markets, data.markets || []);
+        updateLiveSignalStates();
+        notifyStateChanges(state.signals, oldStates);
         state.lastPriceAt = new Date();
-        renderVisibleNumbers();
-        renderStats();
-        renderWatchDashboard();
-        renderStable();
-        renderHealth();
+        renderAll();
         if ($("symbolModal").classList.contains("open")) openSymbolModal($("modalSymbol").textContent);
       } catch (err) {
         rememberError(err, "Price update error");
@@ -876,7 +884,7 @@
       return `<article class="signal-card ${kind}" data-symbol="${clean(s.symbol)}">
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyName(s.signal_type)}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div></div>
           <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">1H</span><span class="tf-pill">4H</span><span class="tf-pill">1D</span></div></div>
         </div>
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
@@ -911,6 +919,30 @@
         node.classList.toggle("positive", pnl >= 0);
       });
     }
+    function updateLiveSignalStates() {
+      for (const s of state.signals) {
+        if (!isLivePricedSignal(s)) continue;
+        const next = displayState(s);
+        const prev = s.reached_state || "holding";
+        if (next === prev || next === "holding") continue;
+        if (["tp1","tp2","tp3","ftp"].includes(next) && targetOrder(next) < targetOrder(prev)) continue;
+        if (next === "sl" && targetOrder(prev) > 0) continue;
+        s.reached_state = next;
+        s.hit_price = hitPriceForState(s, next);
+        s.hit_at = new Date().toISOString();
+      }
+    }
+    function targetOrder(state) {
+      return {holding: 0, tp1: 1, tp2: 2, tp3: 3, ftp: 4, sl: -1}[state || "holding"] ?? 0;
+    }
+    function hitPriceForState(s, state) {
+      if (state === "sl") return Number(s.sl_price);
+      if (state === "tp1") return Number(s.tp1_price);
+      if (state === "tp2") return Number(s.tp2_price);
+      if (state === "tp3") return Number(s.tp3_price);
+      if (state === "ftp") return Number(s.ftp_price);
+      return Number(currentMarketPrice(s));
+    }
     function renderNotifications() {
       const recentSignals = sortSignals(state.signals).slice(0, 12);
       const liveNotes = state.notifications.slice(0, 12);
@@ -918,7 +950,7 @@
         <div class="notify-section"><span>即時提示</span><span>${liveNotes.length}</span></div>
         ${liveNotes.map(note => `<div class="notify-item" data-symbol="${note.symbol}"><div class="notify-row"><span class="notify-symbol">${note.symbol}</span><span class="pill ${note.kind}">${note.title}</span></div><div class="notify-meta">${note.body}</div></div>`).join("") || `<div class="empty">暫無新的即時提示。</div>`}
         <div class="notify-section"><span>數據交易訊號</span><span>${recentSignals.length}</span></div>
-        ${recentSignals.map(s => `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${s.signal_type === "reversal_bullish" ? "bull" : "bear"}">${strategyName(s.signal_type)}</span></div><div class="notify-meta">${stateLabel(s.reached_state)} · ${shortTime(s.triggered_at)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}</div></div>`).join("")}
+        ${recentSignals.map(s => `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${s.signal_type === "reversal_bullish" ? "bull" : "bear"}">${strategyNameForSignal(s)}</span></div><div class="notify-meta">${stateLabel(s.reached_state)} · ${shortTime(s.triggered_at)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}</div></div>`).join("")}
         <div class="notify-section"><span>諧波交易訊號</span><span>0</span></div>
         <div class="empty" style="padding:16px">尚未接入諧波訊號來源。</div>`;
       $("notifyList").querySelectorAll(".notify-item").forEach(item => item.addEventListener("click", () => {
@@ -1008,7 +1040,7 @@
             kind: next === "sl" ? "bear" : "bull",
             symbol: clean(s.symbol),
             title: stateLabel(next),
-            body: `${strategyName(s.signal_type)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}`
+            body: `${strategyNameForSignal(s)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}`
           });
         }
       }
@@ -1050,7 +1082,7 @@
       $("modalRows").innerHTML = rows.slice(0, 20).map(s => {
         const pnlValue = pnlPct(s, isLivePricedSignal(s));
         const score = signalScore(s);
-        return `<tr><td><span class="pill ${stateKind(s)}">${stateLabel(displayState(s))}</span></td><td>15M</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${s.signal_type === "reversal_bullish" ? "多" : "空"}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${strategyName(s.signal_type)}</td><td class="mono">${shortTime(s.triggered_at)}</td><td><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span></td><td class="${pnlValue >= 0 ? "bull-text" : "bear-text"}">${signed(pnlValue)}</td></tr>`;
+        return `<tr><td><span class="pill ${stateKind(s)}">${stateLabel(displayState(s))}</span></td><td>${String(s.timeframe || "15M").toUpperCase()}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${s.signal_type === "reversal_bullish" ? "多" : "空"}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${strategyNameForSignal(s)}</td><td class="mono">${shortTime(s.triggered_at)}</td><td><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span></td><td class="${pnlValue >= 0 ? "bull-text" : "bear-text"}">${signed(pnlValue)}</td></tr>`;
       }).join("") || `<tr><td colspan="7" class="empty">尚無 ${symbol} 訊號。</td></tr>`;
       $("symbolModal").classList.add("open");
     }
@@ -1118,7 +1150,7 @@
           kind: open.signal_type === "reversal_bullish" ? "bull" : "bear",
           label: stateLabel(open.reached_state),
           tf1: "●", tf4: "●", tfD: "-",
-          reason: `此幣目前有${strategyName(open.signal_type)}持倉，觸發價 ${fmt(open.trigger_price, 6)}，即時盈虧 ${signed(pnlPct(open, true))}。`,
+          reason: `此幣目前有${strategyNameForSignal(open)}持倉，觸發價 ${fmt(open.trigger_price, 6)}，即時盈虧 ${signed(pnlPct(open, true))}。`,
           advice: "依原訊號 SL / TP 階梯管理"
         };
       }
@@ -1444,6 +1476,11 @@
       return "持倉中";
     }
     function strategyName(type) { return type === "reversal_bullish" ? "嘎空" : "嘎多"; }
+    function strategyNameForSignal(s) {
+      const setup = String(s.setup_id || "");
+      if (setup.includes("oi_5m") || setup.includes("divergence")) return "5M背離";
+      return strategyName(s.signal_type);
+    }
     function winsOf(rows) { return rows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length; }
     function lossesOf(rows) { return rows.filter(s => s.reached_state === "sl").length; }
     function setView(view) {

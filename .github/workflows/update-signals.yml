@@ -2,7 +2,7 @@ name: Update live signals
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,7 @@ jobs:
           SCAN_TOP: "0"
           SCAN_WORKERS: "8"
           OI_PERCENTILE: "99"
+          DIVERGENCE_OI_PERCENTILE: "95"
           MAX_SEED_ROWS: "3000"
         run: python scripts/update_seed_signals.py
       - name: Export GitHub Pages data
