@@ -255,6 +255,19 @@
     .flow-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; margin: 12px 0 8px; }
     .flow-bar span { display: block; height: 100%; border-radius: inherit; background: var(--bull); }
     .flow-card.bear .flow-bar span { background: var(--bear); }
+    .tag-row { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .tag-row.left { justify-content: flex-start; }
+    .mini-tag { min-height: 21px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,.035); display: inline-flex; align-items: center; font-size: 10px; font-weight: 900; }
+    .mini-tag.bull { color: var(--bull); border-color: rgba(0,224,164,.3); background: var(--bull-soft); }
+    .mini-tag.bear { color: var(--bear); border-color: rgba(255,85,119,.35); background: var(--bear-soft); }
+    .mini-tag.warn { color: var(--warn); border-color: rgba(255,177,59,.35); background: var(--warn-soft); }
+    .mini-tag.accent { color: var(--accent); border-color: rgba(179,107,255,.38); background: var(--accent-soft); }
+    .abnormal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 12px; margin-bottom: 22px; }
+    .abnormal-card { border: 1px solid rgba(255,177,59,.2); border-radius: 10px; background: rgba(10,17,25,.94); padding: 14px; cursor: pointer; }
+    .abnormal-card:hover { border-color: rgba(255,177,59,.44); }
+    .abnormal-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .abnormal-symbol { font-size: 18px; font-weight: 950; }
+    .abnormal-value { font: 950 18px var(--mono); }
     .backtest-panel { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.92); margin-bottom: 22px; padding: 16px; }
     .backtest-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
     .equity-chart { width: 100%; height: 180px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(rgba(102,167,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.04) 1px, transparent 1px), #060b12; background-size: 28px 28px; }
@@ -308,7 +321,7 @@
       <input id="accessPassword" type="password" placeholder="輸入密碼" autocomplete="current-password">
       <div class="gate-actions">
         <button class="btn primary" id="unlockBtn">進入</button>
-        <span class="subline">Private terminal</span>
+        <span class="subline">私人策略終端</span>
       </div>
       <div class="gate-error" id="gateError"></div>
     </section>
@@ -379,6 +392,10 @@
       </div>
       <div class="flow-grid" id="sectorFlows"></div>
       <div class="section-head">
+        <div><span class="watch-title">當日成交量異常</span><span class="watch-sub" id="abnormalMeta">等待更新</span></div>
+      </div>
+      <div class="abnormal-grid" id="abnormalVolumeCards"></div>
+      <div class="section-head">
         <div><span class="watch-title">我的觀察清單</span><span class="watch-sub" id="watchMeta">0 SYMBOLS</span></div>
         <div class="section-actions">
           <input id="symbolSearch" class="search-input" placeholder="搜尋幣種，例如 BCH">
@@ -421,7 +438,7 @@
       <section class="backtest-panel">
         <div class="backtest-head">
           <div>
-            <div class="kicker">Signal Backtest</div>
+            <div class="kicker">訊號回測</div>
             <h2>數據交易訊號回測</h2>
             <div class="subline">只計算 OI 嘎空/嘎多訊號，不混入穩如老狗或 5M 背離。</div>
           </div>
@@ -460,7 +477,7 @@
       <section class="backtest-panel">
         <div class="backtest-head">
           <div>
-            <div class="kicker">Simulation Backtest</div>
+            <div class="kicker">模擬回測</div>
             <h2>模擬回測圖表</h2>
             <div class="subline">依目前收錄交易逐筆累加，觀察穩如老狗策略的累積盈虧曲線。</div>
           </div>
@@ -540,11 +557,13 @@
       markets: [],
       signals: [],
       sectorFlows: [],
+      volumeAnomalies: [],
       notifications: [],
       lastBookAt: null,
       lastTickAt: null,
       lastPriceAt: null,
       lastMarketAt: null,
+      lastVolumeAt: null,
       lastError: "",
       busy: false,
       currentView: "dashboard",
@@ -632,6 +651,7 @@
     async function initialize() {
       await loadBook();
       await loadSectorFlows();
+      await loadVolumeAnomalies();
       await loadMarkets();
       toggleAutoScan();
     }
@@ -652,6 +672,10 @@
         const res = await fetch(`data/sector_flows.json?ts=${Date.now()}`);
         return res.ok ? res.json() : {rows: [], updated_at: null};
       }
+      if (endpoint === "volume_anomalies") {
+        const res = await fetch(`data/volume_anomalies.json?ts=${Date.now()}`);
+        return res.ok ? res.json() : {rows: [], updated_at: null};
+      }
       if (endpoint === "markets" || endpoint === "prices") {
         const res = await fetch(`data/markets.json?ts=${Date.now()}`);
         const data = await res.json();
@@ -668,6 +692,17 @@
       } catch (err) {
         state.sectorFlows = [];
         renderSectorFlows();
+      }
+    }
+    async function loadVolumeAnomalies() {
+      try {
+        const data = await apiJson("volume_anomalies");
+        state.volumeAnomalies = data.rows || [];
+        state.lastVolumeAt = data.updated_at ? new Date(data.updated_at) : new Date();
+        renderVolumeAnomalies();
+      } catch (err) {
+        state.volumeAnomalies = [];
+        renderVolumeAnomalies();
       }
     }
     async function staticBook() {
@@ -696,16 +731,23 @@
       const fallbackRes = await fetch(`data/markets.json?ts=${Date.now()}`);
       const fallbackData = fallbackRes.ok ? await fallbackRes.json() : {rows: []};
       try {
-        const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/price");
+        const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr");
         if (!res.ok) throw new Error("Binance ticker unavailable");
         const tickers = await res.json();
         const prices = {};
         const liveRows = tickers
           .filter(row => wanted.has(clean(row.symbol)))
           .map(row => {
-            prices[clean(row.symbol)] = Number(row.price);
+            prices[clean(row.symbol)] = Number(row.lastPrice);
             const prev = (fallbackData.rows || []).find(m => clean(m.symbol) === clean(row.symbol)) || {};
-            return {...prev, symbol: row.symbol, price: Number(row.price), live_price: true};
+            return {
+              ...prev,
+              symbol: row.symbol,
+              price: Number(row.lastPrice),
+              price_change_pct: Number(row.priceChangePercent),
+              quote_volume: Number(row.quoteVolume),
+              live_price: true
+            };
           });
         return {markets: liveRows.length ? liveRows : (fallbackData.rows || []), prices};
       } catch (err) {
@@ -808,7 +850,11 @@
       }
     }
     async function refreshPrices() {
-      const symbols = [...new Set(state.signals.filter(isLivePricedSignal).map(s => clean(s.symbol)))];
+      const symbols = [...new Set([
+        ...state.signals.filter(isLivePricedSignal).map(s => clean(s.symbol)),
+        ...MAIN_WATCH_SYMBOLS,
+        ...(state.volumeAnomalies || []).slice(0, 20).map(row => clean(row.symbol))
+      ])];
       if (!symbols.length) return;
       try {
         const data = await apiJson("prices", `symbols=${encodeURIComponent(symbols.join(","))}`);
@@ -857,6 +903,7 @@
     function renderAll() {
       renderStats();
       renderSectorFlows();
+      renderVolumeAnomalies();
       renderWatchDashboard();
       renderSignals();
       renderStable();
@@ -927,9 +974,31 @@
             <div class="flow-value ${change >= 0 ? "bull-text" : "bear-text"}">${signed(change)}</div>
           </div>
           <div class="flow-bar"><span style="width:${width}%"></span></div>
-          <div class="subline">24h Volume ${compact(volume)} · Market Cap ${compact(row.market_cap || 0)}</div>
+          <div class="subline">24H 成交量 ${compact(volume)} · 市值 ${compact(row.market_cap || 0)}</div>
         </article>`;
       }).join("") || `<section class="panel"><div class="empty">暫無板塊資金流資料，等待下一次雲端更新。</div></section>`;
+    }
+    function renderVolumeAnomalies() {
+      const target = $("abnormalVolumeCards");
+      if (!target) return;
+      const rows = (state.volumeAnomalies || []).slice(0, 12);
+      $("abnormalMeta").textContent = rows.length ? `更新於 ${lastTimeText(state.lastVolumeAt || state.lastBookAt)}` : "暫無資料";
+      target.innerHTML = rows.map(row => {
+        const symbol = clean(row.symbol);
+        const sector = row.sector || sectorForSymbol(symbol);
+        const latest = latestSignalFor(symbol);
+        const tags = strategyTagsForSymbol(symbol);
+        const change = Number(row.price_change_pct);
+        return `<article class="abnormal-card" data-abnormal-symbol="${symbol}">
+          <div class="abnormal-top">
+            <div><div class="abnormal-symbol">${symbol}</div><div class="watch-analysis-pair">${sector} · ${row.reason || "成交量放大"}</div></div>
+            <div><div class="abnormal-value ${numClass(change)}">${signed(change)}</div><div class="subline">${compact(row.quote_volume || row.volume_usdt || 0)}</div></div>
+          </div>
+          <div class="tag-row left">${tags.map(tag => `<span class="mini-tag ${tag.kind}">${tag.label}</span>`).join("") || `<span class="mini-tag">等待訊號</span>`}</div>
+          <div class="subline">最新價 ${fmt(row.price, 6)} · 分數 ${fmt(row.anomaly_score || 0, 0)}${latest ? ` · 最新${strategyNameForSignal(latest)} ${shortTime(latest.triggered_at)}` : ""}</div>
+        </article>`;
+      }).join("") || `<section class="panel"><div class="empty">暫無當日成交量異常清單。</div></section>`;
+      target.querySelectorAll("[data-abnormal-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.abnormalSymbol)));
     }
     function renderWatchDashboard() {
       const rows = watchMarkets().map(m => ({...m, analysis: classifyMarket(m)}));
@@ -957,10 +1026,11 @@
       const a = m.analysis;
       const open = latestOpenSignal(clean(m.symbol));
       const details = analysisRows(m, a);
+      const sector = sectorForSymbol(clean(m.symbol));
       return `<article class="watch-analysis-card ${a.kind}" data-watch-symbol="${clean(m.symbol)}">
         <div class="watch-analysis-main">
           <div class="watch-analysis-top">
-            <div><div class="watch-analysis-symbol">${clean(m.symbol)}</div><div class="watch-analysis-pair">${clean(m.symbol)}/USDT · PERP${m.fallback ? " · 更新中" : ""}</div></div>
+            <div><div class="watch-analysis-symbol">${clean(m.symbol)}</div><div class="watch-analysis-pair">${clean(m.symbol)}/USDT · 永續合約${m.fallback ? " · 更新中" : ""}</div><div class="tag-row left"><span class="mini-tag">${sector}</span><span class="mini-tag ${numClass(m.price_change_pct).includes("bull") ? "bull" : numClass(m.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(m.price_change_pct)}</span></div></div>
             <div><div class="watch-analysis-price">${Number.isFinite(Number(m.price)) ? `$${fmt(m.price, 6)}` : "更新中"}</div><div class="watch-analysis-change ${numClass(m.price_change_pct)}">${signed(m.price_change_pct)}</div></div>
           </div>
           <div class="watch-status-pill ${a.kind}"><span>●</span>${open ? stateLabel(open.reached_state) : a.label}</div>
@@ -1149,10 +1219,12 @@
       const pnl = pnlPct(s, isLivePricedSignal(s));
       const current = currentPrice(s);
       const rPct = riskPct(s);
+      const reversal = reversalWarning(s);
+      const market = marketFor(s.symbol);
       return `<article class="signal-card ${meta.kind}" data-stable-symbol="${clean(s.symbol)}">
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sectorForSymbol(s.symbol)}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
         </div>
         <div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
@@ -1175,10 +1247,12 @@
       const current = currentPrice(s);
       const rPct = riskPct(s);
       const score = signalScore(s);
+      const reversal = reversalWarning(s);
+      const market = marketFor(s.symbol);
       return `<article class="signal-card ${kind}" data-symbol="${clean(s.symbol)}">
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sectorForSymbol(s.symbol)}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
@@ -1238,7 +1312,9 @@
       return Number(currentMarketPrice(s));
     }
     function renderNotifications() {
-      const recentSignals = sortSignals(state.signals).slice(0, 12);
+      const recentSignals = sortSignals(state.signals)
+        .filter(s => isOpenSignal(s) || isPartialActiveSignal(s))
+        .slice(0, 12);
       const liveNotes = state.notifications.slice(0, 12);
       $("notifyList").innerHTML = `
         <div class="notify-section"><span>即時提示</span><span>${liveNotes.length}</span></div>
@@ -1343,6 +1419,7 @@
     }
     function notifySignalChanges(rows) {
       for (const s of rows) {
+        if (!(isOpenSignal(s) || isPartialActiveSignal(s))) continue;
         const key = signalKey(s);
         if (seenSignals.has(key)) continue;
         seenSignals.add(key);
@@ -1350,8 +1427,8 @@
         addNotification({
           kind: s.signal_type === "reversal_bullish" ? "bull" : "bear",
           symbol: clean(s.symbol),
-          title: s.signal_type === "reversal_bullish" ? "新嘎空" : "新嘎多",
-          body: `${shortTime(s.triggered_at)} · OI ${signed(s.oi_change_pct)} · Price ${signed(s.price_change_pct)}`
+          title: s.signal_type === "reversal_bullish" ? "新持倉：嘎空" : "新持倉：嘎多",
+          body: `${shortTime(s.triggered_at)} · OI ${signed(s.oi_change_pct)} · 價格 ${signed(s.price_change_pct)}`
         });
       }
     }
@@ -1362,12 +1439,12 @@
         const prev = oldStates.get(key);
         seenStates.set(key, next);
         if (!prev || prev === next) continue;
-        if (["tp1","tp2","tp3","ftp","sl"].includes(next)) {
+        if (["tp1","tp2","tp3"].includes(next)) {
           addNotification({
-            kind: next === "sl" ? "bear" : "bull",
+            kind: "bull",
             symbol: clean(s.symbol),
             title: stateLabel(next),
-            body: `${strategyNameForSignal(s)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}`
+            body: `${strategyNameForSignal(s)} 繼續持倉中 · ${signed(pnlPct(s, isLivePricedSignal(s)))}`
           });
         }
       }
@@ -1406,8 +1483,9 @@
       const ct = rows.filter(s => s.signal_type === "reversal_bearish");
       $("modalStrategies").innerHTML = [modalStrategy("嘎空", hh, "bull"), modalStrategy("嘎多", ct, "bear")].join("");
       $("modalMarket").innerHTML = market ? [
-        ["目前價格", fmt(market.price, 6), `Price ${signed(market.price_change_pct)}`],
-        ["OI 變化", signed(market.oi_change_pct), `Percentile ${fmt(market.oi_percentile,1)}`],
+        ["所屬板塊", sectorForSymbol(symbol), "依幣種分類"],
+        ["目前價格", fmt(market.price, 6), `最新漲跌 ${signed(market.price_change_pct)}`],
+        ["OI 變化", signed(market.oi_change_pct), `百分位 ${fmt(market.oi_percentile,1)}`],
         ["Taker / OI USD", fmt(market.taker_buy_ratio, 2), compact(market.oi_value_usdt)]
       ].map(metricCard).join("") : `<div class="modal-card"><div class="subline">市場快照</div><div class="stat-value warn-text">尚無資料</div><div class="subline">等待下一輪掃描</div></div>`;
       $("modalRows").innerHTML = rows.slice(0, 20).map(s => {
@@ -1789,6 +1867,28 @@
     function latestSignalFor(symbol) {
       return sortSignals(state.signals).find(s => clean(s.symbol) === clean(symbol));
     }
+    function latestOppositeSignal(s) {
+      const symbol = clean(s.symbol);
+      return sortSignals(state.signals).find(row =>
+        clean(row.symbol) === symbol
+        && row.signal_type !== s.signal_type
+        && new Date(row.triggered_at || 0) > new Date(s.triggered_at || 0)
+      );
+    }
+    function reversalWarning(s) {
+      if (!(isOpenSignal(s) || isPartialActiveSignal(s))) return "";
+      const opposite = latestOppositeSignal(s);
+      if (!opposite) return "";
+      return opposite.signal_type === "reversal_bullish" ? "轉多警戒" : "轉空警戒";
+    }
+    function protectiveStopText(s) {
+      const state = displayState(s);
+      if (state === "tp3") return `保護價 TP1 ${fmt(s.tp1_price, 6)}`;
+      if (state === "tp2") return `保護價 進場 ${fmt(s.trigger_price, 6)}`;
+      if (state === "tp1") return `原始SL ${fmt(s.sl_price, 6)}`;
+      if (state === "ftp") return "已完全止盈";
+      return `SL ${fmt(s.sl_price, 6)}`;
+    }
     function marketFor(symbol) {
       return state.markets.find(m => clean(m.symbol) === clean(symbol));
     }
@@ -1808,19 +1908,28 @@
     function pnlPct(s, live = false) {
       const entry = Number(s.trigger_price);
       const livePrice = Number(currentMarketPrice(s));
-      if (live && Number.isFinite(entry) && Number.isFinite(livePrice) && entry > 0) {
-        return s.signal_type === "reversal_bullish" ? (livePrice - entry) / entry * 100 : (entry - livePrice) / entry * 100;
-      }
       const r = riskPct(s);
       if (!Number.isFinite(r)) return 0;
-      if (s.reached_state === "sl") return -r;
-      if (s.reached_state === "tp1") return r;
-      if (s.reached_state === "tp2") return r * 2;
-      if (s.reached_state === "tp3") return r * 3;
-      if (s.reached_state === "ftp") return r * 5;
+      const rawRFromPrice = price => {
+        if (!Number.isFinite(entry) || !Number.isFinite(price) || entry <= 0 || r <= 0) return 0;
+        const pct = s.signal_type === "reversal_bullish" ? (price - entry) / entry * 100 : (entry - price) / entry * 100;
+        return pct / r;
+      };
+      const stagedR = (stage, rawR = null) => {
+        if (stage === "sl") return -1;
+        if (stage === "tp1") return rawR === null ? 1 : 0.3 * 1 + 0.7 * clamp(rawR, -1, 5);
+        if (stage === "tp2") return rawR === null ? 1.7 : 0.3 * 1 + 0.3 * 2 + 0.4 * clamp(Math.max(rawR, 0), 0, 5);
+        if (stage === "tp3") return rawR === null ? 2.3 : 0.3 * 1 + 0.3 * 2 + 0.2 * 3 + 0.2 * clamp(Math.max(rawR, 1), 1, 5);
+        if (stage === "ftp") return 3.3;
+        return rawR === null ? 0 : clamp(rawR, -1, 5);
+      };
+      if (live && Number.isFinite(entry) && Number.isFinite(livePrice) && entry > 0) {
+        return stagedR(displayState(s), rawRFromPrice(livePrice)) * r;
+      }
+      if (["sl","tp1","tp2","tp3","ftp"].includes(s.reached_state)) return stagedR(s.reached_state) * r;
       const maxGain = Number(s.max_gain_pct);
       const maxDrawdown = Number(s.max_drawdown_pct);
-      if (Number.isFinite(maxGain) && maxGain > 0) return Math.min(maxGain, r * 5);
+      if (Number.isFinite(maxGain) && maxGain > 0) return stagedR("holding", maxGain / r) * r;
       if (Number.isFinite(maxDrawdown) && maxDrawdown > 0) return -Math.min(maxDrawdown, r);
       return 0;
     }
@@ -1868,6 +1977,33 @@
     function strategyNameForSignal(s) {
       if (isDivergenceSignal(s)) return divergenceKind(s) === "top" ? "頂背離" : "底背離";
       return strategyName(s.signal_type);
+    }
+    function sectorForSymbol(symbol) {
+      const s = clean(symbol);
+      const map = {
+        BTC:"比特幣生態", ETH:"Layer 1", BNB:"交易所平台", SOL:"Layer 1", XRP:"支付網路", DOGE:"Meme", ADA:"Layer 1",
+        AVAX:"Layer 1", LINK:"Oracle", TON:"Layer 1", TRX:"Layer 1", BCH:"比特幣生態", LTC:"支付網路", DOT:"Layer 1",
+        NEAR:"Layer 1", UNI:"DeFi", APT:"Layer 1", SUI:"Layer 1", OP:"Layer 2", ARB:"Layer 2", AAVE:"DeFi",
+        LDO:"DeFi", INJ:"DeFi", RUNE:"DeFi", FET:"AI", TAO:"AI", WLD:"AI", AI:"AI", NEIRO:"Meme",
+        PEPE:"Meme", BONK:"Meme", FLOKI:"Meme", SHIB:"Meme", WIF:"Meme", FARTCOIN:"Meme", MANA:"Gaming",
+        SAND:"Gaming", GALA:"Gaming", IMX:"Gaming", RONIN:"Gaming", ENJ:"Gaming"
+      };
+      if (map[s]) return map[s];
+      if (/1000|PEPE|BONK|FLOKI|SHIB|DOGE|WIF|MEME|NEIRO|FART/.test(s)) return "Meme";
+      if (/AI|FET|TAO|WLD|AGIX|ARKM|VIRTUAL|RENDER|RNDR/.test(s)) return "AI";
+      if (/AAVE|UNI|LDO|CRV|COMP|MKR|SNX|RUNE|INJ|PENDLE|CAKE/.test(s)) return "DeFi";
+      if (/SAND|MANA|GALA|IMX|RON|PIXEL|MAGIC|AXS|YGG/.test(s)) return "Gaming";
+      if (/ARB|OP|STRK|ZK|MANTA|METIS/.test(s)) return "Layer 2";
+      if (/BTC|BCH|ORDI|SATS|RUNE/.test(s)) return "比特幣生態";
+      return "其他板塊";
+    }
+    function strategyTagsForSymbol(symbol) {
+      const rows = sortSignals(state.signals).filter(s => clean(s.symbol) === clean(symbol)).slice(0, 12);
+      const tags = [];
+      if (rows.some(s => !isDivergenceSignal(s))) tags.push({label:"嘎空/嘎多", kind:"accent"});
+      if (rows.some(s => stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s))) tags.push({label:"穩如老狗", kind:"bull"});
+      if (rows.some(isDivergenceSignal)) tags.push({label:"5M背離", kind:"warn"});
+      return tags;
     }
     function dataSignals() {
       return state.signals.filter(s => !isDivergenceSignal(s));

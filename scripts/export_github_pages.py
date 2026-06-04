@@ -33,6 +33,14 @@ SECTOR_KEYWORDS = [
     ("Exchange", ("exchange-based", "centralized-exchange")),
     ("Privacy", ("privacy",)),
 ]
+SECTOR_SYMBOLS = {
+    "BTC": "比特幣生態", "ETH": "Layer 1", "BNB": "交易所平台", "SOL": "Layer 1", "XRP": "支付網路",
+    "DOGE": "Meme", "ADA": "Layer 1", "AVAX": "Layer 1", "LINK": "Oracle", "TON": "Layer 1",
+    "TRX": "Layer 1", "BCH": "比特幣生態", "LTC": "支付網路", "DOT": "Layer 1", "NEAR": "Layer 1",
+    "UNI": "DeFi", "APT": "Layer 1", "SUI": "Layer 1", "OP": "Layer 2", "ARB": "Layer 2",
+    "AAVE": "DeFi", "LDO": "DeFi", "INJ": "DeFi", "RUNE": "DeFi", "FET": "AI", "TAO": "AI",
+    "WLD": "AI", "MANA": "Gaming", "SAND": "Gaming", "GALA": "Gaming", "IMX": "Gaming",
+}
 
 
 def load_seed_rows() -> list[dict[str, object]]:
@@ -141,12 +149,85 @@ def build_sector_flows() -> list[dict[str, object]]:
     return rows
 
 
+def clean_symbol(symbol: object) -> str:
+    return str(symbol or "").upper().replace("USDT", "")
+
+
+def sector_for_symbol(symbol: object) -> str:
+    clean = clean_symbol(symbol)
+    if clean in SECTOR_SYMBOLS:
+        return SECTOR_SYMBOLS[clean]
+    if any(key in clean for key in ("PEPE", "BONK", "FLOKI", "SHIB", "DOGE", "WIF", "MEME", "NEIRO", "FART")):
+        return "Meme"
+    if any(key in clean for key in ("AI", "FET", "TAO", "WLD", "ARKM", "VIRTUAL", "RENDER", "RNDR")):
+        return "AI"
+    if any(key in clean for key in ("AAVE", "UNI", "LDO", "CRV", "COMP", "MKR", "SNX", "RUNE", "INJ", "PENDLE", "CAKE")):
+        return "DeFi"
+    if any(key in clean for key in ("SAND", "MANA", "GALA", "IMX", "RON", "PIXEL", "MAGIC", "AXS", "YGG")):
+        return "Gaming"
+    if any(key in clean for key in ("ARB", "OP", "STRK", "ZK", "MANTA", "METIS")):
+        return "Layer 2"
+    return "其他板塊"
+
+
+def signal_tags(symbol: str, seed_rows: list[dict[str, object]]) -> list[str]:
+    clean = clean_symbol(symbol)
+    rows = [row for row in seed_rows if clean_symbol(row.get("symbol")) == clean][:12]
+    tags: list[str] = []
+    if any("oi_5m" not in str(row.get("setup_id") or "") and "divergence" not in str(row.get("setup_id") or "") for row in rows):
+        tags.append("嘎空/嘎多")
+    if rows:
+        tags.append("穩如老狗")
+    if any("oi_5m" in str(row.get("setup_id") or "") or "divergence" in str(row.get("setup_id") or "") for row in rows):
+        tags.append("5M背離")
+    return tags
+
+
+def build_volume_anomalies(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    try:
+        request = Request(
+            "https://fapi.binance.com/fapi/v1/ticker/24hr",
+            headers={"User-Agent": "wei-strategy-room/0.1"},
+        )
+        with urlopen(request, timeout=25) as response:
+            tickers = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return []
+
+    rows: list[dict[str, object]] = []
+    for item in tickers:
+        symbol = str(item.get("symbol") or "")
+        if not symbol.endswith("USDT"):
+            continue
+        quote_volume = float(item.get("quoteVolume") or 0)
+        change = float(item.get("priceChangePercent") or 0)
+        trades = float(item.get("count") or 0)
+        if quote_volume <= 0:
+            continue
+        score = (quote_volume ** 0.5) * (abs(change) + 1) * (1 + min(trades, 500000) / 500000)
+        rows.append(
+            {
+                "symbol": symbol,
+                "price": float(item.get("lastPrice") or 0),
+                "price_change_pct": change,
+                "quote_volume": quote_volume,
+                "trade_count": trades,
+                "anomaly_score": score,
+                "sector": sector_for_symbol(symbol),
+                "strategy_tags": signal_tags(symbol, seed_rows),
+                "reason": "24H 成交量與波動同步放大",
+            }
+        )
+    return sorted(rows, key=lambda row: row["anomaly_score"], reverse=True)[:40]
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "data").mkdir(parents=True, exist_ok=True)
     seed_rows = load_seed_rows()
     markets = build_markets(seed_rows)
     sector_flows = build_sector_flows()
+    volume_anomalies = build_volume_anomalies(seed_rows)
     (OUT / "index.html").write_text(APP_HTML.read_text(encoding="utf-8"), encoding="utf-8")
     if BRAND_IMAGE.exists():
         copyfile(BRAND_IMAGE, OUT / "brand-hero.png")
@@ -172,12 +253,16 @@ def main() -> None:
         json.dumps({"rows": sector_flows}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    (OUT / "data" / "volume_anomalies.json").write_text(
+        json.dumps({"rows": volume_anomalies}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
     (OUT / "data" / "manifest.json").write_text(
-        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json"}, ensure_ascii=False, separators=(",", ":")),
+        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json", "volume_anomalies": "volume_anomalies.json"}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     print(f"Exported GitHub Pages site to {OUT}")
-    print(f"Signals: {len(seed_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)}")
+    print(f"Signals: {len(seed_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)} Volume anomalies: {len(volume_anomalies)}")
 
 
 if __name__ == "__main__":
