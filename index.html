@@ -382,6 +382,7 @@
         <div><span class="watch-title">我的觀察清單</span><span class="watch-sub" id="watchMeta">0 SYMBOLS</span></div>
         <div class="section-actions">
           <input id="symbolSearch" class="search-input" placeholder="搜尋幣種，例如 BCH">
+          <input id="symbolDate" type="date" title="查詢日期">
           <select id="signalFilter">
             <option value="all">全部</option>
             <option value="open">持倉中</option>
@@ -407,6 +408,7 @@
         <h2 class="section-title">全部數據交易訊號 <span id="signalCount" class="section-count">(0)</span></h2>
         <div class="section-actions">
           <input id="signalSearch" class="search-input" placeholder="搜尋幣種，例如 ETH">
+          <input id="signalDate" type="date" title="查詢日期">
           <select id="signalStatusFilter">
             <option value="all">全部</option>
             <option value="open">持倉中</option>
@@ -416,6 +418,22 @@
           <button class="btn primary" id="refreshSignals">⟳ 更新訊號</button>
         </div>
       </div>
+      <section class="backtest-panel">
+        <div class="backtest-head">
+          <div>
+            <div class="kicker">Signal Backtest</div>
+            <h2>數據交易訊號回測</h2>
+            <div class="subline">只計算 OI 嘎空/嘎多訊號，不混入穩如老狗或 5M 背離。</div>
+          </div>
+          <div class="section-actions">
+            <input id="signalBtFrom" type="date" title="開始日期">
+            <input id="signalBtTo" type="date" title="結束日期">
+            <span class="pill accent" id="signalBacktestMeta">0 trades</span>
+          </div>
+        </div>
+        <div id="signalBacktestChart" class="equity-chart"></div>
+        <div class="chart-stats" id="signalBacktestStats"></div>
+      </section>
       <div class="signals-grid" id="signalCards"></div>
     </section>
 
@@ -429,6 +447,7 @@
         <h2 class="section-title">穩健共振清單 <span id="stableCount" class="section-count">(0)</span></h2>
         <div class="section-actions">
           <input id="stableSearch" class="search-input" placeholder="搜尋幣種，例如 BTC">
+          <input id="stableDate" type="date" title="查詢日期">
           <select id="stableSideFilter">
             <option value="all">全部</option>
             <option value="bull">嘎空</option>
@@ -446,6 +465,10 @@
             <div class="subline">依目前收錄交易逐筆累加，觀察穩如老狗策略的累積盈虧曲線。</div>
           </div>
           <span class="pill accent" id="backtestMeta">0 trades</span>
+          <div class="section-actions">
+            <input id="stableBtFrom" type="date" title="開始日期">
+            <input id="stableBtTo" type="date" title="結束日期">
+          </div>
         </div>
         <div id="backtestChart" class="equity-chart"></div>
         <div class="chart-stats" id="backtestStats"></div>
@@ -505,7 +528,7 @@
         <div class="kicker">市場快照</div>
         <div class="modal-stats" id="modalMarket"></div>
         <div class="kicker">近期訊號</div>
-        <div class="subline" id="modalHint">只顯示最近 20 筆。</div>
+        <div class="section-actions"><div class="subline" id="modalHint">只顯示最近 20 筆。</div><input id="modalDate" type="date" title="查詢日期"></div>
         <div class="table-wrap"><table><thead><tr><th>狀態</th><th>時間框架</th><th>方向</th><th>策略</th><th>觸發時間</th><th>評分</th><th>累計盈虧</th></tr></thead><tbody id="modalRows"></tbody></table></div>
       </div>
     </section>
@@ -558,11 +581,19 @@
     $("notifyClear").addEventListener("click", markNotificationsRead);
     $("symbolSearch").addEventListener("input", () => syncSearch("symbolSearch"));
     $("signalSearch").addEventListener("input", () => syncSearch("signalSearch"));
+    $("symbolDate").addEventListener("change", () => syncDate("symbolDate"));
+    $("signalDate").addEventListener("change", () => syncDate("signalDate"));
+    $("stableDate").addEventListener("change", renderStable);
+    $("signalBtFrom").addEventListener("change", renderSignals);
+    $("signalBtTo").addEventListener("change", renderSignals);
+    $("stableBtFrom").addEventListener("change", renderStable);
+    $("stableBtTo").addEventListener("change", renderStable);
     $("stableSearch").addEventListener("input", renderStable);
     $("stableSideFilter").addEventListener("change", renderStable);
     $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
     $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
     $("modalClose").addEventListener("click", closeSymbolModal);
+    $("modalDate").addEventListener("change", () => openSymbolModal($("modalSymbol").textContent));
     $("symbolModal").addEventListener("click", event => { if (event.target.id === "symbolModal") closeSymbolModal(); });
     document.addEventListener("click", event => {
       if (!$("notifyPanel").contains(event.target) && !$("bellBtn").contains(event.target)) $("notifyPanel").classList.remove("open");
@@ -838,6 +869,11 @@
       $(targetId).value = $(sourceId).value;
       renderAll();
     }
+    function syncDate(sourceId) {
+      const targetId = sourceId === "symbolDate" ? "signalDate" : "symbolDate";
+      $(targetId).value = $(sourceId).value;
+      renderAll();
+    }
     function syncFilter(sourceId) {
       const targetId = sourceId === "signalFilter" ? "signalStatusFilter" : "signalFilter";
       $(targetId).value = $(sourceId).value;
@@ -845,7 +881,7 @@
     }
     function renderStats() {
       const stableMode = state.currentView === "stable";
-      const sourceRows = stableMode ? stableSignals() : dataSignals();
+      const sourceRows = stableMode ? stableUniverse() : dataSignals();
       const open = sourceRows.filter(isOpenSignal);
       const partial = sourceRows.filter(isPartialActiveSignal);
       const closed = sourceRows.filter(s => !isOpenSignal(s) && !isPartialActiveSignal(s));
@@ -950,9 +986,15 @@
     }
     function renderSignals() {
       const rows = filteredSignals();
+      const backtestRows = dateRangeRows(dataSignals(), $("signalBtFrom").value, $("signalBtTo").value);
       $("signalCount").textContent = `(${rows.length})`;
       const dashRows = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).slice(0, 8);
       $("dashboardSignalCount").textContent = `(${dashRows.length})`;
+      renderBacktestChart(backtestRows, {
+        chartId: "signalBacktestChart",
+        statsId: "signalBacktestStats",
+        metaId: "signalBacktestMeta"
+      });
       const allHtml = rows.map(signalCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的訊號。</div></section>`;
       const dashHtml = dashRows.map(signalCard).join("") || `<section class="panel"><div class="empty">目前沒有持倉中訊號。</div></section>`;
       $("signalCards").innerHTML = allHtml;
@@ -962,8 +1004,10 @@
     function renderStable() {
       const q = $("stableSearch").value.trim().toUpperCase();
       const sideFilter = $("stableSideFilter").value;
+      const day = $("stableDate").value;
       const rows = stableSignals()
         .filter(s => !q || s.symbol.includes(q))
+        .filter(s => !day || sameDay(s.triggered_at, day))
         .filter(s => sideFilter === "all" || stableTradeMeta(s).side === sideFilter)
         .sort((a,b) => signalRank(b) - signalRank(a) || stableTradeMeta(b).score - stableTradeMeta(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
       $("stableCount").textContent = `(${rows.length})`;
@@ -979,11 +1023,14 @@
         ["觀望", wait, "warn-text"],
         ["高分", tradable, ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
-      renderBacktestChart(rows);
+      renderBacktestChart(dateRangeRows(stableUniverse(), $("stableBtFrom").value, $("stableBtTo").value));
       $("stableCards").innerHTML = rows.map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
       $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
     }
-    function renderBacktestChart(rows) {
+    function renderBacktestChart(rows, options = {}) {
+      const chartId = options.chartId || "backtestChart";
+      const statsId = options.statsId || "backtestStats";
+      const metaId = options.metaId || "backtestMeta";
       const all = rows.slice().sort((a,b) => new Date(a.triggered_at || 0) - new Date(b.triggered_at || 0));
       const points = [];
       let equity = 0;
@@ -998,14 +1045,14 @@
       const wins = all.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length;
       const losses = all.filter(s => s.reached_state === "sl").length;
       const rate = wins + losses ? wins / (wins + losses) * 100 : 0;
-      $("backtestMeta").textContent = `${all.length} trades`;
-      $("backtestStats").innerHTML = [
+      $(metaId).textContent = `${all.length} trades`;
+      $(statsId).innerHTML = [
         ["交易數", all.length, ""],
         ["勝率", `${fmt(rate, 1)}%`, "bull-text"],
         ["最大回撤", signed(maxDrawdown), "bear-text"],
         ["累積盈虧", signed(equity), equity >= 0 ? "bull-text" : "bear-text"]
       ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
-      $("backtestChart").innerHTML = equitySvg(points);
+      $(chartId).innerHTML = equitySvg(points);
     }
     function equitySvg(values) {
       if (!values.length) return `<div class="empty">尚無可回測樣本。</div>`;
@@ -1132,7 +1179,7 @@
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
           <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div></div>
-          <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">1H</span><span class="tf-pill">4H</span><span class="tf-pill">1D</span></div></div>
+          <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">觸發價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
@@ -1335,7 +1382,11 @@
 
     function openSymbolModal(symbol) {
       symbol = clean(symbol);
-      const rows = state.signals.filter(s => clean(s.symbol) === symbol).sort((a,b) => new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
+      const modalDay = $("modalDate").value;
+      const rows = state.signals
+        .filter(s => clean(s.symbol) === symbol)
+        .filter(s => !modalDay || sameDay(s.triggered_at, modalDay))
+        .sort((a,b) => new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
       const market = marketFor(symbol);
       $("modalSymbol").textContent = symbol;
       const wins = winsOf(rows);
@@ -1410,8 +1461,10 @@
     function filteredSignals() {
       const q = querySymbol();
       const filter = $("signalFilter").value;
+      const day = $("signalDate").value;
       return sortSignals(dataSignals()).filter(s => {
         if (q && !clean(s.symbol).includes(q)) return false;
+        if (day && !sameDay(s.triggered_at, day)) return false;
         if (filter !== "sl" && s.reached_state === "sl") return false;
         if (filter === "open" && !(isOpenSignal(s) || isPartialActiveSignal(s))) return false;
         if (filter === "tp" && !["tp1","tp2","tp3","ftp"].includes(s.reached_state)) return false;
@@ -1559,6 +1612,7 @@
       score += clamp(priceMove * 8, 0, 18);
       score += clamp(takerBias / 2, 0, 12);
       score += Number.isFinite(risk) ? clamp(14 - Math.abs(risk - 3) * 2.4, 0, 14) : 4;
+      score += signalMetric(s, "mtf_5m_confluence") ? 8 : 0;
       score += statusBoost;
       score = Math.round(clamp(score, 0, 100));
       return {...scoreGrade(score), value: score};
@@ -1604,8 +1658,11 @@
       return {symbol, side, kind, label, score, reason, oiChange: oi, priceChange: price, oiPercentile: pct, taker, riskText};
     }
     function stableSignals(applyThreshold = true) {
-      return sortSignals(state.signals)
+      return stableUniverse(applyThreshold)
         .filter(s => s.reached_state !== "sl")
+    }
+    function stableUniverse(applyThreshold = true) {
+      return sortSignals(state.signals)
         .filter(s => {
           const meta = stableTradeMeta(s);
           return isDivergenceSignal(s) || !applyThreshold || meta.score >= STABLE_THRESHOLD;
@@ -1779,6 +1836,12 @@
       const bullish = s.signal_type === "reversal_bullish";
       const hit = price => Number.isFinite(Number(price)) && (bullish ? current >= Number(price) : current <= Number(price));
       const stopped = Number.isFinite(Number(s.sl_price)) && (bullish ? current <= Number(s.sl_price) : current >= Number(s.sl_price));
+      if (targetOrder(saved) > 0) {
+        if (hit(s.ftp_price)) return "ftp";
+        if (hit(s.tp3_price) && targetOrder(saved) < 3) return "tp3";
+        if (hit(s.tp2_price) && targetOrder(saved) < 2) return "tp2";
+        return saved;
+      }
       if (stopped) return "sl";
       if (hit(s.ftp_price)) return "ftp";
       if (hit(s.tp3_price)) return "tp3";
@@ -1808,6 +1871,24 @@
     }
     function dataSignals() {
       return state.signals.filter(s => !isDivergenceSignal(s));
+    }
+    function sameDay(value, yyyyMmDd) {
+      if (!value || !yyyyMmDd) return false;
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return false;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}` === yyyyMmDd;
+    }
+    function dateRangeRows(rows, from, to) {
+      return rows.filter(row => {
+        const d = new Date(row.triggered_at || row.detected_at || 0);
+        if (Number.isNaN(d.getTime())) return false;
+        if (from && d < new Date(`${from}T00:00:00`)) return false;
+        if (to && d > new Date(`${to}T23:59:59`)) return false;
+        return true;
+      });
     }
     function isDivergenceSignal(s) {
       const setup = String(s && s.setup_id || "");

@@ -50,8 +50,8 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
         snapshot = row.get("snapshot_data")
         if not isinstance(snapshot, dict):
             snapshot = {}
-        if "divergence_label" not in snapshot:
-            snapshot["divergence_label"] = "頂背離" if "bearish" in setup else "底背離"
+        if snapshot.get("divergence_label") not in {"top_divergence", "bottom_divergence"}:
+            snapshot["divergence_label"] = "top_divergence" if "bearish" in setup else "bottom_divergence"
         row["snapshot_data"] = snapshot
     return row
 
@@ -109,7 +109,8 @@ def state_from_price(row: dict[str, object], price: float) -> str:
 
 def update_existing_states(rows: list[dict[str, object]]) -> None:
     active_rows = [
-        row for row in rows
+        row
+        for row in rows
         if str(row.get("status") or "active") == "active"
         and str(row.get("reached_state") or "holding") in {"holding", "tp1", "tp2", "tp3"}
     ]
@@ -157,7 +158,7 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
     if price_change < 0 and oi_change > 0:
         signal_type = "reversal_bullish"
         setup_id = "oi_5m_bullish_divergence"
-        divergence_name = "底背離"
+        divergence_name = "bottom_divergence"
         sl = price - risk
         tp1 = price + risk
         tp2 = price + risk * 2
@@ -166,7 +167,7 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
     else:
         signal_type = "reversal_bearish"
         setup_id = "oi_5m_bearish_divergence"
-        divergence_name = "頂背離"
+        divergence_name = "top_divergence"
         sl = price + risk
         tp1 = price - risk
         tp2 = price - risk * 2
@@ -204,17 +205,50 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
     return normalize_row(row)
 
 
+def apply_5m_confluence(row: dict[str, object], snapshot: object) -> dict[str, object]:
+    signal_type = str(row.get("signal_type") or "")
+    oi_change = float(getattr(snapshot, "oi_change_pct"))
+    price_change = float(getattr(snapshot, "price_change_pct"))
+    oi_percentile = float(getattr(snapshot, "oi_percentile"))
+    bullish_5m = oi_change > 0 and price_change > 0
+    bearish_5m = oi_change < 0 and price_change <= 0
+    confluence = (
+        (signal_type == "reversal_bullish" and bullish_5m)
+        or (signal_type == "reversal_bearish" and bearish_5m)
+    )
+    snapshot_data = row.get("snapshot_data")
+    if not isinstance(snapshot_data, dict):
+        snapshot_data = {}
+    snapshot_data.update(
+        {
+            "mtf_5m_confluence": confluence,
+            "mtf_5m_oi_change_pct": oi_change,
+            "mtf_5m_price_change_pct": price_change,
+            "mtf_5m_oi_percentile": oi_percentile,
+        }
+    )
+    row["mtf_5m_confluence"] = confluence
+    row["mtf_5m_oi_change_pct"] = oi_change
+    row["mtf_5m_price_change_pct"] = price_change
+    row["mtf_5m_oi_percentile"] = oi_percentile
+    row["snapshot_data"] = snapshot_data
+    return row
+
+
 def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerConfig) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     with BinanceFuturesClient(timeout=20) as client:
         scanner = SentimentScanner(client, config)
         signal = scanner.latest_signal(symbol)
-        if signal is not None:
-            rows.append(normalize_row(format_signal(signal)))
 
         divergence_scanner = SentimentScanner(client, divergence_config)
         klines, oi_points, taker_points = divergence_scanner._load(symbol)
         snapshots = divergence_scanner._snapshots(symbol, klines, oi_points, taker_points)
+        if signal is not None:
+            row = normalize_row(format_signal(signal))
+            if snapshots:
+                row = apply_5m_confluence(row, snapshots[-1])
+            rows.append(row)
         if snapshots:
             row = format_divergence_signal(symbol, snapshots[-1], divergence_config)
             if row is not None:
@@ -250,15 +284,15 @@ def main() -> None:
     found: list[dict[str, object]] = []
     errors: list[str] = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
-      futures = {executor.submit(scan_symbol, symbol, config, divergence_config): symbol for symbol in symbols}
-      for future in as_completed(futures):
-          symbol = futures[future]
-          try:
-              rows = future.result()
-          except Exception as exc:
-              errors.append(f"{symbol}: {exc}")
-              continue
-          found.extend(rows)
+        futures = {executor.submit(scan_symbol, symbol, config, divergence_config): symbol for symbol in symbols}
+        for future in as_completed(futures):
+            symbol = futures[future]
+            try:
+                rows = future.result()
+            except Exception as exc:
+                errors.append(f"{symbol}: {exc}")
+                continue
+            found.extend(rows)
 
     by_id = {str(row.get("id") or signal_id(row)): row for row in existing}
     new_count = 0
