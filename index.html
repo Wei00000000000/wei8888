@@ -266,6 +266,18 @@
     .trade-detail-row.open { display: table-row; }
     .trade-detail { padding: 14px 16px; color: #c7d8ef; line-height: 1.65; background: rgba(255,255,255,.025); border-left: 3px solid var(--accent); }
     .mistake-list { margin-top: 8px; display: grid; gap: 4px; color: var(--muted); }
+    .gate { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 20px; background: radial-gradient(circle at 50% 20%, rgba(0,224,164,.14), transparent 32%), rgba(4,8,13,.96); }
+    .gate.hidden { display: none; }
+    .gate-card { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 14px; background: #0b121b; padding: 22px; box-shadow: 0 22px 54px rgba(0,0,0,.6); }
+    .gate-card h2 { font-size: 22px; }
+    .gate-card input { width: 100%; margin-top: 14px; }
+    .gate-actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; }
+    .gate-error { min-height: 18px; margin-top: 10px; color: var(--bear); font-size: 12px; }
+    .review-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px; }
+    .review-card { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.94); padding: 16px; }
+    .review-title { display: flex; justify-content: space-between; gap: 10px; align-items: start; font-weight: 950; }
+    .review-list { margin-top: 12px; display: grid; gap: 8px; }
+    .review-item { border-top: 1px solid var(--line); padding-top: 8px; color: #c7d8ef; font-size: 13px; line-height: 1.5; }
     .matrix-cell { border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); padding: 10px; min-height: 58px; }
     .matrix-label { color: var(--faint); font: 800 10px var(--mono); }
     .matrix-value { margin-top: 4px; font: 900 13px var(--mono); }
@@ -288,6 +300,19 @@
   </style>
 </head>
 <body>
+  <div class="gate" id="loginGate">
+    <section class="gate-card">
+      <div class="kicker">Private Access</div>
+      <h2>Wei 策略情報室</h2>
+      <div class="subline">請輸入密碼才能開啟網站。</div>
+      <input id="accessPassword" type="password" placeholder="輸入密碼" autocomplete="current-password">
+      <div class="gate-actions">
+        <button class="btn primary" id="unlockBtn">進入</button>
+        <span class="subline">預設測試密碼：wei8888</span>
+      </div>
+      <div class="gate-error" id="gateError"></div>
+    </section>
+  </div>
   <div class="top">
     <div class="top-inner">
       <div class="brand">
@@ -301,6 +326,7 @@
         <button class="active" data-view="dashboard">儀表板</button>
         <button data-view="signals">數據交易訊號</button>
         <button data-view="stable">穩如老狗</button>
+        <button data-view="review">交易檢討</button>
         <button data-view="harmonic">諧波交易訊號</button>
       </nav>
       <div class="top-actions">
@@ -427,6 +453,16 @@
       <div class="terminal-grid" id="stableCards"></div>
     </section>
 
+    <section id="review" class="view">
+      <section class="radar-strip">
+        <div class="kicker">Trade Review Center</div>
+        <h2>交易檢討中心</h2>
+        <div class="subline">獨立統計止損與低品質交易原因，避免同樣錯誤反覆出現。</div>
+      </section>
+      <div class="watch-stats" id="reviewStats"></div>
+      <div class="review-grid" id="reviewCards"></div>
+    </section>
+
     <section id="harmonic" class="view">
       <section class="panel">
         <div class="panel-head">
@@ -488,7 +524,8 @@
       lastMarketAt: null,
       lastError: "",
       busy: false,
-      currentView: "dashboard"
+      currentView: "dashboard",
+      soundUnlocked: false
     };
     const MAIN_WATCH_SYMBOLS = [
       "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
@@ -496,6 +533,7 @@
     ];
     const STATIC_MODE = location.hostname.endsWith("github.io") || location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.protocol === "file:";
     const STABLE_THRESHOLD = 88;
+    const ACCESS_PASSWORD_HASH = "6d7103cdfb6e33d204c467eac3d4be0943ec1b8ca681c6730a3ac4ad1db94ef6";
     const seenSignals = new Set();
     const seenStates = new Map();
     const controls = {
@@ -503,6 +541,8 @@
     };
     let autoTimer = null;
 
+    $("unlockBtn").addEventListener("click", unlockApp);
+    $("accessPassword").addEventListener("keydown", event => { if (event.key === "Enter") unlockApp(); });
     document.querySelectorAll(".nav button").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
     $("scan").addEventListener("click", tickScan);
     $("backtest").addEventListener("click", () => runSignals("backtest"));
@@ -513,7 +553,8 @@
     $("jumpSignals").addEventListener("click", () => setView("signals"));
     $("autoScan").addEventListener("click", toggleAutoScan);
     $("focusSearch").addEventListener("click", () => $("symbolSearch").focus());
-    $("bellBtn").addEventListener("click", event => { event.stopPropagation(); requestNotifyPermission(); toggleNotifyPanel(); });
+    document.addEventListener("pointerdown", unlockSoundOnce, {once: true});
+    $("bellBtn").addEventListener("click", event => { event.stopPropagation(); unlockSoundOnce(); requestNotifyPermission(); toggleNotifyPanel(); });
     $("notifyClear").addEventListener("click", markNotificationsRead);
     $("symbolSearch").addEventListener("input", () => syncSearch("symbolSearch"));
     $("signalSearch").addEventListener("input", () => syncSearch("signalSearch"));
@@ -527,12 +568,35 @@
       if (!$("notifyPanel").contains(event.target) && !$("bellBtn").contains(event.target)) $("notifyPanel").classList.remove("open");
     });
 
+    initAccessGate();
     renderAll();
     status("Auto scanner warming up.");
     initialize();
     setInterval(refreshPrices, 5000);
     setInterval(loadBook, 120000);
     setInterval(renderHealth, 1000);
+
+    function initAccessGate() {
+      if (sessionStorage.getItem("wei_strategy_access") === ACCESS_PASSWORD_HASH) $("loginGate").classList.add("hidden");
+      setTimeout(() => $("accessPassword")?.focus(), 80);
+    }
+    async function unlockApp() {
+      const value = $("accessPassword").value || "";
+      const hash = await sha256(value);
+      if (hash === ACCESS_PASSWORD_HASH) {
+        sessionStorage.setItem("wei_strategy_access", hash);
+        $("loginGate").classList.add("hidden");
+        unlockSoundOnce();
+        return;
+      }
+      $("gateError").textContent = "密碼錯誤。";
+      $("accessPassword").select();
+    }
+    async function sha256(text) {
+      const bytes = new TextEncoder().encode(text);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
+    }
 
     async function initialize() {
       await loadBook();
@@ -765,6 +829,7 @@
       renderWatchDashboard();
       renderSignals();
       renderStable();
+      renderReview();
       renderNotifications();
       renderHealth();
     }
@@ -961,6 +1026,60 @@
         <path d="${path} L${w-pad} ${h-pad} L${pad} ${h-pad} Z" fill="rgba(0,224,164,.08)"/>
       </svg>`;
     }
+    function renderReview() {
+      const rows = state.signals.filter(s => s && !s.error);
+      const stopped = rows.filter(s => s.reached_state === "sl");
+      const lowScore = rows.filter(s => signalScore(s).value < 58);
+      const reasonMap = new Map();
+      for (const s of rows) {
+        const tags = reviewTags(s);
+        for (const tag of tags) {
+          if (!reasonMap.has(tag)) reasonMap.set(tag, []);
+          reasonMap.get(tag).push(s);
+        }
+      }
+      const reasonRows = [...reasonMap.entries()].sort((a,b) => b[1].length - a[1].length);
+      $("reviewStats").innerHTML = [
+        ["止損交易", stopped.length, "bear-text"],
+        ["低分交易", lowScore.length, "warn-text"],
+        ["重複風險類型", reasonRows.length, "accent-text"],
+        ["近期樣本", rows.slice(0, 120).length, ""]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      $("reviewCards").innerHTML = reasonRows.slice(0, 12).map(([tag, items]) => {
+        const recent = items.slice(0, 4);
+        return `<article class="review-card">
+          <div class="review-title"><span>${tag}</span><span class="pill ${tag.includes("止損") ? "bear" : "warn"}">${items.length} 筆</span></div>
+          <div class="subline">${reviewAdvice(tag)}</div>
+          <div class="review-list">${recent.map(s => `<div class="review-item"><strong>${clean(s.symbol)}</strong> · ${strategyNameForSignal(s)} · ${shortTime(s.triggered_at)} · ${stateLabel(s.reached_state)}<br>${plainTradeReason(s)}</div>`).join("")}</div>
+        </article>`;
+      }).join("") || `<section class="panel"><div class="empty">目前沒有足夠的檢討樣本。</div></section>`;
+    }
+    function reviewTags(s) {
+      const tags = [];
+      const oi = Math.abs(Number(signalMetric(s, "oi_change_pct")) || 0);
+      const price = Math.abs(Number(signalMetric(s, "price_change_pct")) || 0);
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
+      const risk = riskPct(s);
+      if (s.reached_state === "sl") tags.push("觸發止損");
+      if (signalScore(s).value < 58) tags.push("低分訊號");
+      if (oi > 2) tags.push("OI 過熱");
+      if (price > 2) tags.push("追價波動");
+      if (Number.isFinite(taker) && Math.abs(taker - 0.5) < 0.04) tags.push("Taker 不共振");
+      if (Number.isFinite(risk) && risk > 5) tags.push("R 值過大");
+      if (isDivergenceSignal(s)) tags.push(strategyNameForSignal(s));
+      return tags;
+    }
+    function reviewAdvice(tag) {
+      if (tag.includes("止損")) return "下一次同方向訊號需等待重新站回結構，避免連續追同一段。";
+      if (tag.includes("OI")) return "OI 極端代表槓桿擁擠，進場要搭配價格延續與 Taker 共振。";
+      if (tag.includes("追價")) return "價格已大幅移動時，降低倉位或等待回踩後再進。";
+      if (tag.includes("Taker")) return "主動買賣不明確時，訊號只列觀察。";
+      if (tag.includes("R")) return "止損太遠代表位置不好，應等待更貼近失效點的進場。";
+      return "納入觀察，避免同類型條件反覆造成低品質進場。";
+    }
+    function plainTradeReason(s) {
+      return reviewTags(s).slice(0, 3).join("、") || "依規則完成，無明顯錯誤標籤。";
+    }
     function stableCard(s) {
       return `<article class="stable-card ${s.kind}" data-stable-symbol="${s.symbol}">
         <div class="stable-head">
@@ -1095,20 +1214,23 @@
       $("notifyPanel").classList.toggle("open");
     }
     function markNotificationsRead() {
-      state.notifications.forEach(n => n.read = true);
+      state.notifications = [];
+      seenSignals.clear();
+      rememberExistingSignals(state.signals);
+      renderNotifications();
       updateBell();
       $("notifyPanel").classList.remove("open");
     }
     function updateBell() {
       const unread = state.notifications.filter(n => !n.read).length;
-      const open = state.signals.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length;
-      $("bellBadge").textContent = unread || open || "";
-      $("bellBadge").classList.toggle("on", unread > 0 || open > 0);
+      $("bellBadge").textContent = unread || "";
+      $("bellBadge").classList.toggle("on", unread > 0);
     }
     function addNotification(note) {
       state.notifications.unshift({...note, read: false, at: new Date()});
       state.notifications = state.notifications.slice(0, 50);
       showToast(note);
+      playAlertSound(note.kind);
       showSystemNotification(note);
       updateBell();
     }
@@ -1127,6 +1249,36 @@
       } catch {
         try { new Notification(title, {body, icon: "icon-192.png"}); } catch {}
       }
+    }
+    function unlockSoundOnce() {
+      if (state.soundUnlocked) return;
+      state.soundUnlocked = true;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume?.();
+        window.__weiAudioContext = ctx;
+      } catch {}
+    }
+    function playAlertSound(kind = "accent") {
+      try {
+        const ctx = window.__weiAudioContext || new (window.AudioContext || window.webkitAudioContext)();
+        window.__weiAudioContext = ctx;
+        if (ctx.state === "suspended") ctx.resume();
+        const now = ctx.currentTime;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.36);
+        gain.connect(ctx.destination);
+        [0, 0.11].forEach((offset, i) => {
+          const osc = ctx.createOscillator();
+          osc.type = "sine";
+          osc.frequency.value = kind === "bear" ? 520 - i * 90 : 760 + i * 120;
+          osc.connect(gain);
+          osc.start(now + offset);
+          osc.stop(now + offset + 0.13);
+        });
+      } catch {}
     }
     function showToast({kind, symbol, title, body}) {
       const node = document.createElement("div");
@@ -1519,11 +1671,15 @@
       });
     }
     function signalRank(s) {
-      if (isOpenSignal(s)) return 4;
-      if (isPartialActiveSignal(s)) return 3;
-      if (["tp1","tp2","tp3","ftp"].includes(s.reached_state)) return 2;
-      if (s.reached_state === "sl") return 1;
-      return 0;
+      const score = isDivergenceSignal(s) ? stableTradeMeta(s).score : signalScore(s).value;
+      const ageHours = Math.max(0, (Date.now() - new Date(s.triggered_at || s.detected_at || 0).getTime()) / 3600000);
+      const fresh = clamp(24 - ageHours, 0, 24);
+      if (isOpenSignal(s)) return 700 + score + fresh;
+      if (isPartialActiveSignal(s)) return 620 + score + fresh;
+      if (["tp1","tp2","tp3"].includes(s.reached_state)) return 500 + score + fresh;
+      if (s.reached_state === "ftp") return 360 + score;
+      if (s.reached_state === "sl") return -100 + score;
+      return score + fresh;
     }
     function sortMarkets(a,b) {
       const as = latestOpenSignal(clean(a.symbol));
