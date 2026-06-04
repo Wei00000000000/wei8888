@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -50,7 +50,8 @@
     .top { position: sticky; top: 0; z-index: 50; background: rgba(8,13,19,.94); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
     .top-inner { max-width: 1680px; margin: 0 auto; min-height: 58px; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
     .brand { display: flex; align-items: center; gap: 11px; min-width: 220px; }
-    .logo { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(179,107,255,.35); font: 900 13px var(--mono); }
+    .logo { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; overflow: hidden; background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(179,107,255,.35); font: 900 13px var(--mono); }
+    .logo img { width: 100%; height: 100%; object-fit: cover; }
     .brand-title { margin: 0; font-size: 15px; line-height: 1.1; font-weight: 900; }
     .brand-sub { color: var(--faint); font: 700 10px var(--mono); margin-top: 3px; letter-spacing: .8px; }
     .nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -70,7 +71,7 @@
     h2 { margin: 3px 0 0; font-size: 18px; line-height: 1.2; }
     .subline { margin-top: 4px; color: var(--muted); font-size: 12px; }
     .muted { color: var(--muted); }
-    .toolbar { display: grid; grid-template-columns: minmax(250px, 1.5fr) repeat(5, minmax(84px, 1fr)) minmax(110px,.8fr) minmax(80px,.7fr) auto auto auto auto; gap: 9px; padding: 12px; align-items: end; background: var(--deep); border-bottom: 1px solid var(--line); }
+    .toolbar { display: none; grid-template-columns: minmax(250px, 1.5fr) repeat(5, minmax(84px, 1fr)) minmax(110px,.8fr) minmax(80px,.7fr) auto auto auto auto; gap: 9px; padding: 12px; align-items: end; background: var(--deep); border-bottom: 1px solid var(--line); }
     label { display: grid; gap: 5px; color: var(--faint); font: 800 10px var(--mono); text-transform: uppercase; letter-spacing: .55px; }
     input, select { height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-3); color: var(--text); padding: 0 10px; outline: none; }
     input:focus, select:focus { border-color: rgba(179,107,255,.55); }
@@ -243,6 +244,28 @@
     .stable-score { font: 950 28px var(--mono); }
     .stable-rule { margin-top: 12px; color: #dbe8f8; line-height: 1.65; font-size: 14px; }
     .stable-matrix { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-top: 14px; }
+    .brand-hero { margin: 0 0 20px; min-height: 190px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: linear-gradient(90deg, rgba(6,10,15,.78), rgba(6,10,15,.25)), url("brand-hero.png") center/cover; display: flex; align-items: flex-end; padding: 22px; }
+    .brand-hero h2 { font-size: 28px; margin: 0; text-shadow: 0 2px 16px rgba(0,0,0,.7); }
+    .brand-hero .subline { max-width: 720px; color: #c7d8ef; }
+    .flow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 12px; margin-bottom: 22px; }
+    .flow-card { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.92); padding: 14px; }
+    .flow-top { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .flow-name { font-weight: 950; }
+    .flow-value { font: 950 18px var(--mono); }
+    .flow-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; margin: 12px 0 8px; }
+    .flow-bar span { display: block; height: 100%; border-radius: inherit; background: var(--bull); }
+    .flow-card.bear .flow-bar span { background: var(--bear); }
+    .backtest-panel { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.92); margin-bottom: 22px; padding: 16px; }
+    .backtest-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
+    .equity-chart { width: 100%; height: 180px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(rgba(102,167,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.04) 1px, transparent 1px), #060b12; background-size: 28px 28px; }
+    .chart-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 12px; }
+    .chart-stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: rgba(255,255,255,.025); }
+    .trade-row { cursor: pointer; }
+    .trade-row:hover { background: rgba(255,255,255,.035); }
+    .trade-detail-row { display: none; }
+    .trade-detail-row.open { display: table-row; }
+    .trade-detail { padding: 14px 16px; color: #c7d8ef; line-height: 1.65; background: rgba(255,255,255,.025); border-left: 3px solid var(--accent); }
+    .mistake-list { margin-top: 8px; display: grid; gap: 4px; color: var(--muted); }
     .matrix-cell { border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); padding: 10px; min-height: 58px; }
     .matrix-label { color: var(--faint); font: 800 10px var(--mono); }
     .matrix-value { margin-top: 4px; font: 900 13px var(--mono); }
@@ -268,10 +291,10 @@
   <div class="top">
     <div class="top-inner">
       <div class="brand">
-        <div class="logo">SL</div>
+        <div class="logo"><img src="brand-hero.png" alt="Wei"></div>
         <div>
-          <h1 class="brand-title">Sentiment Lens</h1>
-          <div class="brand-sub">LOCAL · BINANCE FUTURES</div>
+          <h1 class="brand-title">Wei 策略情報室</h1>
+          <div class="brand-sub">BINANCE FUTURES · FLOW RADAR</div>
         </div>
       </div>
       <nav class="nav">
@@ -317,7 +340,18 @@
     </section>
 
     <section id="dashboard" class="view active">
+      <section class="brand-hero">
+        <div>
+          <div class="kicker">Wei Strategy Intelligence</div>
+          <h2>Wei 策略情報室</h2>
+          <div class="subline">整合 15M OI 訊號、穩如老狗、5M 頂底背離、板塊資金流與模擬回測。</div>
+        </div>
+      </section>
       <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>諧波交易訊號</span></div>
+      <div class="section-head">
+        <div><span class="watch-title">板塊資金流動</span><span class="watch-sub" id="sectorMeta">等待更新</span></div>
+      </div>
+      <div class="flow-grid" id="sectorFlows"></div>
       <div class="section-head">
         <div><span class="watch-title">我的觀察清單</span><span class="watch-sub" id="watchMeta">0 SYMBOLS</span></div>
         <div class="section-actions">
@@ -378,6 +412,18 @@
         </div>
       </div>
       <div class="watch-stats" id="stableStats"></div>
+      <section class="backtest-panel">
+        <div class="backtest-head">
+          <div>
+            <div class="kicker">Simulation Backtest</div>
+            <h2>模擬回測圖表</h2>
+            <div class="subline">依目前收錄交易逐筆累加，觀察穩如老狗策略的累積盈虧曲線。</div>
+          </div>
+          <span class="pill accent" id="backtestMeta">0 trades</span>
+        </div>
+        <div id="backtestChart" class="equity-chart"></div>
+        <div class="chart-stats" id="backtestStats"></div>
+      </section>
       <div class="terminal-grid" id="stableCards"></div>
     </section>
 
@@ -434,6 +480,7 @@
     const state = {
       markets: [],
       signals: [],
+      sectorFlows: [],
       notifications: [],
       lastBookAt: null,
       lastTickAt: null,
@@ -447,7 +494,7 @@
       "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
       "TRX","BCH","LTC","DOT","NEAR","UNI","APT","SUI","OP","ARB"
     ];
-    const STATIC_MODE = location.hostname.endsWith("github.io") || location.protocol === "file:";
+    const STATIC_MODE = location.hostname.endsWith("github.io") || location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.protocol === "file:";
     const STABLE_THRESHOLD = 88;
     const seenSignals = new Set();
     const seenStates = new Map();
@@ -489,6 +536,7 @@
 
     async function initialize() {
       await loadBook();
+      await loadSectorFlows();
       await loadMarkets();
       toggleAutoScan();
     }
@@ -505,12 +553,27 @@
         return {...data, new_signals: [], scanned: [], total_symbols: MAIN_WATCH_SYMBOLS.length};
       }
       if (endpoint === "prices") return staticPrices(query);
+      if (endpoint === "sector_flows") {
+        const res = await fetch(`data/sector_flows.json?ts=${Date.now()}`);
+        return res.ok ? res.json() : {rows: [], updated_at: null};
+      }
       if (endpoint === "markets" || endpoint === "prices") {
         const res = await fetch(`data/markets.json?ts=${Date.now()}`);
         const data = await res.json();
         return endpoint === "prices" ? {markets: data.rows || [], prices: {}} : data;
       }
       throw new Error("Static mode does not support this endpoint.");
+    }
+    async function loadSectorFlows() {
+      try {
+        const data = await apiJson("sector_flows");
+        state.sectorFlows = data.rows || [];
+        state.lastSectorAt = data.updated_at ? new Date(data.updated_at) : new Date();
+        renderSectorFlows();
+      } catch (err) {
+        state.sectorFlows = [];
+        renderSectorFlows();
+      }
     }
     async function staticBook() {
       try {
@@ -698,6 +761,7 @@
 
     function renderAll() {
       renderStats();
+      renderSectorFlows();
       renderWatchDashboard();
       renderSignals();
       renderStable();
@@ -716,7 +780,7 @@
     }
     function renderStats() {
       const stableMode = state.currentView === "stable";
-      const sourceRows = stableMode ? stableSignals() : state.signals;
+      const sourceRows = stableMode ? stableSignals() : dataSignals();
       const open = sourceRows.filter(isOpenSignal);
       const partial = sourceRows.filter(isPartialActiveSignal);
       const closed = sourceRows.filter(s => !isOpenSignal(s) && !isPartialActiveSignal(s));
@@ -745,6 +809,26 @@
       ];
       $("stats").innerHTML = cells.map(([label, value, detail]) => `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value ${String(value).startsWith("-") ? "bear-text" : "bull-text"}">${value}</div><div class="subline">${detail || ""}</div></div>`).join("");
       updateBell();
+    }
+    function renderSectorFlows() {
+      const target = $("sectorFlows");
+      if (!target) return;
+      const rows = (state.sectorFlows || []).slice(0, 8);
+      $("sectorMeta").textContent = rows.length ? `更新於 ${lastTimeText(state.lastSectorAt)}` : "暫無資料";
+      target.innerHTML = rows.map(row => {
+        const change = Number(row.market_cap_change_24h || row.change_24h || 0);
+        const volume = Number(row.volume_24h || 0);
+        const width = clamp(Math.abs(change) * 10 + 18, 8, 100);
+        const kind = change >= 0 ? "bull" : "bear";
+        return `<article class="flow-card ${kind}">
+          <div class="flow-top">
+            <div><div class="flow-name">${row.name}</div><div class="subline">${row.source || "CoinGecko categories"}</div></div>
+            <div class="flow-value ${change >= 0 ? "bull-text" : "bear-text"}">${signed(change)}</div>
+          </div>
+          <div class="flow-bar"><span style="width:${width}%"></span></div>
+          <div class="subline">24h Volume ${compact(volume)} · Market Cap ${compact(row.market_cap || 0)}</div>
+        </article>`;
+      }).join("") || `<section class="panel"><div class="empty">暫無板塊資金流資料，等待下一次雲端更新。</div></section>`;
     }
     function renderWatchDashboard() {
       const rows = watchMarkets().map(m => ({...m, analysis: classifyMarket(m)}));
@@ -830,8 +914,52 @@
         ["觀望", wait, "warn-text"],
         ["高分", tradable, ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      renderBacktestChart(rows);
       $("stableCards").innerHTML = rows.map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
       $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
+    }
+    function renderBacktestChart(rows) {
+      const all = rows.slice().sort((a,b) => new Date(a.triggered_at || 0) - new Date(b.triggered_at || 0));
+      const points = [];
+      let equity = 0;
+      let peak = 0;
+      let maxDrawdown = 0;
+      for (const row of all) {
+        equity += pnlPct(row, false);
+        peak = Math.max(peak, equity);
+        maxDrawdown = Math.min(maxDrawdown, equity - peak);
+        points.push(equity);
+      }
+      const wins = all.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length;
+      const losses = all.filter(s => s.reached_state === "sl").length;
+      const rate = wins + losses ? wins / (wins + losses) * 100 : 0;
+      $("backtestMeta").textContent = `${all.length} trades`;
+      $("backtestStats").innerHTML = [
+        ["交易數", all.length, ""],
+        ["勝率", `${fmt(rate, 1)}%`, "bull-text"],
+        ["最大回撤", signed(maxDrawdown), "bear-text"],
+        ["累積盈虧", signed(equity), equity >= 0 ? "bull-text" : "bear-text"]
+      ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
+      $("backtestChart").innerHTML = equitySvg(points);
+    }
+    function equitySvg(values) {
+      if (!values.length) return `<div class="empty">尚無可回測樣本。</div>`;
+      const w = 900, h = 180, pad = 18;
+      const min = Math.min(0, ...values);
+      const max = Math.max(0, ...values);
+      const span = Math.max(1, max - min);
+      const xy = values.map((v, i) => {
+        const x = pad + (values.length === 1 ? 0 : i / (values.length - 1) * (w - pad * 2));
+        const y = h - pad - ((v - min) / span) * (h - pad * 2);
+        return [x, y];
+      });
+      const path = xy.map(([x,y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+      const zeroY = h - pad - ((0 - min) / span) * (h - pad * 2);
+      return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" role="img" aria-label="equity curve">
+        <line x1="${pad}" y1="${zeroY}" x2="${w-pad}" y2="${zeroY}" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 5"/>
+        <path d="${path}" fill="none" stroke="#00e0a4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="${path} L${w-pad} ${h-pad} L${pad} ${h-pad} Z" fill="rgba(0,224,164,.08)"/>
+      </svg>`;
     }
     function stableCard(s) {
       return `<article class="stable-card ${s.kind}" data-stable-symbol="${s.symbol}">
@@ -1082,8 +1210,16 @@
       $("modalRows").innerHTML = rows.slice(0, 20).map(s => {
         const pnlValue = pnlPct(s, isLivePricedSignal(s));
         const score = signalScore(s);
-        return `<tr><td><span class="pill ${stateKind(s)}">${stateLabel(displayState(s))}</span></td><td>${String(s.timeframe || "15M").toUpperCase()}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${s.signal_type === "reversal_bullish" ? "多" : "空"}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${strategyNameForSignal(s)}</td><td class="mono">${shortTime(s.triggered_at)}</td><td><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span></td><td class="${pnlValue >= 0 ? "bull-text" : "bear-text"}">${signed(pnlValue)}</td></tr>`;
+        const key = signalKey(s).replace(/[^\w-]/g, "_");
+        return `<tr class="trade-row" data-trade="${key}"><td><span class="pill ${stateKind(s)}">${stateLabel(displayState(s))}</span></td><td>${String(s.timeframe || "15M").toUpperCase()}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${s.signal_type === "reversal_bullish" ? "多" : "空"}</td><td class="${s.signal_type === "reversal_bullish" ? "bull-text" : "bear-text"}">${strategyNameForSignal(s)}</td><td class="mono">${shortTime(s.triggered_at)}</td><td><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span></td><td class="${pnlValue >= 0 ? "bull-text" : "bear-text"}">${signed(pnlValue)}</td></tr>
+        <tr class="trade-detail-row" id="trade_${key}"><td colspan="7"><div class="trade-detail">${tradeReasonHtml(s)}</div></td></tr>`;
       }).join("") || `<tr><td colspan="7" class="empty">尚無 ${symbol} 訊號。</td></tr>`;
+      $("modalRows").querySelectorAll(".trade-row").forEach(row => {
+        row.addEventListener("click", () => {
+          const target = $(`trade_${row.dataset.trade}`);
+          if (target) target.classList.toggle("open");
+        });
+      });
       $("symbolModal").classList.add("open");
     }
     function closeSymbolModal() { $("symbolModal").classList.remove("open"); }
@@ -1097,11 +1233,32 @@
     function metricCard([a,b,c]) {
       return `<div class="modal-card"><div class="subline">${a}</div><div class="stat-value ${String(b).startsWith("-") ? "bear-text" : "bull-text"}">${b}</div><div class="subline">${c || ""}</div></div>`;
     }
+    function tradeReasonHtml(s) {
+      const stopped = s.reached_state === "sl";
+      const oi = Number(signalMetric(s, "oi_change_pct")) || 0;
+      const price = Number(signalMetric(s, "price_change_pct")) || 0;
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
+      const risk = riskPct(s);
+      const reasons = [];
+      if (stopped) reasons.push(`止損原因：價格觸及 SL ${fmt(s.sl_price, 6)}，代表進場後市場沒有延續預期方向。`);
+      if (isDivergenceSignal(s)) reasons.push(`背離結構：${strategyNameForSignal(s)}，${divergenceKind(s) === "top" ? "價格創短線高但 OI 退潮，偏空。" : "價格下殺但 OI 增加，偏多反轉。"}`);
+      if (Math.abs(oi) > 2) reasons.push(`OI 變化過大：${signed(oi)}，槓桿擁擠，容易出現反向掃損。`);
+      if (Math.abs(price) > 2) reasons.push(`價格波動過大：${signed(price)}，追價風險升高。`);
+      if (Number.isFinite(taker) && Math.abs(taker - 0.5) < 0.04) reasons.push(`Taker 買賣不夠偏向：${fmt(taker, 2)}，主動成交沒有明確站隊。`);
+      if (Number.isFinite(risk) && risk > 5) reasons.push(`止損距離偏大：R=${fmt(risk, 2)}%，部位需要更小或等待更好的進場價。`);
+      if (!reasons.length) reasons.push("此筆交易沒有明顯單一錯誤，主要依訊號規則完成。");
+      const lessons = [
+        stopped ? "同類型止損後，下次等待價格重新站回進場結構再進場。" : "若已觸發 TP，後續不要把獲利單重新當成新進場訊號。",
+        "OI 極端但價格沒有延續時，優先降低倉位。",
+        "分數低於 80 或多週期不共振時，只列觀察，不急著進。"
+      ];
+      return `<strong>${stopped ? "止損檢討" : "交易備註"}</strong><div class="mistake-list">${reasons.map(r => `<span>• ${r}</span>`).join("")}</div><strong>避免再犯</strong><div class="mistake-list">${lessons.map(r => `<span>• ${r}</span>`).join("")}</div>`;
+    }
 
     function filteredSignals() {
       const q = querySymbol();
       const filter = $("signalFilter").value;
-      return sortSignals(state.signals).filter(s => {
+      return sortSignals(dataSignals()).filter(s => {
         if (q && !clean(s.symbol).includes(q)) return false;
         if (filter !== "sl" && s.reached_state === "sl") return false;
         if (filter === "open" && !(isOpenSignal(s) || isPartialActiveSignal(s))) return false;
@@ -1299,10 +1456,23 @@
         .filter(s => s.reached_state !== "sl")
         .filter(s => {
           const meta = stableTradeMeta(s);
-          return !applyThreshold || meta.score >= STABLE_THRESHOLD;
+          return isDivergenceSignal(s) || !applyThreshold || meta.score >= STABLE_THRESHOLD;
         });
     }
     function stableTradeMeta(s) {
+      if (isDivergenceSignal(s)) {
+        const top = divergenceKind(s) === "top";
+        const score = Math.round(clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100));
+        return {
+          score,
+          kind: top ? "bear" : "bull",
+          side: top ? "bear" : "bull",
+          label: top ? "頂背離做空" : "底背離做多",
+          reason: top
+            ? `5M 頂背離：價格上推但 OI 退潮，追多動能不足，歸入穩如老狗空方觀察。`
+            : `5M 底背離：價格下殺但 OI 增加，空方擁擠，歸入穩如老狗多方觀察。`
+        };
+      }
       const isBull = s.signal_type === "reversal_bullish";
       const dir = isBull ? 1 : -1;
       const oiPct = clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100);
@@ -1477,9 +1647,20 @@
     }
     function strategyName(type) { return type === "reversal_bullish" ? "嘎空" : "嘎多"; }
     function strategyNameForSignal(s) {
-      const setup = String(s.setup_id || "");
-      if (setup.includes("oi_5m") || setup.includes("divergence")) return "5M背離";
+      if (isDivergenceSignal(s)) return divergenceKind(s) === "top" ? "頂背離" : "底背離";
       return strategyName(s.signal_type);
+    }
+    function dataSignals() {
+      return state.signals.filter(s => !isDivergenceSignal(s));
+    }
+    function isDivergenceSignal(s) {
+      const setup = String(s && s.setup_id || "");
+      return setup.includes("oi_5m") || setup.includes("divergence");
+    }
+    function divergenceKind(s) {
+      const label = String(signalMetric(s, "divergence") || "");
+      if (label.includes("price_up_oi_down") || String(s.setup_id || "").includes("bearish")) return "top";
+      return "bottom";
     }
     function winsOf(rows) { return rows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length; }
     function lossesOf(rows) { return rows.filter(s => s.reached_state === "sl").length; }
@@ -1541,3 +1722,4 @@
   </script>
 </body>
 </html>
+

@@ -4,6 +4,8 @@ import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from shutil import copyfile
+from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,12 +15,23 @@ from sentiment_scanner.binance import BinanceFuturesClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 APP_HTML = ROOT / "sentiment_scanner" / "app.html"
 SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
+BRAND_IMAGE = ROOT / "sentiment_scanner" / "brand-hero.png"
 OUT = ROOT / "site"
 MAIN_SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
     "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "TONUSDT",
     "TRXUSDT", "BCHUSDT", "LTCUSDT", "DOTUSDT", "NEARUSDT",
     "UNIUSDT", "APTUSDT", "SUIUSDT", "OPUSDT", "ARBUSDT",
+]
+SECTOR_KEYWORDS = [
+    ("Layer 1", ("layer-1", "smart-contract-platform")),
+    ("DeFi", ("decentralized-finance", "defi")),
+    ("AI", ("artificial-intelligence", "ai")),
+    ("Meme", ("meme",)),
+    ("Gaming", ("gaming", "gamefi")),
+    ("RWA", ("real-world-assets", "rwa")),
+    ("Exchange", ("exchange-based", "centralized-exchange")),
+    ("Privacy", ("privacy",)),
 ]
 
 
@@ -89,12 +102,54 @@ def build_markets(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]
     return [markets[symbol] for symbol in MAIN_SYMBOLS if symbol in markets]
 
 
+def build_sector_flows() -> list[dict[str, object]]:
+    try:
+        request = Request(
+            "https://api.coingecko.com/api/v3/coins/categories",
+            headers={"User-Agent": "wei-strategy-room/0.1"},
+        )
+        with urlopen(request, timeout=20) as response:
+            categories = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return []
+
+    rows: list[dict[str, object]] = []
+    used: set[str] = set()
+    for display_name, keywords in SECTOR_KEYWORDS:
+        match = next(
+            (
+                item for item in categories
+                if item.get("id") not in used
+                and any(keyword in str(item.get("id") or "").lower() or keyword in str(item.get("name") or "").lower() for keyword in keywords)
+            ),
+            None,
+        )
+        if not match:
+            continue
+        used.add(str(match.get("id")))
+        rows.append(
+            {
+                "name": display_name,
+                "source": "CoinGecko",
+                "category_id": match.get("id"),
+                "market_cap": match.get("market_cap") or 0,
+                "volume_24h": match.get("volume_24h") or 0,
+                "market_cap_change_24h": match.get("market_cap_change_24h") or 0,
+                "top_coins": match.get("top_3_coins") or [],
+            }
+        )
+    return rows
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "data").mkdir(parents=True, exist_ok=True)
     seed_rows = load_seed_rows()
     markets = build_markets(seed_rows)
+    sector_flows = build_sector_flows()
     (OUT / "index.html").write_text(APP_HTML.read_text(encoding="utf-8"), encoding="utf-8")
+    if BRAND_IMAGE.exists():
+        copyfile(BRAND_IMAGE, OUT / "brand-hero.png")
     (OUT / "data" / "book.json").write_text(
         json.dumps({"rows": seed_rows, "markets": markets}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
@@ -113,12 +168,16 @@ def main() -> None:
         json.dumps({"rows": markets}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    (OUT / "data" / "sector_flows.json").write_text(
+        json.dumps({"rows": sector_flows}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
     (OUT / "data" / "manifest.json").write_text(
-        json.dumps({"signal_chunks": chunks, "markets": "markets.json"}, ensure_ascii=False, separators=(",", ":")),
+        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json"}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     print(f"Exported GitHub Pages site to {OUT}")
-    print(f"Signals: {len(seed_rows)} Markets: {len(markets)}")
+    print(f"Signals: {len(seed_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)}")
 
 
 if __name__ == "__main__":

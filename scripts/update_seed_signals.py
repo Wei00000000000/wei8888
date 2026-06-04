@@ -45,6 +45,14 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
     row.setdefault("status", "active")
     row.setdefault("reached_state", "holding")
     row.setdefault("detected_at", datetime.now(timezone.utc).isoformat())
+    setup = str(row.get("setup_id") or "")
+    if "oi_5m" in setup or "divergence" in setup:
+        snapshot = row.get("snapshot_data")
+        if not isinstance(snapshot, dict):
+            snapshot = {}
+        if "divergence_label" not in snapshot:
+            snapshot["divergence_label"] = "頂背離" if "bearish" in setup else "底背離"
+        row["snapshot_data"] = snapshot
     return row
 
 
@@ -149,6 +157,7 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
     if price_change < 0 and oi_change > 0:
         signal_type = "reversal_bullish"
         setup_id = "oi_5m_bullish_divergence"
+        divergence_name = "底背離"
         sl = price - risk
         tp1 = price + risk
         tp2 = price + risk * 2
@@ -157,6 +166,7 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
     else:
         signal_type = "reversal_bearish"
         setup_id = "oi_5m_bearish_divergence"
+        divergence_name = "頂背離"
         sl = price + risk
         tp1 = price - risk
         tp2 = price - risk * 2
@@ -187,6 +197,7 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
         "oi_value_usdt": getattr(snapshot, "oi_value_usdt"),
         "snapshot_data": {
             "divergence": "price_down_oi_up" if price_change < 0 and oi_change > 0 else "price_up_oi_down",
+            "divergence_label": divergence_name,
             "interval": "5m",
         },
     }
