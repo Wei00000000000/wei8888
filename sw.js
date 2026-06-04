@@ -1,4 +1,4 @@
-const CACHE_NAME = "sentiment-lens-v9";
+﻿const CACHE_NAME = "wei-strategy-room-v10";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -41,3 +41,4 @@ self.addEventListener("fetch", event => {
       .catch(() => caches.match(event.request))
   );
 });
+
