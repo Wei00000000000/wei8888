@@ -576,6 +576,7 @@
     const STATIC_MODE = location.hostname.endsWith("github.io") || location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.protocol === "file:";
     const STABLE_THRESHOLD = 88;
     const ACCESS_PASSWORD_HASH = "aee231a88857a8bf1737e8663740894c615a7a4fcb721629134abd8c39e122c7";
+    const NOTIFY_MEMORY_KEY = "wei_strategy_notify_memory_v2";
     const seenSignals = new Set();
     const seenStates = new Map();
     const controls = {
@@ -619,6 +620,7 @@
     });
 
     initAccessGate();
+    loadNotificationMemory();
     renderAll();
     status("Auto scanner warming up.");
     initialize();
@@ -798,6 +800,10 @@
         state.markets = mergeMarkets(state.markets, data.markets || []);
         state.lastBookAt = new Date();
         if (firstLoad) {
+          if (seenSignals.size) {
+            notifySignalChanges(state.signals);
+            notifyStateChanges(state.signals, oldStates);
+          }
           rememberExistingSignals(state.signals);
         } else {
           notifySignalChanges(state.signals);
@@ -1338,8 +1344,8 @@
     }
     function markNotificationsRead() {
       state.notifications = [];
-      seenSignals.clear();
       rememberExistingSignals(state.signals);
+      saveNotificationMemory();
       renderNotifications();
       updateBell();
       $("notifyPanel").classList.remove("open");
@@ -1431,6 +1437,7 @@
           body: `${shortTime(s.triggered_at)} · OI ${signed(s.oi_change_pct)} · 價格 ${signed(s.price_change_pct)}`
         });
       }
+      saveNotificationMemory();
     }
     function notifyStateChanges(rows, oldStates) {
       for (const s of rows) {
@@ -1448,6 +1455,7 @@
           });
         }
       }
+      saveNotificationMemory();
     }
     function rememberExistingSignals(rows) {
       rows.forEach(s => {
@@ -1455,6 +1463,25 @@
         seenSignals.add(key);
         seenStates.set(key, s.reached_state || s.status || "active");
       });
+      saveNotificationMemory();
+    }
+    function loadNotificationMemory() {
+      try {
+        const raw = localStorage.getItem(NOTIFY_MEMORY_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        (data.signals || []).forEach(key => seenSignals.add(key));
+        Object.entries(data.states || {}).forEach(([key, value]) => seenStates.set(key, value));
+      } catch {}
+    }
+    function saveNotificationMemory() {
+      try {
+        const payload = {
+          signals: [...seenSignals].slice(-2500),
+          states: Object.fromEntries([...seenStates].slice(-2500))
+        };
+        localStorage.setItem(NOTIFY_MEMORY_KEY, JSON.stringify(payload));
+      } catch {}
     }
 
     function openSymbolModal(symbol) {

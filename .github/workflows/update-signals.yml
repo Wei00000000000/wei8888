@@ -15,6 +15,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,6 +30,7 @@ jobs:
           OI_PERCENTILE: "99"
           DIVERGENCE_OI_PERCENTILE: "95"
           MAX_SEED_ROWS: "3000"
+          SCAN_FALLBACK_LIMIT: "120"
         run: python scripts/update_seed_signals.py
       - name: Export GitHub Pages data
         run: python scripts/export_github_pages.py

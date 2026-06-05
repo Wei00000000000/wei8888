@@ -117,8 +117,12 @@ def update_existing_states(rows: list[dict[str, object]]) -> None:
     symbols = sorted({clean_symbol(row.get("symbol")) for row in active_rows})
     if not symbols:
         return
-    with BinanceFuturesClient(timeout=20) as client:
-        prices = client.ticker_price(symbols)
+    try:
+        with BinanceFuturesClient(timeout=20) as client:
+            prices = client.ticker_price(symbols)
+    except Exception as exc:
+        print(f"WARN price state update skipped: {exc}")
+        return
     now = datetime.now(timezone.utc).isoformat()
     for row in active_rows:
         price = prices.get(clean_symbol(row.get("symbol")))
@@ -258,10 +262,18 @@ def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerCo
 
 def resolve_symbols() -> list[str]:
     top = int(os.getenv("SCAN_TOP", "0") or "0")
-    with BinanceFuturesClient(timeout=20) as client:
-        if top > 0:
-            return client.top_symbols_by_volume(limit=top)
-        return client.exchange_symbols()
+    try:
+        with BinanceFuturesClient(timeout=20) as client:
+            if top > 0:
+                return client.top_symbols_by_volume(limit=top)
+            return client.exchange_symbols()
+    except Exception as exc:
+        existing_symbols = sorted({clean_symbol(row.get("symbol")) for row in load_rows() if row.get("symbol")})
+        fallback_limit = int(os.getenv("SCAN_FALLBACK_LIMIT", "120"))
+        if existing_symbols:
+            print(f"WARN symbol discovery failed, using {min(len(existing_symbols), fallback_limit)} seed symbols: {exc}")
+            return existing_symbols[:fallback_limit]
+        raise
 
 
 def main() -> None:
