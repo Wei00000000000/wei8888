@@ -567,7 +567,8 @@
       lastError: "",
       busy: false,
       currentView: "dashboard",
-      soundUnlocked: false
+      soundUnlocked: false,
+      priceBaselineReady: false
     };
     const MAIN_WATCH_SYMBOLS = [
       "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
@@ -802,7 +803,6 @@
         if (firstLoad) {
           if (seenSignals.size) {
             notifySignalChanges(state.signals);
-            notifyStateChanges(state.signals, oldStates);
           }
           rememberExistingSignals(state.signals);
         } else {
@@ -867,7 +867,12 @@
         const oldStates = new Map(seenStates);
         state.markets = mergeMarkets(state.markets, data.markets || []);
         updateLiveSignalStates();
-        notifyStateChanges(state.signals, oldStates);
+        if (state.priceBaselineReady) {
+          notifyStateChanges(state.signals, oldStates);
+        } else {
+          rememberExistingSignals(state.signals);
+          state.priceBaselineReady = true;
+        }
         state.lastPriceAt = new Date();
         renderAll();
         if ($("symbolModal").classList.contains("open")) openSymbolModal($("modalSymbol").textContent);
