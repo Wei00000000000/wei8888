@@ -216,6 +216,23 @@ def score_contract_market(row: dict[str, object]) -> tuple[int, str, str, str, l
     return score, bias, kind, mkt_label, reasons
 
 
+def contract_quality_score(row: dict[str, object], trigger: str, radar_score: int, min_volume: float) -> tuple[int, list[str]]:
+    checks: list[str] = []
+    if abs(first_float(row, ("open_interest_change_percent_1h", "open_interest_change_percent_15m", "open_interest_change_percent_4h", "oi_change_1h"))) >= 8:
+        checks.append("OI強")
+    if abs(cvd_ratio(row, "1h") or first_float(row, ("cvd_ratio_1h",))) >= 5:
+        checks.append("CVD明確")
+    if abs(first_float(row, ("price_change_percent_5m", "price_change_5m"))) >= 3 or abs(first_float(row, ("price_change_percent_15m", "price_change_15m"))) >= 3:
+        checks.append("價格配合")
+    if quote_volume_24h(row) >= max(min_volume, 5_000_000):
+        checks.append("高流動性")
+    if abs(first_float(row, ("avg_funding_rate_by_oi", "avg_funding_rate_by_vol", "funding_rate"))) >= 0.02:
+        checks.append("費率極端")
+    if abs(radar_score) >= 40 or trigger != "watch":
+        checks.append("觸發明確")
+    return min(6, len(checks)), checks
+
+
 def build_contract_radar(coinglass_rows: list[dict[str, object]], min_volume: float) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for item in coinglass_rows:
@@ -232,10 +249,15 @@ def build_contract_radar(coinglass_rows: list[dict[str, object]], min_volume: fl
             continue
         score, bias, kind, mkt_label, reasons = score_contract_market(item)
         trigger = "oi_cross" if abs(oi_1h) >= 8 else "price_5m" if abs(price_5m) >= 3 else "price_15m" if abs(price_15m) >= 3 else "watch"
+        quality, quality_checks = contract_quality_score(item, trigger, score, min_volume)
         rows.append(
             {
                 "symbol": symbol,
                 "score": score,
+                "radar_score": score,
+                "quality_score": quality,
+                "quality_label": "高品質" if quality >= 4 else "一般",
+                "quality_checks": quality_checks,
                 "bias": bias,
                 "kind": kind,
                 "trigger": trigger,
@@ -258,7 +280,7 @@ def build_contract_radar(coinglass_rows: list[dict[str, object]], min_volume: fl
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
         )
-    return sorted(rows, key=lambda row: (abs(float(row["score"])), abs(float(row["oi_change_1h"])), float(row["volume_24h"])), reverse=True)[:160]
+    return sorted(rows, key=lambda row: (float(row["quality_score"]), abs(float(row["radar_score"])), abs(float(row["oi_change_1h"])), float(row["volume_24h"])), reverse=True)[:160]
 
 
 def funding_map(rows: list[dict[str, object]]) -> dict[str, float]:
@@ -311,10 +333,23 @@ def build_contract_radar_from_binance_tickers(
         else:
             bias, kind = "neutral", "neutral"
         trigger = "price_24h" if abs(change) >= 3 else "funding" if abs(fr) >= 0.02 else "watch"
+        temp_row = {
+            "price_change_percent_5m": 0,
+            "price_change_percent_15m": 0,
+            "funding_rate": fr,
+            "quote_volume": volume,
+            "cvd_ratio_1h": 0,
+            "oi_change_1h": 0,
+        }
+        quality, quality_checks = contract_quality_score(temp_row, trigger, score, min_volume)
         rows.append(
             {
                 "symbol": symbol,
                 "score": score,
+                "radar_score": score,
+                "quality_score": quality,
+                "quality_label": "高品質" if quality >= 4 else "一般",
+                "quality_checks": quality_checks,
                 "bias": bias,
                 "kind": kind,
                 "trigger": trigger,
@@ -337,7 +372,7 @@ def build_contract_radar_from_binance_tickers(
                 "updated_at": now,
             }
         )
-    return sorted(rows, key=lambda row: (abs(float(row["score"])), abs(float(row["price_change_24h"])), float(row["volume_24h"])), reverse=True)[:160]
+    return sorted(rows, key=lambda row: (float(row["quality_score"]), abs(float(row["radar_score"])), abs(float(row["price_change_24h"])), float(row["volume_24h"])), reverse=True)[:160]
 
 
 def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None:
@@ -386,7 +421,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
             quality += 1
         if abs(float(row.get("price_change_5m") or 0)) >= 3 or abs(float(row.get("price_change_15m") or 0)) >= 3:
             quality += 1
-        if float(row.get("volume_24h") or 0) >= 10_000_000:
+        if float(row.get("volume_24h") or 0) >= 5_000_000:
             quality += 1
         if abs(float(row.get("funding_rate") or 0)) >= 0.02:
             quality += 1
@@ -419,7 +454,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "source": "coinglass_contract_scan",
                     "snapshot_data": {
                         "contract_radar": True,
-                        "score": row.get("score"),
+                        "radar_score": row.get("radar_score", row.get("score")),
                         "bias": bias,
                         "trigger": trigger,
                         "market_label": row.get("market_label"),
@@ -624,7 +659,7 @@ def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerCo
 
 def resolve_symbols() -> list[str]:
     top = int(os.getenv("SCAN_TOP", "0") or "0")
-    min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "10000000"))
+    min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
     try:
         with BinanceFuturesClient(timeout=20) as client:
             return client.symbols_by_volume(limit=top, min_quote_volume=min_volume)
@@ -639,7 +674,7 @@ def resolve_symbols() -> list[str]:
 
 def main() -> None:
     existing = [normalize_row(row) for row in load_rows()]
-    min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "10000000"))
+    min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
     config = ScannerConfig(
         lookback_limit=int(os.getenv("LOOKBACK_LIMIT", "500")),
         oi_percentile_threshold=float(os.getenv("OI_PERCENTILE", "99")),

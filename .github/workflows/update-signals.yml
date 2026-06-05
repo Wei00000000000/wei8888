@@ -31,7 +31,7 @@ jobs:
           DIVERGENCE_OI_PERCENTILE: "95"
           MAX_SEED_ROWS: "3000"
           SCAN_FALLBACK_LIMIT: "120"
-          MIN_QUOTE_VOLUME_USDT: "10000000"
+          MIN_QUOTE_VOLUME_USDT: "5000000"
           COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
         run: python scripts/update_seed_signals.py
       - name: Export GitHub Pages data
