@@ -31,6 +31,8 @@ jobs:
           DIVERGENCE_OI_PERCENTILE: "95"
           MAX_SEED_ROWS: "3000"
           SCAN_FALLBACK_LIMIT: "120"
+          MIN_QUOTE_VOLUME_USDT: "10000000"
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
         run: python scripts/update_seed_signals.py
       - name: Export GitHub Pages data
         run: python scripts/export_github_pages.py
@@ -39,7 +41,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp -r site/* .
-          git add sentiment_scanner/seed_signals.json data index.html
+          git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json data index.html
           if git diff --cached --quiet; then
             echo "No signal updates"
           else

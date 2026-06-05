@@ -338,6 +338,7 @@
       <nav class="nav">
         <button class="active" data-view="dashboard">儀表板</button>
         <button data-view="signals">數據交易訊號</button>
+        <button data-view="contract">合約異常雷達</button>
         <button data-view="stable">穩如老狗</button>
         <button data-view="review">交易檢討</button>
         <button data-view="harmonic">諧波交易訊號</button>
@@ -454,6 +455,28 @@
       <div class="signals-grid" id="signalCards"></div>
     </section>
 
+    <section id="contract" class="view">
+      <section class="radar-strip">
+        <div class="kicker">Contract Anomaly Radar</div>
+        <h2>合約異常雷達</h2>
+        <div class="subline">CoinGlass 快照每輪只打一個全市場端點，24H 成交量低於 1000 萬 USDT 不列入，K 線與交易訊號由雲端掃描補齊。</div>
+      </section>
+      <div class="section-head">
+        <h2 class="section-title">全市場合約異常 <span id="contractCount" class="section-count">(0)</span></h2>
+        <div class="section-actions">
+          <input id="contractSearch" class="search-input" placeholder="搜尋幣種，例如 BTC">
+          <select id="contractBiasFilter">
+            <option value="all">全部</option>
+            <option value="long">偏多</option>
+            <option value="short">偏空</option>
+            <option value="neutral">觀察</option>
+          </select>
+        </div>
+      </div>
+      <div class="watch-stats" id="contractStats"></div>
+      <div class="terminal-grid" id="contractCards"></div>
+    </section>
+
     <section id="stable" class="view">
       <section class="radar-strip">
         <div class="kicker">Conservative Contract Matrix</div>
@@ -558,12 +581,14 @@
       signals: [],
       sectorFlows: [],
       volumeAnomalies: [],
+      contractAnomalies: [],
       notifications: [],
       lastBookAt: null,
       lastTickAt: null,
       lastPriceAt: null,
       lastMarketAt: null,
       lastVolumeAt: null,
+      lastContractAt: null,
       lastError: "",
       busy: false,
       currentView: "dashboard",
@@ -611,6 +636,8 @@
     $("stableBtTo").addEventListener("change", renderStable);
     $("stableSearch").addEventListener("input", renderStable);
     $("stableSideFilter").addEventListener("change", renderStable);
+    $("contractSearch").addEventListener("input", renderContractRadar);
+    $("contractBiasFilter").addEventListener("change", renderContractRadar);
     $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
     $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
     $("modalClose").addEventListener("click", closeSymbolModal);
@@ -655,6 +682,7 @@
       await loadBook();
       await loadSectorFlows();
       await loadVolumeAnomalies();
+      await loadContractRadar();
       await loadMarkets();
       toggleAutoScan();
     }
@@ -677,6 +705,10 @@
       }
       if (endpoint === "volume_anomalies") {
         const res = await fetch(`data/volume_anomalies.json?ts=${Date.now()}`);
+        return res.ok ? res.json() : {rows: [], updated_at: null};
+      }
+      if (endpoint === "contract_anomalies") {
+        const res = await fetch(`data/contract_anomalies.json?ts=${Date.now()}`);
         return res.ok ? res.json() : {rows: [], updated_at: null};
       }
       if (endpoint === "markets" || endpoint === "prices") {
@@ -706,6 +738,17 @@
       } catch (err) {
         state.volumeAnomalies = [];
         renderVolumeAnomalies();
+      }
+    }
+    async function loadContractRadar() {
+      try {
+        const data = await apiJson("contract_anomalies");
+        state.contractAnomalies = data.rows || [];
+        state.lastContractAt = data.updated_at ? new Date(data.updated_at) : new Date();
+        renderContractRadar();
+      } catch (err) {
+        state.contractAnomalies = [];
+        renderContractRadar();
       }
     }
     async function staticBook() {
@@ -801,13 +844,9 @@
         state.markets = mergeMarkets(state.markets, data.markets || []);
         state.lastBookAt = new Date();
         if (firstLoad) {
-          if (seenSignals.size) {
-            notifySignalChanges(state.signals);
-          }
           rememberExistingSignals(state.signals);
         } else {
           notifySignalChanges(state.signals);
-          notifyStateChanges(state.signals, oldStates);
           rememberExistingSignals(state.signals);
         }
         renderAll();
@@ -844,7 +883,6 @@
         state.signals = sortSignals(data.rows || state.signals);
         state.markets = mergeMarkets(state.markets, data.markets || []);
         notifySignalChanges(data.new_signals || []);
-        notifyStateChanges(state.signals, oldStates);
         state.lastTickAt = new Date();
         renderAll();
         const scanned = data.scanned ? data.scanned.length : 0;
@@ -868,7 +906,8 @@
         state.markets = mergeMarkets(state.markets, data.markets || []);
         updateLiveSignalStates();
         if (state.priceBaselineReady) {
-          notifyStateChanges(state.signals, oldStates);
+          seenStates.clear();
+          rememberExistingSignals(state.signals);
         } else {
           rememberExistingSignals(state.signals);
           state.priceBaselineReady = true;
@@ -915,6 +954,7 @@
       renderStats();
       renderSectorFlows();
       renderVolumeAnomalies();
+      renderContractRadar();
       renderWatchDashboard();
       renderSignals();
       renderStable();
@@ -1010,6 +1050,59 @@
         </article>`;
       }).join("") || `<section class="panel"><div class="empty">暫無當日成交量異常清單。</div></section>`;
       target.querySelectorAll("[data-abnormal-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.abnormalSymbol)));
+    }
+    function renderContractRadar() {
+      const target = $("contractCards");
+      if (!target) return;
+      const q = $("contractSearch").value.trim().toUpperCase();
+      const bias = $("contractBiasFilter").value;
+      const rows = (state.contractAnomalies || [])
+        .filter(row => !q || clean(row.symbol).includes(q))
+        .filter(row => bias === "all" || String(row.bias || "neutral") === bias)
+        .slice(0, 120);
+      $("contractCount").textContent = `(${rows.length})`;
+      const longs = rows.filter(row => row.bias === "long").length;
+      const shorts = rows.filter(row => row.bias === "short").length;
+      const neutral = rows.filter(row => row.bias === "neutral").length;
+      const avgScore = rows.length ? rows.reduce((sum, row) => sum + Math.abs(Number(row.score) || 0), 0) / rows.length : 0;
+      $("contractStats").innerHTML = [
+        ["偏多候選", longs, "bull-text"],
+        ["偏空候選", shorts, "bear-text"],
+        ["觀察", neutral, "warn-text"],
+        ["平均強度", fmt(avgScore, 0), "accent-text"],
+        ["成交量門檻", "1000萬", ""],
+        ["更新", lastTimeText(state.lastContractAt), ""]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      target.innerHTML = rows.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有符合成交量門檻的合約異常。</div></section>`;
+      target.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol)));
+    }
+    function contractCard(row) {
+      const symbol = clean(row.symbol);
+      const kind = row.bias === "long" ? "bull" : row.bias === "short" ? "bear" : "warn";
+      const label = row.bias === "long" ? "偏多" : row.bias === "short" ? "偏空" : "觀察";
+      const latest = latestSignalFor(symbol);
+      const reason = [
+        row.market_label,
+        row.trigger,
+        ...(row.reasons || [])
+      ].filter(Boolean).join(" · ");
+      return `<article class="signal-card ${kind}" data-contract-symbol="${symbol}">
+        <div class="signal-top">
+          <div class="side-badge ${kind === "bull" ? "long" : "short"}">${kind === "bull" ? "多" : kind === "bear" ? "空" : "觀"}</div>
+          <div><div class="signal-symbol">${symbol}</div><div class="signal-time">${lastTimeText(state.lastContractAt)}</div><div class="signal-strategy ${kind === "bear" ? "bear" : ""}">合約異常雷達 · ${label}</div></div>
+          <div class="signal-actions"><span class="score-badge ${kind}">S ${fmt(row.score,0)}</span></div>
+        </div>
+        <div class="pnl-box"><div class="metric-label">雷達強度</div><div class="pnl-value ${kind === "bear" ? "bear-text" : "bull-text"}">${fmt(row.score,0)}</div></div>
+        <div class="metric-grid">
+          <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(row.price, 6)}</div></div>
+          <div class="metric-box"><div class="metric-label">24H 成交量</div><div class="metric-value">${compact(row.volume_24h)}</div></div>
+          <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${signed(row.oi_change_1h)}</div></div>
+          <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${signed(row.cvd_ratio_1h)}</div></div>
+          <div class="metric-box tp"><div class="metric-label">價格 5M</div><div class="metric-value">${signed(row.price_change_5m)}</div></div>
+          <div class="metric-box tp"><div class="metric-label">價格 15M</div><div class="metric-value">${signed(row.price_change_15m)}</div></div>
+        </div>
+        <div class="stable-rule">${reason || "等待更多共振"}${latest ? ` · 最新訊號 ${strategyNameForSignal(latest)} ${shortTime(latest.triggered_at)}` : ""}</div>
+      </article>`;
     }
     function renderWatchDashboard() {
       const rows = watchMarkets().map(m => ({...m, analysis: classifyMarket(m)}));
@@ -1430,7 +1523,7 @@
     }
     function notifySignalChanges(rows) {
       for (const s of rows) {
-        if (!(isOpenSignal(s) || isPartialActiveSignal(s))) continue;
+        if (!isOpenSignal(s)) continue;
         const key = signalKey(s);
         if (seenSignals.has(key)) continue;
         seenSignals.add(key);

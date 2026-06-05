@@ -72,15 +72,33 @@ class BinanceFuturesClient:
                 symbols.append(item["symbol"])
         return sorted(symbols)
 
-    def top_symbols_by_volume(self, limit: int = 50, quote_asset: str = "USDT") -> list[str]:
+    def symbols_by_volume(
+        self,
+        limit: int = 0,
+        quote_asset: str = "USDT",
+        min_quote_volume: float = 0.0,
+    ) -> list[str]:
         valid = set(self.exchange_symbols(quote_asset=quote_asset))
         tickers = self._get(BINANCE_FAPI, "/fapi/v1/ticker/24hr", {})
         ranked = sorted(
-            (item for item in tickers if item.get("symbol") in valid),
+            (
+                item
+                for item in tickers
+                if item.get("symbol") in valid and float(item.get("quoteVolume") or 0.0) >= min_quote_volume
+            ),
             key=lambda item: float(item.get("quoteVolume") or 0.0),
             reverse=True,
         )
-        return [item["symbol"] for item in ranked[:limit]]
+        if limit > 0:
+            ranked = ranked[:limit]
+        return [item["symbol"] for item in ranked]
+
+    def top_symbols_by_volume(self, limit: int = 50, quote_asset: str = "USDT") -> list[str]:
+        return self.symbols_by_volume(limit=limit, quote_asset=quote_asset)
+
+    def ticker_24hr(self) -> list[dict[str, Any]]:
+        data = self._get(BINANCE_FAPI, "/fapi/v1/ticker/24hr", {})
+        return [row for row in data if isinstance(row, dict)]
 
     def ticker_price(self, symbols: Iterable[str]) -> dict[str, float]:
         wanted = set(normalize_symbols(symbols))

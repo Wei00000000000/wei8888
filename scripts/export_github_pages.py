@@ -15,6 +15,7 @@ from sentiment_scanner.binance import BinanceFuturesClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 APP_HTML = ROOT / "sentiment_scanner" / "app.html"
 SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
+CONTRACT_RADAR = ROOT / "sentiment_scanner" / "contract_anomalies.json"
 BRAND_IMAGE = ROOT / "sentiment_scanner" / "brand-hero.png"
 OUT = ROOT / "site"
 MAIN_SYMBOLS = [
@@ -48,6 +49,18 @@ def load_seed_rows() -> list[dict[str, object]]:
         return []
     rows = json.loads(SEED.read_text(encoding="utf-8"))
     return [row for row in rows if isinstance(row, dict)]
+
+
+def load_contract_radar() -> dict[str, object]:
+    if not CONTRACT_RADAR.exists():
+        return {"rows": [], "updated_at": None}
+    try:
+        data = json.loads(CONTRACT_RADAR.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {"rows": [], "updated_at": None}
 
 
 def fallback_market(symbol: str, rows: list[dict[str, object]]) -> dict[str, object]:
@@ -225,6 +238,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "data").mkdir(parents=True, exist_ok=True)
     seed_rows = load_seed_rows()
+    contract_radar = load_contract_radar()
     markets = build_markets(seed_rows)
     sector_flows = build_sector_flows()
     volume_anomalies = build_volume_anomalies(seed_rows)
@@ -257,12 +271,16 @@ def main() -> None:
         json.dumps({"rows": volume_anomalies}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    (OUT / "data" / "contract_anomalies.json").write_text(
+        json.dumps(contract_radar, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
     (OUT / "data" / "manifest.json").write_text(
-        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json", "volume_anomalies": "volume_anomalies.json"}, ensure_ascii=False, separators=(",", ":")),
+        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json", "volume_anomalies": "volume_anomalies.json", "contract_anomalies": "contract_anomalies.json"}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     print(f"Exported GitHub Pages site to {OUT}")
-    print(f"Signals: {len(seed_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)} Volume anomalies: {len(volume_anomalies)}")
+    print(f"Signals: {len(seed_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)} Volume anomalies: {len(volume_anomalies)} Contract radar: {len(contract_radar.get('rows') or [])}")
 
 
 if __name__ == "__main__":
