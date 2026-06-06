@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import BinanceFuturesClient
 from sentiment_scanner.binance import BINANCE_FAPI, BINANCE_FDATA
+from sentiment_scanner.bybit import BybitFuturesClient
 from sentiment_scanner.cli import format_signal
 from sentiment_scanner.coinglass import CoinGlassClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
@@ -23,6 +24,25 @@ SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
 CONTRACT_RADAR = ROOT / "sentiment_scanner" / "contract_anomalies.json"
 SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"
 TARGET_ORDER = {"holding": 0, "tp1": 1, "tp2": 2, "tp3": 3, "ftp": 4, "sl": -1}
+
+
+def provider_name() -> str:
+    return os.getenv("MARKET_DATA_PROVIDER", "bybit").strip().lower()
+
+
+def market_client(timeout: float = 20.0):
+    if provider_name() == "binance":
+        return BinanceFuturesClient(timeout=timeout)
+    return BybitFuturesClient(timeout=timeout)
+
+
+def previous_success_at() -> str | None:
+    try:
+        data = json.loads(SCANNER_STATUS.read_text(encoding="utf-8"))
+        value = data.get("last_success_at") or data.get("updated_at")
+        return str(value) if value else None
+    except Exception:
+        return None
 
 
 def load_rows() -> list[dict[str, object]]:
@@ -455,7 +475,7 @@ def candidate_symbols_from_tickers(tickers: list[dict[str, object]], min_volume:
 
 def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[str, float]]:
     def load(symbol: str) -> tuple[str, dict[str, float]]:
-        with BinanceFuturesClient(timeout=12) as client:
+        with market_client(timeout=12) as client:
             rows = client.klines(symbol, interval="5m", limit=14)
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         rows = [row for row in rows if row.close_time <= now_ms]
@@ -488,6 +508,8 @@ def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[
 
 
 def prefetch_scan_data(symbols: list[str], lookback: int, divergence_lookback: int) -> None:
+    if provider_name() != "binance":
+        return
     requests: list[tuple[str, str, dict[str, object]]] = []
     for symbol in symbols:
         for interval, limit in (("15m", lookback), ("5m", divergence_lookback)):
@@ -498,7 +520,7 @@ def prefetch_scan_data(symbols: list[str], lookback: int, divergence_lookback: i
                     (BINANCE_FDATA, "/takerlongshortRatio", {"symbol": symbol, "period": interval, "limit": min(limit, 500)}),
                 ]
             )
-    with BinanceFuturesClient(timeout=60) as client:
+    with market_client(timeout=60) as client:
         client.prefetch(requests)
 
 
@@ -510,7 +532,7 @@ def latest_ratio(rows: list[dict[str, object]]) -> float | None:
 
 def binance_positioning_details(symbols: list[str], workers: int = 8) -> dict[str, dict[str, object]]:
     def load(symbol: str) -> tuple[str, dict[str, object]]:
-        with BinanceFuturesClient(timeout=12) as client:
+        with market_client(timeout=12) as client:
             taker = client.taker_buy_sell_volume(symbol, period="1h", limit=1)
             retail = client.global_long_short_account_ratio(symbol, period="1h", limit=1)
             top_account = client.top_long_short_account_ratio(symbol, period="1h", limit=1)
@@ -569,7 +591,7 @@ def enrich_coinglass_details(
 
 
 def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dict[str, object]], dict[str, object]]:
-    with BinanceFuturesClient(timeout=20) as client:
+    with market_client(timeout=20) as client:
         tickers = client.ticker_24hr()
     kline_limit = int(os.getenv("CONTRACT_KLINE_CANDIDATES", "120"))
     detail_limit = int(os.getenv("CONTRACT_DETAIL_CANDIDATES", "20"))
@@ -589,7 +611,7 @@ def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dic
                 "/topLongShortPositionRatio",
             )
         )
-    with BinanceFuturesClient(timeout=60) as client:
+    with market_client(timeout=60) as client:
         client.prefetch(prefetch)
     changes = short_kline_changes(candidates, workers=workers)
     details = binance_positioning_details(detail_symbols, workers=workers)
@@ -618,7 +640,8 @@ def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dic
         "coinglass_calls": cg_calls,
         "detail_symbols": len(detail_symbols),
         "kline_symbols": len(candidates),
-        "binance_positioning_symbols": len(details),
+        "market_data_provider": provider_name(),
+        "positioning_symbols": len(details),
     }
 
 
@@ -837,21 +860,22 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
     pairs = sorted(earliest_by_pair)
     if not pairs:
         return {"checked": 0, "changed": 0, "closed": 0}
-    with BinanceFuturesClient(timeout=60) as client:
-        client.prefetch(
-            [
-                (
-                    BINANCE_FAPI,
-                    "/fapi/v1/klines",
-                    {"symbol": symbol, "interval": interval, "limit": 1500, "startTime": earliest_by_pair[(symbol, interval)]},
-                )
-                for symbol, interval in pairs
-            ]
-        )
+    if provider_name() == "binance":
+        with market_client(timeout=60) as client:
+            client.prefetch(
+                [
+                    (
+                        BINANCE_FAPI,
+                        "/fapi/v1/klines",
+                        {"symbol": symbol, "interval": interval, "limit": 1500, "startTime": earliest_by_pair[(symbol, interval)]},
+                    )
+                    for symbol, interval in pairs
+                ]
+            )
 
     def load(pair: tuple[str, str]) -> tuple[tuple[str, str], list[object]]:
         symbol, interval = pair
-        with BinanceFuturesClient(timeout=15) as client:
+        with market_client(timeout=15) as client:
             return pair, client.klines_since(symbol, interval=interval, start_time=earliest_by_pair[pair])
 
     histories: dict[tuple[str, str], list[object]] = {}
@@ -1036,7 +1060,7 @@ def apply_5m_confluence(row: dict[str, object], snapshot: object) -> dict[str, o
 
 def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerConfig) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    with BinanceFuturesClient(timeout=20) as client:
+    with market_client(timeout=20) as client:
         scanner = SentimentScanner(client, config)
         signal = scanner.latest_signal(symbol)
 
@@ -1062,7 +1086,7 @@ def resolve_symbols() -> list[str]:
     top = int(os.getenv("SCAN_TOP", "0") or "0")
     min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
     try:
-        with BinanceFuturesClient(timeout=20) as client:
+        with market_client(timeout=20) as client:
             return client.symbols_by_volume(limit=top, min_quote_volume=min_volume)
     except Exception as exc:
         existing_symbols = sorted({clean_symbol(row.get("symbol")) for row in load_rows() if row.get("symbol")})
@@ -1150,16 +1174,27 @@ def main() -> None:
         reverse=True,
     )
     max_rows = int(os.getenv("MAX_SEED_ROWS", "3000"))
-    SEED.write_text(json.dumps(rows[:max_rows], ensure_ascii=False, indent=2), encoding="utf-8")
+    allowed_errors = int(os.getenv("MAX_SCAN_ERRORS", str(max(5, int(len(symbols) * 0.05)))))
+    scan_ok = bool(found) and len(errors) <= allowed_errors
+    if scan_ok:
+        SEED.write_text(json.dumps(rows[:max_rows], ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
+        print("WARN scan failed; keeping previous signal data")
+    status_time = datetime.now(timezone.utc).isoformat()
     SCANNER_STATUS.write_text(
         json.dumps(
             {
-                "ok": not errors,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "ok": scan_ok,
+                "updated_at": status_time,
+                "last_attempt_at": status_time,
+                "last_success_at": status_time if scan_ok else previous_success_at(),
+                "market_data_provider": provider_name(),
                 "symbols_scanned": len(symbols),
                 "signals_found": len(found),
                 "new_signals": new_count,
                 "errors": errors[:20],
+                "error_count": len(errors),
+                "allowed_errors": allowed_errors,
                 "state_audit": state_audit,
                 "state_consistency": state_consistency,
                 "min_volume_usdt": min_volume,

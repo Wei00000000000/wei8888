@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from shutil import copyfile
-from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import BinanceFuturesClient
+from sentiment_scanner.bybit import BybitFuturesClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 APP_HTML = ROOT / "sentiment_scanner" / "app.html"
 SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
@@ -25,6 +26,16 @@ MAIN_SYMBOLS = [
     "TRXUSDT", "BCHUSDT", "LTCUSDT", "DOTUSDT", "NEARUSDT",
     "UNIUSDT", "APTUSDT", "SUIUSDT", "OPUSDT", "ARBUSDT",
 ]
+
+
+def provider_name() -> str:
+    return os.getenv("MARKET_DATA_PROVIDER", "bybit").strip().lower()
+
+
+def market_client(timeout: float = 20.0):
+    if provider_name() == "binance":
+        return BinanceFuturesClient(timeout=timeout)
+    return BybitFuturesClient(timeout=timeout)
 SECTOR_KEYWORDS = [
     ("Layer 1", ("layer-1", "smart-contract-platform")),
     ("DeFi", ("decentralized-finance", "defi")),
@@ -83,8 +94,8 @@ def fallback_market(symbol: str, rows: list[dict[str, object]]) -> dict[str, obj
 
 
 def live_market(symbol: str) -> dict[str, object]:
-    config = ScannerConfig(lookback_limit=500, oi_percentile_threshold=99)
-    with BinanceFuturesClient() as client:
+    config = ScannerConfig(lookback_limit=500, oi_percentile_threshold=99, oi_change_min_pct=3)
+    with market_client() as client:
         scanner = SentimentScanner(client, config)
         klines, oi_points, taker_points = scanner._load(symbol)
         snapshots = scanner._snapshots(symbol, klines, oi_points, taker_points)
@@ -199,12 +210,8 @@ def signal_tags(symbol: str, seed_rows: list[dict[str, object]]) -> list[str]:
 
 def build_volume_anomalies(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]:
     try:
-        request = Request(
-            "https://fapi.binance.com/fapi/v1/ticker/24hr",
-            headers={"User-Agent": "wei-strategy-room/0.1"},
-        )
-        with urlopen(request, timeout=25) as response:
-            tickers = json.loads(response.read().decode("utf-8"))
+        with market_client(timeout=25) as client:
+            tickers = client.ticker_24hr()
     except Exception:
         return []
 
@@ -215,7 +222,7 @@ def build_volume_anomalies(seed_rows: list[dict[str, object]]) -> list[dict[str,
             continue
         quote_volume = float(item.get("quoteVolume") or 0)
         change = float(item.get("priceChangePercent") or 0)
-        trades = float(item.get("count") or 0)
+        trades = float(item.get("count") or item.get("trade_count") or 0)
         if quote_volume <= 0:
             continue
         score = (quote_volume ** 0.5) * (abs(change) + 1) * (1 + min(trades, 500000) / 500000)

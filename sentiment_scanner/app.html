@@ -97,6 +97,15 @@
     .btn.primary { border-color: rgba(179,107,255,.7); background: var(--accent-soft); color: #e8d4ff; }
     .btn:disabled { opacity: .55; cursor: progress; }
     .status-line { padding: 10px 14px; color: var(--muted); font: 700 11px var(--mono); border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .health-pack { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+    .health-dot { min-height: 22px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: rgba(255,255,255,.025); color: var(--muted); }
+    .health-dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+    .health-dot.ok { color: var(--bull); border-color: rgba(0,224,164,.28); }
+    .health-dot.ok::before { background: var(--bull); box-shadow: 0 0 10px rgba(0,224,164,.7); }
+    .health-dot.warn { color: var(--warn); border-color: rgba(255,177,59,.28); }
+    .health-dot.warn::before { background: var(--warn); }
+    .health-dot.bad { color: var(--bear); border-color: rgba(255,85,119,.34); }
+    .health-dot.bad::before { background: var(--bear); }
     .pill { min-height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; font-weight: 900; white-space: nowrap; }
     .pill.bull { color: var(--bull); border-color: rgba(0,224,164,.35); background: var(--bull-soft); }
     .pill.bear { color: var(--bear); border-color: rgba(255,85,119,.38); background: var(--bear-soft); }
@@ -175,6 +184,15 @@
     .signal-card { border: 1px solid rgba(91,158,255,.16); border-radius: 14px; background: #111a2a; padding: 19px; min-height: 552px; cursor: pointer; }
     .signal-card.bull { border-color: rgba(0,224,164,.2); }
     .signal-card.bear { border-color: rgba(255,85,119,.22); }
+    .signal-card.high-score { position: relative; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,224,164,.08), 0 0 28px rgba(0,224,164,.06); }
+    .signal-card.high-score::after { content: ""; position: absolute; inset: 0; transform: translateX(-115%); background: linear-gradient(90deg, transparent, rgba(0,224,164,.11), transparent); animation: sweep 5.2s linear infinite; pointer-events: none; }
+    .signal-card.bear.high-score::after { background: linear-gradient(90deg, transparent, rgba(255,85,119,.11), transparent); }
+    .sector-strip { height: 4px; border-radius: 999px; margin-bottom: 14px; background: linear-gradient(90deg, var(--info), rgba(255,255,255,.08)); }
+    .sector-strip.ai { background: linear-gradient(90deg, #66a7ff, rgba(102,167,255,.12)); }
+    .sector-strip.meme { background: linear-gradient(90deg, #ffb13b, rgba(255,177,59,.12)); }
+    .sector-strip.layer1 { background: linear-gradient(90deg, #00e0a4, rgba(0,224,164,.12)); }
+    .sector-strip.defi { background: linear-gradient(90deg, #b36bff, rgba(179,107,255,.12)); }
+    .sector-strip.exchange { background: linear-gradient(90deg, #f5df00, rgba(245,223,0,.12)); }
     .signal-main { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: start; }
     .side-badge { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; background: rgba(0,224,164,.15); color: var(--bull); font-size: 20px; font-weight: 950; }
     .side-badge.short { background: rgba(255,85,119,.16); color: var(--bear); }
@@ -211,6 +229,12 @@
     .history-stat-cell:last-child { border-right: 0; }
     .history-stat-value { font: 900 13px var(--mono); }
     .history-stat-label { color: var(--faint); font-size: 9px; margin-top: 2px; }
+    .signal-visuals { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: center; margin-top: 12px; }
+    .sparkline { height: 52px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.14); padding: 6px; }
+    .tp-progress { display: grid; gap: 6px; }
+    .tp-progress-line { height: 8px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.08); }
+    .tp-progress-line span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--bull), #f5df00); }
+    .tp-progress-labels { display: flex; justify-content: space-between; color: var(--muted); font: 800 10px var(--mono); }
     .notify-panel { position: fixed; top: 60px; right: 18px; width: 360px; max-width: calc(100vw - 24px); max-height: 480px; overflow: hidden; z-index: 1200; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 36px rgba(0,0,0,.55); display: none; }
     .notify-panel.open { display: block; }
     .notify-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
@@ -318,10 +342,13 @@
       .top-actions { min-width: 0; }
     }
     @media (max-width: 620px) {
-      .main { padding-left: 10px; padding-right: 10px; }
+      .main { padding-left: 10px; padding-right: 10px; padding-bottom: 94px; }
+      .nav { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 900; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8,13,19,.95); backdrop-filter: blur(14px); box-shadow: 0 14px 36px rgba(0,0,0,.45); }
+      .nav button { min-width: 0; padding: 0 4px; height: 38px; font-size: 12px; }
       .signal-main { grid-template-columns: auto 1fr; }
       .signal-actions { grid-column: 1 / -1; justify-content: flex-start; }
       .price-grid, .levels, .modal-stats, .modal-strategies { grid-template-columns: 1fr; }
+      .signal-visuals { grid-template-columns: 1fr; }
       .analysis-row { grid-template-columns: 1fr; gap: 5px; }
       .analysis-value { text-align: left; }
       .watch-footer { align-items: flex-start; flex-direction: column; }
@@ -348,7 +375,7 @@
         <div class="logo"><img src="brand-hero.png" alt="Wei"></div>
         <div>
           <h1 class="brand-title">Wei 策略情報室</h1>
-          <div class="brand-sub">BINANCE FUTURES · FLOW RADAR</div>
+          <div class="brand-sub">OKX · BYBIT · COINGLASS RADAR</div>
         </div>
       </div>
       <nav class="nav">
@@ -373,7 +400,7 @@
         <div>
           <div class="kicker">Sentiment Scanner</div>
           <h2>數據交易訊號系統</h2>
-          <div class="subline">15M OI percentile · 嘎空 / 嘎多 · 終端雷達掃描</div>
+          <div class="subline">OKX / Bybit 主行情源 · CoinGlass 全市場資料 · 嘎空 / 嘎多 · 終端雷達掃描</div>
         </div>
         <span class="pill accent" id="statusPill">Live</span>
       </div>
@@ -475,7 +502,7 @@
       <section class="radar-strip">
         <div class="kicker">Contract Anomaly Radar</div>
         <h2>合約異常雷達</h2>
-        <div class="subline">CoinGlass 與 Binance 快照採低頻快取，24H 成交量低於 500 萬 USDT 不列入，K 線與交易訊號由雲端掃描補齊。</div>
+        <div class="subline">OKX / Bybit 作主行情源，CoinGlass 只補全市場列表與候選幣資料；24H 成交量低於 500 萬 USDT 不列入。</div>
       </section>
       <div class="section-head">
         <h2 class="section-title">全市場合約異常 <span id="contractCount" class="section-count">(0)</span></h2>
@@ -613,6 +640,7 @@
       lastMarketAt: null,
       lastVolumeAt: null,
       lastContractAt: null,
+      scannerStatus: null,
       lastError: "",
       busy: false,
       currentView: "dashboard",
@@ -789,6 +817,8 @@
         const rows = chunks.flatMap(chunk => chunk.rows || []);
         const marketsRes = await fetch(`data/${manifest.markets || "markets.json"}?ts=${Date.now()}`);
         const marketsData = marketsRes.ok ? await marketsRes.json() : {rows: []};
+        const statusRes = await fetch(`data/${manifest.scanner_status || "scanner_status.json"}?ts=${Date.now()}`);
+        state.scannerStatus = statusRes.ok ? await statusRes.json() : null;
         return {rows, markets: marketsData.rows || []};
       } catch {
         const res = await fetch(`data/book.json?ts=${Date.now()}`);
@@ -801,21 +831,23 @@
       const fallbackRes = await fetch(`data/markets.json?ts=${Date.now()}`);
       const fallbackData = fallbackRes.ok ? await fallbackRes.json() : {rows: []};
       try {
-        const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr");
-        if (!res.ok) throw new Error("Binance ticker unavailable");
-        const tickers = await res.json();
+        const res = await fetch("https://api.bybit.com/v5/market/tickers?category=linear");
+        if (!res.ok) throw new Error("Bybit ticker unavailable");
+        const payload = await res.json();
+        const tickers = (payload.result && payload.result.list) || [];
         const prices = {};
         const liveRows = tickers
           .filter(row => wanted.has(clean(row.symbol)))
           .map(row => {
+            const change = Number(row.price24hPcnt) * 100;
             prices[clean(row.symbol)] = Number(row.lastPrice);
             const prev = (fallbackData.rows || []).find(m => clean(m.symbol) === clean(row.symbol)) || {};
             return {
               ...prev,
               symbol: row.symbol,
               price: Number(row.lastPrice),
-              price_change_pct: Number(row.priceChangePercent),
-              quote_volume: Number(row.quoteVolume),
+              price_change_pct: change,
+              quote_volume: Number(row.turnover24h),
               live_price: true
             };
           });
@@ -1034,19 +1066,22 @@
       const total = realized + unrealized;
       const hot = stableMode ? sourceRows.filter(s => stableTradeMeta(s).score >= 80).length : state.markets.filter(m => m.signal_type).length;
       const avgScore = sourceRows.length ? sourceRows.reduce((sum, s) => sum + (stableMode ? stableTradeMeta(s).score : signalScore(s).value), 0) / sourceRows.length : 0;
+      const maxDd = maxDrawdownOf(sourceRows);
+      const streak = streakSummary(sourceRows);
+      const avgHold = avgHoldHours(sourceRows);
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
         ["穩狗平倉勝率", `${fmt(winRate, 1)}%`, `${wins}W / ${Math.max(0, decided.length - wins)}L`],
-        ["穩狗已實現", signed(realized), `${closed.length} 筆平倉`],
-        ["穩狗未實現", signed(unrealized), `${open.length + partial.length} 筆浮動`],
-        ["穩狗累積盈虧", signed(total), `${sourceRows.length} 筆訊號`],
+        ["穩狗累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
+        ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
+        ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
         ["平倉勝率", `${fmt(winRate, 1)}%`, `${wins}W / ${Math.max(0, decided.length - wins)}L`],
-        ["已實現盈虧", signed(realized), `${closed.length} 筆平倉`],
-        ["未實現盈虧", signed(unrealized), `${open.length + partial.length} 筆浮動`],
-        ["總累積盈虧", signed(total), `${sourceRows.length} 筆訊號`],
+        ["總累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
+        ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
+        ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["市場熱點", hot, `${watchMarkets().length} 個觀察中`]
       ];
       $("stats").innerHTML = cells.map(([label, value, detail]) => `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value ${String(value).startsWith("-") ? "bear-text" : "bull-text"}">${value}</div><div class="subline">${detail || ""}</div></div>`).join("");
@@ -1436,14 +1471,18 @@
       const rPct = riskPct(s);
       const reversal = reversalWarning(s);
       const market = marketFor(s.symbol);
-      return `<article class="signal-card ${meta.kind}" data-stable-symbol="${clean(s.symbol)}">
+      const sector = sectorForSymbol(s.symbol);
+      const visual = signalVisuals(s, meta.score);
+      return `<article class="signal-card ${meta.kind} ${meta.score >= 88 ? "high-score" : ""}" data-stable-symbol="${clean(s.symbol)}">
+        <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sectorForSymbol(s.symbol)}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
         </div>
         <div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
+        ${visual}
         <div class="levels">
           <div class="level"><span>R</span><b>${fmt(rPct, 2)}%</b><i class="copy">▢</i></div>
           <div class="level"><span>SL</span><b>${fmt(s.sl_price, 6)}</b><i class="copy">▢</i></div>
@@ -1464,14 +1503,18 @@
       const score = signalScore(s);
       const reversal = reversalWarning(s);
       const market = marketFor(s.symbol);
-      return `<article class="signal-card ${kind}" data-symbol="${clean(s.symbol)}">
+      const sector = sectorForSymbol(s.symbol);
+      const visual = signalVisuals(s, score.value);
+      return `<article class="signal-card ${kind} ${score.value >= 88 ? "high-score" : ""}" data-symbol="${clean(s.symbol)}">
+        <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sectorForSymbol(s.symbol)}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">觸發價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
+        ${visual}
         <div class="levels">
           <div class="level"><span>R</span><b>${fmt(rPct, 2)}%</b><i class="copy">▢</i></div>
           <div class="level"><span>SL</span><b>${fmt(s.sl_price, 6)}</b><i class="copy">▢</i></div>
@@ -1488,6 +1531,56 @@
           <div class="history-stat-cell"><div class="history-stat-value ${score.kind}-text">${score.value}</div><div class="history-stat-label">${score.label}</div></div>
         </div>
       </article>`;
+    }
+    function signalVisuals(s, score = 0) {
+      return `<div class="signal-visuals">
+        ${sparklineHtml(s)}
+        ${tpProgressHtml(s, score)}
+      </div>`;
+    }
+    function sparklineHtml(s) {
+      const isBull = s.signal_type === "reversal_bullish";
+      const vals = [
+        Number(s.trigger_price),
+        Number(s.tp1_price),
+        Number(s.tp2_price),
+        Number(s.tp3_price),
+        Number(s.ftp_price),
+        Number(currentPrice(s))
+      ].filter(Number.isFinite);
+      if (vals.length < 2) return `<div class="sparkline"><svg viewBox="0 0 120 52" width="100%" height="100%"><text x="8" y="30" fill="#53657c" font-size="10">等待價格</text></svg></div>`;
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const span = Math.max(0.0000001, max - min);
+      const points = vals.map((v, i) => {
+        const x = 6 + i / Math.max(1, vals.length - 1) * 108;
+        const y = 44 - ((v - min) / span) * 36;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ");
+      const color = isBull ? "#00e0a4" : "#ff5577";
+      return `<div class="sparkline"><svg viewBox="0 0 120 52" width="100%" height="100%" role="img" aria-label="小型價格走勢">
+        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="114" cy="${points.split(" ").at(-1).split(",")[1]}" r="3" fill="${color}"/>
+      </svg></div>`;
+    }
+    function tpProgressHtml(s, score = 0) {
+      const reached = Math.max(0, targetOrder(displayState(s)));
+      const width = clamp(reached / 4 * 100, 0, 100);
+      const label = reached >= 4 ? "FTP" : reached >= 3 ? "TP3" : reached >= 2 ? "TP2" : reached >= 1 ? "TP1" : "持倉";
+      return `<div class="tp-progress">
+        <div class="tp-progress-labels"><span>${label}</span><span>品質 ${fmt(score, 0)}</span></div>
+        <div class="tp-progress-line"><span style="width:${width}%"></span></div>
+        <div class="tp-progress-labels"><span>入場</span><span>TP1</span><span>TP2</span><span>TP3</span><span>FTP</span></div>
+      </div>`;
+    }
+    function sectorClass(sector) {
+      const s = String(sector || "").toLowerCase();
+      if (s.includes("ai")) return "ai";
+      if (s.includes("meme")) return "meme";
+      if (s.includes("layer")) return "layer1";
+      if (s.includes("defi")) return "defi";
+      if (s.includes("exchange")) return "exchange";
+      return "";
     }
     function renderVisibleNumbers() {
       document.querySelectorAll("[data-current]").forEach(node => {
@@ -2276,6 +2369,40 @@
     }
     function winsOf(rows) { return rows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length; }
     function lossesOf(rows) { return rows.filter(s => s.reached_state === "sl").length; }
+    function maxDrawdownOf(rows) {
+      let equity = 0;
+      let peak = 0;
+      let dd = 0;
+      for (const row of rows.slice().sort((a,b) => new Date(a.triggered_at || 0) - new Date(b.triggered_at || 0))) {
+        equity += pnlPct(row, false);
+        peak = Math.max(peak, equity);
+        dd = Math.min(dd, equity - peak);
+      }
+      return dd;
+    }
+    function streakSummary(rows) {
+      let win = 0, loss = 0, maxWin = 0, maxLoss = 0;
+      for (const row of rows.slice().sort((a,b) => new Date(a.triggered_at || 0) - new Date(b.triggered_at || 0))) {
+        if (["tp1","tp2","tp3","ftp"].includes(row.reached_state)) {
+          win += 1; loss = 0; maxWin = Math.max(maxWin, win);
+        } else if (row.reached_state === "sl") {
+          loss += 1; win = 0; maxLoss = Math.max(maxLoss, loss);
+        }
+      }
+      return `${maxWin}W / ${maxLoss}L`;
+    }
+    function avgHoldHours(rows) {
+      const vals = rows
+        .map(row => {
+          const start = new Date(row.triggered_at || row.detected_at || 0).getTime();
+          const end = new Date(row.hit_at || row.closed_at || row.updated_at || Date.now()).getTime();
+          return Number.isFinite(start) && Number.isFinite(end) && end > start ? (end - start) / 3600000 : NaN;
+        })
+        .filter(Number.isFinite);
+      if (!vals.length) return "-";
+      const avg = vals.reduce((a,b) => a + b, 0) / vals.length;
+      return avg >= 24 ? `${fmt(avg / 24, 1)}天` : `${fmt(avg, 1)}小時`;
+    }
     function setView(view) {
       state.currentView = view;
       document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
@@ -2284,14 +2411,29 @@
       renderHealth();
     }
     function renderHealth() {
+      const status = state.scannerStatus || {};
+      const lastSuccess = status.last_success_at ? new Date(status.last_success_at) : null;
+      const cronFresh = lastSuccess && Date.now() - lastSuccess.getTime() < 20 * 60 * 1000;
+      const ok = status.ok !== false;
+      const provider = status.market_data_provider || "bybit";
       const parts = [
         autoTimer ? "自動掃描中" : "自動掃描停止",
         state.busy ? "請求中" : "待命",
+        `源 ${provider}`,
+        ok ? "資料源正常" : "資料源異常，保留舊資料",
+        `成功 ${status.last_success_at ? shortTime(status.last_success_at) : "-"}`,
         `book ${lastTimeText(state.lastBookAt)}`,
         `tick ${lastTimeText(state.lastTickAt)}`,
         `price ${lastTimeText(state.lastPriceAt)}`
       ];
       $("healthText").textContent = parts.join(" · ");
+      $("healthText").innerHTML = `<span class="health-pack">
+        <span class="health-dot ${provider === "bybit" && ok ? "ok" : provider === "okx" && ok ? "ok" : "warn"}">Bybit/OKX</span>
+        <span class="health-dot ${Number(status.coinglass_calls || 0) >= 0 ? "ok" : "warn"}">CoinGlass</span>
+        <span class="health-dot ${cronFresh ? "ok" : "warn"}">GitHub Cron</span>
+        <span class="health-dot ${ok ? "ok" : "bad"}">${ok ? "資料正常" : "資料源異常"}</span>
+        <span>成功 ${status.last_success_at ? shortTime(status.last_success_at) : "-"}</span>
+      </span>`;
     }
     function querySymbol() { return $("symbolSearch").value.trim().toUpperCase(); }
     function signalKey(s) { return `${clean(s.symbol)}|${s.signal_type}|${s.triggered_at || s.triggered_at_ms || ""}`; }

@@ -27,15 +27,17 @@ jobs:
       - name: Scan Binance futures
         env:
           SCAN_TOP: "0"
-          SCAN_WORKERS: "8"
+          SCAN_WORKERS: "3"
           OI_PERCENTILE: "99"
           OI_CHANGE_MIN_PCT: "3"
           OI_CHANGE_STRONG_PCT: "5"
           REQUIRE_5M_OI_CONFLUENCE: "true"
+          MAX_SCAN_ERRORS: "12"
           DIVERGENCE_CVD_PERCENTILE: "95"
           MAX_SEED_ROWS: "3000"
           SCAN_FALLBACK_LIMIT: "120"
           MIN_QUOTE_VOLUME_USDT: "5000000"
+          MARKET_DATA_PROVIDER: "bybit"
           CONTRACT_KLINE_CANDIDATES: "120"
           CONTRACT_DETAIL_CANDIDATES: "20"
           COINGLASS_REQUEST_BUDGET: "27"
