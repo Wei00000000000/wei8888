@@ -1742,7 +1742,7 @@
       const risk = riskPct(s);
       const reasons = [];
       if (stopped) reasons.push(`止損原因：價格觸及 SL ${fmt(s.sl_price, 6)}，代表進場後市場沒有延續預期方向。`);
-      if (isDivergenceSignal(s)) reasons.push(`背離結構：${strategyNameForSignal(s)}，${divergenceKind(s) === "top" ? "價格創短線高但 OI 退潮，偏空。" : "價格下殺但 OI 增加，偏多反轉。"}`);
+      if (isDivergenceSignal(s)) reasons.push(`CVD 背離結構：${strategyNameForSignal(s)}，${divergenceKind(s) === "top" ? "價格創短線高但 CVD 轉弱，偏空。" : "價格下殺但 CVD 轉強，偏多反轉。"}`);
       if (Math.abs(oi) > 2) reasons.push(`OI 變化過大：${signed(oi)}，槓桿擁擠，容易出現反向掃損。`);
       if (Math.abs(price) > 2) reasons.push(`價格波動過大：${signed(price)}，追價風險升高。`);
       if (Number.isFinite(taker) && Math.abs(taker - 0.5) < 0.04) reasons.push(`Taker 買賣不夠偏向：${fmt(taker, 2)}，主動成交沒有明確站隊。`);
@@ -1978,8 +1978,8 @@
           side: top ? "bear" : "bull",
           label: top ? "頂背離做空" : "底背離做多",
           reason: top
-            ? `5M 頂背離：價格上推但 OI 退潮，追多動能不足，歸入穩如老狗空方觀察。`
-            : `5M 底背離：價格下殺但 OI 增加，空方擁擠，歸入穩如老狗多方觀察。`
+            ? `5M CVD 頂背離：價格上推但主動買賣差轉弱，追多動能不足，歸入穩如老狗空方觀察。`
+            : `5M CVD 底背離：價格下殺但主動買盤轉強，賣壓衰退，歸入穩如老狗多方觀察。`
         };
       }
       const isBull = s.signal_type === "reversal_bullish";
@@ -2251,11 +2251,11 @@
     }
     function isDivergenceSignal(s) {
       const setup = String(s && s.setup_id || "");
-      return setup.includes("oi_5m") || setup.includes("divergence");
+      return setup.includes("cvd_5m") || setup.includes("divergence");
     }
     function divergenceKind(s) {
       const label = String(signalMetric(s, "divergence") || "");
-      if (label.includes("price_up_oi_down") || String(s.setup_id || "").includes("bearish")) return "top";
+      if (label.includes("price_up_cvd_down") || String(s.setup_id || "").includes("bearish")) return "top";
       return "bottom";
     }
     function winsOf(rows) { return rows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length; }

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
+from threading import Lock
 from typing import Any, Iterable
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -38,8 +40,13 @@ class TakerPoint:
 
 
 class BinanceFuturesClient:
+    _cache: dict[str, Any] = {}
+    _cache_lock = Lock()
+
     def __init__(self, timeout: float = 15.0) -> None:
         self.timeout = timeout
+        self.proxy_url = os.getenv("BINANCE_PROXY_URL", "").rstrip("/")
+        self.proxy_token = os.getenv("BINANCE_PROXY_TOKEN", "")
 
     def close(self) -> None:
         return None
@@ -51,6 +58,21 @@ class BinanceFuturesClient:
         self.close()
 
     def _get(self, base_url: str, path: str, params: dict[str, Any]) -> Any:
+        cache_key = self._cache_key(base_url, path, params)
+        with self._cache_lock:
+            if cache_key in self._cache:
+                return self._cache[cache_key]
+        if self.proxy_url:
+            results = self._proxy_batch([{"base": self._base_name(base_url), "path": path, "params": params}])
+            if not results:
+                raise RuntimeError("Binance proxy returned no results; deploy the latest Worker")
+            result = results[0]
+            if not result.get("ok"):
+                raise RuntimeError(f"Binance proxy error {result.get('status')}: {result.get('error')}")
+            data = result.get("data")
+            with self._cache_lock:
+                self._cache[cache_key] = data
+            return data
         query = urlencode(params)
         url = f"{base_url}{path}"
         if query:
@@ -59,6 +81,43 @@ class BinanceFuturesClient:
         with urlopen(request, timeout=self.timeout) as response:
             payload = response.read().decode("utf-8")
         return json.loads(payload)
+
+    @staticmethod
+    def _base_name(base_url: str) -> str:
+        return "fdata" if base_url == BINANCE_FDATA else "fapi"
+
+    @classmethod
+    def _cache_key(cls, base_url: str, path: str, params: dict[str, Any]) -> str:
+        return json.dumps([cls._base_name(base_url), path, sorted(params.items())], separators=(",", ":"), default=str)
+
+    def _proxy_batch(self, operations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        body = json.dumps({"operations": operations}).encode("utf-8")
+        headers = {"Content-Type": "application/json", "User-Agent": "sentiment-scanner/0.1"}
+        if self.proxy_token:
+            headers["X-Wei-Proxy-Key"] = self.proxy_token
+        request = Request(f"{self.proxy_url}/binance/batch", data=body, headers=headers, method="POST")
+        with urlopen(request, timeout=max(self.timeout, 30)) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload.get("results", [])
+
+    def prefetch(self, requests: list[tuple[str, str, dict[str, Any]]], batch_size: int = 35) -> None:
+        if not self.proxy_url:
+            return
+        missing: list[tuple[str, str, dict[str, Any]]] = []
+        with self._cache_lock:
+            for base_url, path, params in requests:
+                if self._cache_key(base_url, path, params) not in self._cache:
+                    missing.append((base_url, path, params))
+        for start in range(0, len(missing), batch_size):
+            chunk = missing[start:start + batch_size]
+            operations = [{"base": self._base_name(base), "path": path, "params": params} for base, path, params in chunk]
+            results = self._proxy_batch(operations)
+            for request_info, result in zip(chunk, results):
+                if not result.get("ok"):
+                    continue
+                base_url, path, params = request_info
+                with self._cache_lock:
+                    self._cache[self._cache_key(base_url, path, params)] = result.get("data")
 
     def exchange_symbols(self, quote_asset: str = "USDT") -> list[str]:
         data = self._get(BINANCE_FAPI, "/fapi/v1/exchangeInfo", {})

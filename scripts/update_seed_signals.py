@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import BinanceFuturesClient
+from sentiment_scanner.binance import BINANCE_FAPI, BINANCE_FDATA
 from sentiment_scanner.cli import format_signal
 from sentiment_scanner.coinglass import CoinGlassClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
@@ -82,6 +83,10 @@ def valid_signal_time(row: dict[str, object]) -> bool:
     except (TypeError, ValueError):
         return True
     return triggered_at <= detected_at
+
+
+def is_legacy_oi_divergence(row: dict[str, object]) -> bool:
+    return str(row.get("setup_id") or "").startswith("oi_5m_")
 
 
 def clean_symbol(symbol: object) -> str:
@@ -482,6 +487,21 @@ def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[
     return book
 
 
+def prefetch_scan_data(symbols: list[str], lookback: int, divergence_lookback: int) -> None:
+    requests: list[tuple[str, str, dict[str, object]]] = []
+    for symbol in symbols:
+        for interval, limit in (("15m", lookback), ("5m", divergence_lookback)):
+            requests.extend(
+                [
+                    (BINANCE_FAPI, "/fapi/v1/klines", {"symbol": symbol, "interval": interval, "limit": limit}),
+                    (BINANCE_FDATA, "/openInterestHist", {"symbol": symbol, "period": interval, "limit": min(limit, 500)}),
+                    (BINANCE_FDATA, "/takerlongshortRatio", {"symbol": symbol, "period": interval, "limit": min(limit, 500)}),
+                ]
+            )
+    with BinanceFuturesClient(timeout=60) as client:
+        client.prefetch(requests)
+
+
 def latest_ratio(rows: list[dict[str, object]]) -> float | None:
     if not rows:
         return None
@@ -555,6 +575,22 @@ def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dic
     detail_limit = int(os.getenv("CONTRACT_DETAIL_CANDIDATES", "20"))
     candidates = candidate_symbols_from_tickers(tickers, min_volume, limit=kline_limit)
     detail_symbols = candidates[:detail_limit]
+    prefetch: list[tuple[str, str, dict[str, object]]] = [
+        (BINANCE_FAPI, "/fapi/v1/klines", {"symbol": symbol, "interval": "5m", "limit": 14})
+        for symbol in candidates
+    ]
+    for symbol in detail_symbols:
+        prefetch.extend(
+            (BINANCE_FDATA, path, {"symbol": symbol, "period": "1h", "limit": 1})
+            for path in (
+                "/takerlongshortRatio",
+                "/globalLongShortAccountRatio",
+                "/topLongShortAccountRatio",
+                "/topLongShortPositionRatio",
+            )
+        )
+    with BinanceFuturesClient(timeout=60) as client:
+        client.prefetch(prefetch)
     changes = short_kline_changes(candidates, workers=workers)
     details = binance_positioning_details(detail_symbols, workers=workers)
 
@@ -801,6 +837,17 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
     pairs = sorted(earliest_by_pair)
     if not pairs:
         return {"checked": 0, "changed": 0, "closed": 0}
+    with BinanceFuturesClient(timeout=60) as client:
+        client.prefetch(
+            [
+                (
+                    BINANCE_FAPI,
+                    "/fapi/v1/klines",
+                    {"symbol": symbol, "interval": interval, "limit": 1500, "startTime": earliest_by_pair[(symbol, interval)]},
+                )
+                for symbol, interval in pairs
+            ]
+        )
 
     def load(pair: tuple[str, str]) -> tuple[tuple[str, str], list[object]]:
         symbol, interval = pair
@@ -863,25 +910,44 @@ def validate_state_consistency(rows: list[dict[str, object]]) -> dict[str, int]:
     return {"checked": len(rows), "changed": changed, "closed": closed}
 
 
-def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfig) -> dict[str, object] | None:
-    oi_change = float(getattr(snapshot, "oi_change_pct"))
-    price_change = float(getattr(snapshot, "price_change_pct"))
-    oi_percentile = float(getattr(snapshot, "oi_percentile"))
-    if oi_percentile < config.oi_percentile_threshold:
+def format_cvd_divergence_signal(symbol: str, snapshots: list[object], config: ScannerConfig) -> dict[str, object] | None:
+    window = int(os.getenv("CVD_DIVERGENCE_WINDOW", "3"))
+    if len(snapshots) <= window:
         return None
-    if oi_change == 0 or price_change == 0 or (oi_change > 0) == (price_change > 0):
+    snapshot = snapshots[-1]
+    previous = snapshots[-window - 1]
+    previous_price = float(getattr(previous, "price"))
+    price = float(getattr(snapshot, "price"))
+    if previous_price <= 0:
+        return None
+    price_change = (price - previous_price) / previous_price * 100.0
+
+    def cvd_ratio(group: list[object]) -> float:
+        buy = sum(float(getattr(item, "taker_buy_volume") or 0) for item in group)
+        sell = sum(float(getattr(item, "taker_sell_volume") or 0) for item in group)
+        total = buy + sell
+        return (buy - sell) / total * 100.0 if total > 0 else 0.0
+
+    history: list[float] = []
+    for end in range(window, len(snapshots) - 1):
+        history.append(abs(cvd_ratio(snapshots[end - window:end])))
+    cvd_change = cvd_ratio(snapshots[-window:])
+    from sentiment_scanner.indicators import percentile_rank
+    cvd_percentile = percentile_rank(abs(cvd_change), history)
+    if cvd_percentile is None or cvd_percentile < config.oi_percentile_threshold:
+        return None
+    if price_change == 0 or cvd_change == 0 or (price_change > 0) == (cvd_change > 0):
         return None
 
-    price = float(getattr(snapshot, "price"))
     atr_value = float(getattr(snapshot, "atr"))
     raw_risk = config.atr_risk_multiple * atr_value
     capped_risk = price * config.max_risk_pct
     risk = min(raw_risk, capped_risk)
     sl_source = "atr" if risk == raw_risk else "capped_10pct"
 
-    if price_change < 0 and oi_change > 0:
+    if price_change < 0 and cvd_change > 0:
         signal_type = "reversal_bullish"
-        setup_id = "oi_5m_bullish_divergence"
+        setup_id = "cvd_5m_bullish_divergence"
         divergence_name = "bottom_divergence"
         sl = price - risk
         tp1 = price + risk
@@ -890,7 +956,7 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
         ftp = price + risk * 5
     else:
         signal_type = "reversal_bearish"
-        setup_id = "oi_5m_bearish_divergence"
+        setup_id = "cvd_5m_bearish_divergence"
         divergence_name = "top_divergence"
         sl = price + risk
         tp1 = price - risk
@@ -914,16 +980,19 @@ def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfi
         "ftp_price": ftp,
         "risk": risk,
         "sl_source": sl_source,
-        "oi_percentile": oi_percentile,
-        "oi_change_pct": oi_change,
+        "oi_percentile": float(getattr(snapshot, "oi_percentile")),
+        "oi_change_pct": float(getattr(snapshot, "oi_change_pct")),
         "price_change_pct": price_change,
         "taker_buy_ratio": getattr(snapshot, "taker_buy_ratio"),
         "oi_value": float(getattr(snapshot, "oi_value")),
         "oi_value_usdt": getattr(snapshot, "oi_value_usdt"),
         "snapshot_data": {
-            "divergence": "price_down_oi_up" if price_change < 0 and oi_change > 0 else "price_up_oi_down",
+            "divergence": "price_down_cvd_up" if price_change < 0 and cvd_change > 0 else "price_up_cvd_down",
             "divergence_label": divergence_name,
             "interval": "5m",
+            "cvd_change_pct": cvd_change,
+            "cvd_percentile": cvd_percentile,
+            "cvd_window_bars": window,
         },
     }
     return normalize_row(row)
@@ -974,7 +1043,7 @@ def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerCo
                 row = apply_5m_confluence(row, snapshots[-1])
             rows.append(row)
         if snapshots:
-            row = format_divergence_signal(symbol, snapshots[-1], divergence_config)
+            row = format_cvd_divergence_signal(symbol, snapshots, divergence_config)
             if row is not None:
                 rows.append(row)
     return rows
@@ -996,7 +1065,11 @@ def resolve_symbols() -> list[str]:
 
 
 def main() -> None:
-    existing = [row for raw in load_rows() if valid_signal_time(row := normalize_row(raw))]
+    existing = [
+        row
+        for raw in load_rows()
+        if valid_signal_time(row := normalize_row(raw)) and not is_legacy_oi_divergence(row)
+    ]
     min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
     config = ScannerConfig(
         lookback_limit=int(os.getenv("LOOKBACK_LIMIT", "500")),
@@ -1007,7 +1080,7 @@ def main() -> None:
     divergence_config = ScannerConfig(
         interval="5m",
         lookback_limit=int(os.getenv("DIVERGENCE_LOOKBACK_LIMIT", "500")),
-        oi_percentile_threshold=float(os.getenv("DIVERGENCE_OI_PERCENTILE", "95")),
+        oi_percentile_threshold=float(os.getenv("DIVERGENCE_CVD_PERCENTILE", "95")),
         atr_risk_multiple=float(os.getenv("DIVERGENCE_ATR_MULTIPLE", os.getenv("ATR_MULTIPLE", "2.5"))),
         eval_window_hours=float(os.getenv("EVAL_HOURS", "6")),
     )
@@ -1026,6 +1099,7 @@ def main() -> None:
         print(f"WARN contract radar skipped; keeping previous valid data: {exc}")
 
     symbols = resolve_symbols()
+    prefetch_scan_data(symbols, config.lookback_limit, divergence_config.lookback_limit)
     found: list[dict[str, object]] = []
     errors: list[str] = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
