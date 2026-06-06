@@ -549,6 +549,36 @@ def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dic
     }
 
 
+def preserve_previous_detail(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    if not CONTRACT_RADAR.exists():
+        return rows
+    try:
+        previous_data = json.loads(CONTRACT_RADAR.read_text(encoding="utf-8"))
+        previous_rows = previous_data.get("rows", []) if isinstance(previous_data, dict) else []
+    except Exception:
+        return rows
+    previous = {clean_symbol(row.get("symbol")): row for row in previous_rows if isinstance(row, dict)}
+    detail_fields = (
+        "oi_change_1h",
+        "oi_change_15m",
+        "oi_usd",
+        "cvd_ratio_1h",
+        "long_short_ratio_1h",
+        "top_account_long_short_ratio_1h",
+        "top_position_long_short_ratio_1h",
+        "long_liquidation_1h",
+        "short_liquidation_1h",
+    )
+    for row in rows:
+        old = previous.get(clean_symbol(row.get("symbol")))
+        if not old:
+            continue
+        for field in detail_fields:
+            if row.get(field) is None:
+                row[field] = old.get(field)
+    return rows
+
+
 def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None:
     setup = str(row.get("setup_id") or "")
     if "coinglass_contract" not in setup:
@@ -678,6 +708,45 @@ def state_from_price(row: dict[str, object], price: float) -> str:
     return str(row.get("reached_state") or "holding")
 
 
+def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[str, float | None, str | None, str]:
+    bullish = row.get("signal_type") == "reversal_bullish"
+    trigger_ms = int(row.get("triggered_at_ms") or 0)
+    entry = as_float(row.get("trigger_price"))
+    original_stop = as_float(row.get("sl_price"))
+    current = str(row.get("reached_state") or "holding")
+    max_reached = str(row.get("max_reached_state") or current if current in {"tp1", "tp2", "tp3", "ftp"} else "holding")
+    hit_price = as_float(row.get("hit_price"))
+    hit_at = str(row.get("hit_at") or "") or None
+
+    for kline in klines:
+        if int(getattr(kline, "open_time")) <= trigger_ms:
+            continue
+        high = float(getattr(kline, "high"))
+        low = float(getattr(kline, "low"))
+        timestamp = iso_ms(int(getattr(kline, "open_time")))
+
+        stop = entry if target_order(max_reached) >= target_order("tp2") else original_stop
+        if stop is not None and (low <= stop if bullish else high >= stop):
+            return "sl", stop, timestamp, max_reached
+
+        for name in ("ftp", "tp3", "tp2", "tp1"):
+            if target_order(name) <= target_order(max_reached):
+                continue
+            target = as_float(row.get(f"{name}_price"))
+            if target is None:
+                continue
+            reached = high >= target if bullish else low <= target
+            if reached:
+                current = name
+                max_reached = name
+                hit_price = target
+                hit_at = timestamp
+                break
+        if current == "ftp":
+            return current, hit_price, hit_at, max_reached
+    return current, hit_price, hit_at, max_reached
+
+
 def update_existing_states(rows: list[dict[str, object]]) -> None:
     active_rows = [
         row
@@ -685,31 +754,40 @@ def update_existing_states(rows: list[dict[str, object]]) -> None:
         if str(row.get("status") or "active") == "active"
         and str(row.get("reached_state") or "holding") in {"holding", "tp1", "tp2", "tp3"}
     ]
-    symbols = sorted({clean_symbol(row.get("symbol")) for row in active_rows})
-    if not symbols:
-        return
-    try:
-        with BinanceFuturesClient(timeout=20) as client:
-            prices = client.ticker_price(symbols)
-    except Exception as exc:
-        print(f"WARN price state update skipped: {exc}")
-        return
-    now = datetime.now(timezone.utc).isoformat()
+    pairs = sorted({(clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower()) for row in active_rows})
+
+    def load(pair: tuple[str, str]) -> tuple[tuple[str, str], list[object]]:
+        symbol, interval = pair
+        with BinanceFuturesClient(timeout=15) as client:
+            return pair, client.klines(symbol, interval=interval, limit=500)
+
+    histories: dict[tuple[str, str], list[object]] = {}
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(pairs)))) as executor:
+        futures = {executor.submit(load, pair): pair for pair in pairs}
+        for future in as_completed(futures):
+            pair = futures[future]
+            try:
+                key, klines = future.result()
+            except Exception as exc:
+                print(f"WARN state replay skipped for {pair[0]} {pair[1]}: {exc}")
+                continue
+            histories[key] = klines
+
     for row in active_rows:
-        price = prices.get(clean_symbol(row.get("symbol")))
-        if price is None:
+        key = (clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower())
+        klines = histories.get(key)
+        if not klines:
             continue
         prev = str(row.get("reached_state") or "holding")
-        next_state = state_from_price(row, price)
-        if next_state == prev or next_state == "holding":
-            continue
-        if next_state in {"tp1", "tp2", "tp3", "ftp"} and target_order(next_state) < target_order(prev):
-            continue
-        if next_state == "sl" and target_order(prev) > 0:
+        next_state, hit_price, hit_at, max_reached = replay_signal_state(row, klines)
+        if next_state == prev and max_reached == str(row.get("max_reached_state") or prev):
             continue
         row["reached_state"] = next_state
-        row["hit_price"] = hit_price_for_state(row, next_state)
-        row["hit_at"] = now
+        row["max_reached_state"] = max_reached
+        row["hit_price"] = hit_price
+        row["hit_at"] = hit_at
+        if target_order(max_reached) >= target_order("tp2"):
+            row["active_sl_price"] = row.get("trigger_price")
         if next_state in {"sl", "ftp"}:
             row["status"] = "closed"
 
@@ -867,6 +945,7 @@ def main() -> None:
     radar_meta: dict[str, object] = {}
     try:
         contract_radar, radar_meta = build_live_contract_radar(min_volume, workers)
+        contract_radar = preserve_previous_detail(contract_radar)
         CONTRACT_RADAR.write_text(
             json.dumps({"rows": contract_radar, "updated_at": datetime.now(timezone.utc).isoformat(), "min_volume_usdt": min_volume, **radar_meta}, ensure_ascii=False, indent=2),
             encoding="utf-8",

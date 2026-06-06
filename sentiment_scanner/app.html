@@ -474,6 +474,14 @@
         </div>
       </div>
       <div class="watch-stats" id="contractStats"></div>
+      <div class="section-head">
+        <h2 class="section-title">高分預警 <span id="contractWarningCount" class="section-count">(0)</span></h2>
+        <div class="subline">尚未形成正式持倉，優先追蹤高品質、高雷達分數與多空比擁擠的候選。</div>
+      </div>
+      <div class="terminal-grid" id="contractWarningCards"></div>
+      <div class="section-head">
+        <h2 class="section-title">完整雷達清單</h2>
+      </div>
       <div class="terminal-grid" id="contractCards"></div>
     </section>
 
@@ -1096,8 +1104,13 @@
         ["成交量門檻", "500萬", ""],
         ["更新", lastTimeText(state.lastContractAt), ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      const warnings = rows
+        .filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 4 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 75))
+        .slice(0, isMobileView() ? 4 : 8);
+      $("contractWarningCount").textContent = `(${warnings.length})`;
+      $("contractWarningCards").innerHTML = warnings.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有高分預警。</div></section>`;
       target.innerHTML = rows.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有符合成交量門檻的合約異常。</div></section>`;
-      target.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol)));
+      [target, $("contractWarningCards")].forEach(area => area.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol))));
     }
     function contractCard(row) {
       const symbol = clean(row.symbol);
@@ -1265,7 +1278,7 @@
         .filter(s => !day || sameDay(s.triggered_at, day))
         .filter(s => sideFilter === "all" || stableTradeMeta(s).side === sideFilter)
         .filter(s => historyMode || isOpenSignal(s) || isPartialActiveSignal(s))
-        .sort((a,b) => signalRank(b) - signalRank(a) || stableTradeMeta(b).score - stableTradeMeta(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
+        .sort((a,b) => new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
       $("stableCount").textContent = `(${rows.length})`;
       const metas = rows.map(stableTradeMeta);
       const tradable = metas.filter(s => s.score >= 92).length;
@@ -2009,8 +2022,9 @@
 
     function sortSignals(rows) {
       return rows.filter(Boolean).filter(r => !r.error).sort((a,b) => {
-        const ar = signalRank(a), br = signalRank(b);
-        if (ar !== br) return br - ar;
+        const activeA = isOpenSignal(a) || isPartialActiveSignal(a);
+        const activeB = isOpenSignal(b) || isPartialActiveSignal(b);
+        if (activeA !== activeB) return Number(activeB) - Number(activeA);
         return new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0);
       });
     }
