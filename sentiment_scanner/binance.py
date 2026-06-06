@@ -162,6 +162,31 @@ class BinanceFuturesClient:
             for row in data
         ]
 
+    def global_long_short_account_ratio(
+        self, symbol: str, period: str = "1h", limit: int = 1
+    ) -> list[dict[str, Any]]:
+        return self._ratio_history("/globalLongShortAccountRatio", symbol, period, limit)
+
+    def top_long_short_account_ratio(
+        self, symbol: str, period: str = "1h", limit: int = 1
+    ) -> list[dict[str, Any]]:
+        return self._ratio_history("/topLongShortAccountRatio", symbol, period, limit)
+
+    def top_long_short_position_ratio(
+        self, symbol: str, period: str = "1h", limit: int = 1
+    ) -> list[dict[str, Any]]:
+        return self._ratio_history("/topLongShortPositionRatio", symbol, period, limit)
+
+    def _ratio_history(
+        self, path: str, symbol: str, period: str, limit: int
+    ) -> list[dict[str, Any]]:
+        data = self._get(
+            BINANCE_FDATA,
+            path,
+            {"symbol": symbol, "period": period, "limit": limit},
+        )
+        return [row for row in data if isinstance(row, dict)]
+
 
 def normalize_symbols(symbols: Iterable[str]) -> list[str]:
     normalized: list[str] = []

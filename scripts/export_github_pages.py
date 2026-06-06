@@ -16,6 +16,7 @@ from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 APP_HTML = ROOT / "sentiment_scanner" / "app.html"
 SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
 CONTRACT_RADAR = ROOT / "sentiment_scanner" / "contract_anomalies.json"
+SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"
 BRAND_IMAGE = ROOT / "sentiment_scanner" / "brand-hero.png"
 OUT = ROOT / "site"
 MAIN_SYMBOLS = [
@@ -275,8 +276,13 @@ def main() -> None:
         json.dumps(contract_radar, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    scanner_status = json.loads(SCANNER_STATUS.read_text(encoding="utf-8")) if SCANNER_STATUS.exists() else {}
+    (OUT / "data" / "scanner_status.json").write_text(
+        json.dumps(scanner_status, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
     (OUT / "data" / "manifest.json").write_text(
-        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json", "volume_anomalies": "volume_anomalies.json", "contract_anomalies": "contract_anomalies.json"}, ensure_ascii=False, separators=(",", ":")),
+        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json", "volume_anomalies": "volume_anomalies.json", "contract_anomalies": "contract_anomalies.json", "scanner_status": "scanner_status.json"}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     print(f"Exported GitHub Pages site to {OUT}")

@@ -32,8 +32,17 @@ jobs:
           MAX_SEED_ROWS: "3000"
           SCAN_FALLBACK_LIMIT: "120"
           MIN_QUOTE_VOLUME_USDT: "5000000"
+          CONTRACT_KLINE_CANDIDATES: "120"
+          CONTRACT_DETAIL_CANDIDATES: "20"
+          COINGLASS_REQUEST_BUDGET: "27"
           COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
-        run: python scripts/update_seed_signals.py
+        run: |
+          for attempt in 1 2; do
+            python scripts/update_seed_signals.py && exit 0
+            echo "Scan attempt ${attempt} failed; retrying shortly"
+            sleep 20
+          done
+          exit 1
       - name: Export GitHub Pages data
         run: python scripts/export_github_pages.py
       - name: Commit updated signals
@@ -41,7 +50,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp -r site/* .
-          git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json data index.html
+          git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json data index.html
           if git diff --cached --quiet; then
             echo "No signal updates"
           else
