@@ -44,6 +44,18 @@ def signal_id(row: dict[str, object]) -> str:
 
 def normalize_row(row: dict[str, object]) -> dict[str, object]:
     row = dict(row)
+    triggered_at_ms = row.get("triggered_at_ms")
+    triggered_at = row.get("triggered_at")
+    if not triggered_at_ms and triggered_at:
+        try:
+            parsed = datetime.fromisoformat(str(triggered_at).replace("Z", "+00:00"))
+            triggered_at_ms = int(parsed.timestamp() * 1000)
+            row["triggered_at_ms"] = triggered_at_ms
+        except (TypeError, ValueError):
+            pass
+    if triggered_at_ms:
+        row["triggered_at"] = iso_ms(int(triggered_at_ms))
+        row.setdefault("established_at", row["triggered_at"])
     row.setdefault("id", signal_id(row))
     row.setdefault("status", "active")
     row.setdefault("reached_state", "holding")
@@ -57,6 +69,19 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
             snapshot["divergence_label"] = "top_divergence" if "bearish" in setup else "bottom_divergence"
         row["snapshot_data"] = snapshot
     return row
+
+
+def valid_signal_time(row: dict[str, object]) -> bool:
+    triggered = row.get("triggered_at")
+    detected = row.get("detected_at")
+    if not triggered or not detected:
+        return True
+    try:
+        triggered_at = datetime.fromisoformat(str(triggered).replace("Z", "+00:00"))
+        detected_at = datetime.fromisoformat(str(detected).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return True
+    return triggered_at <= detected_at
 
 
 def clean_symbol(symbol: object) -> str:
@@ -315,7 +340,8 @@ def build_contract_radar_from_binance_tickers(
     short_changes = short_changes or {}
     market_details = market_details or {}
     rows: list[dict[str, object]] = []
-    now = datetime.now(timezone.utc).isoformat()
+    observed_at_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    now = iso_ms(observed_at_ms)
     for item in tickers:
         symbol = str(item.get("symbol") or "").upper()
         if not symbol.endswith("USDT"):
@@ -381,6 +407,9 @@ def build_contract_radar_from_binance_tickers(
                 "trigger": trigger,
                 "market_label": "價格動能" if trigger == "price_24h" else "資金費率擁擠" if trigger == "funding" else "觀察",
                 "price": price,
+                "trigger_price": short.get("last_completed_price")
+                if trigger in {"price_5m", "price_15m"}
+                else price,
                 "price_change_5m": change_5m,
                 "price_change_15m": change_15m,
                 "price_change_1h": change_1h,
@@ -398,6 +427,9 @@ def build_contract_radar_from_binance_tickers(
                 "short_liquidation_1h": detail.get("short_liquidation_usd_1h"),
                 "reasons": ["Binance高成交量", "CoinGlass資金費率"] if fr else ["Binance高成交量"],
                 "updated_at": now,
+                "triggered_at_ms": int(short.get("last_completed_at_ms") or observed_at_ms)
+                if trigger in {"price_5m", "price_15m"}
+                else observed_at_ms,
             }
         )
     return sorted(rows, key=lambda row: (float(row["quality_score"]), abs(float(row["radar_score"])), abs(float(row["price_change_24h"])), float(row["volume_24h"])), reverse=True)[:160]
@@ -420,10 +452,15 @@ def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[
     def load(symbol: str) -> tuple[str, dict[str, float]]:
         with BinanceFuturesClient(timeout=12) as client:
             rows = client.klines(symbol, interval="5m", limit=14)
-        if len(rows) < 4:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        rows = [row for row in rows if row.close_time <= now_ms]
+        if len(rows) < 13:
             return symbol, {}
         last = rows[-1].close
-        changes: dict[str, float] = {}
+        changes: dict[str, float] = {
+            "last_completed_at_ms": float(rows[-1].close_time + 1),
+            "last_completed_price": last,
+        }
         if rows[-2].close:
             changes["price_change_5m"] = (last - rows[-2].close) / rows[-2].close * 100.0
         if len(rows) >= 4 and rows[-4].close:
@@ -598,8 +635,6 @@ def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None
 def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: list[dict[str, object]], config: ScannerConfig) -> list[dict[str, object]]:
     active_keys = {key for row in existing if (key := recent_active_contract_key(row)) is not None}
     rows: list[dict[str, object]] = []
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    now_iso = datetime.now(timezone.utc).isoformat()
     max_new = int(os.getenv("CONTRACT_SIGNAL_MAX_NEW", "30"))
     for row in radar_rows:
         bias = str(row.get("bias") or "neutral")
@@ -610,9 +645,10 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
         symbol = clean_symbol(row.get("symbol"))
         if (symbol, signal_type) in active_keys:
             continue
-        price = as_float(row.get("price"))
+        price = as_float(row.get("trigger_price")) or as_float(row.get("price"))
         if price is None or price <= 0:
             continue
+        triggered_at_ms = int(row.get("triggered_at_ms") or datetime.now(timezone.utc).timestamp() * 1000)
         risk = price * float(os.getenv("CONTRACT_RISK_PCT", "0.028"))
         if signal_type == "reversal_bullish":
             sl, tp1, tp2, tp3, ftp = price - risk, price + risk, price + risk * 2, price + risk * 3, price + risk * 5
@@ -638,8 +674,8 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "timeframe": "15M",
                     "signal_type": signal_type,
                     "setup_id": f"coinglass_contract_{bias}_{trigger}",
-                    "triggered_at_ms": now_ms,
-                    "triggered_at": now_iso,
+                    "triggered_at_ms": triggered_at_ms,
+                    "triggered_at": iso_ms(triggered_at_ms),
                     "trigger_price": price,
                     "atr_at_trigger": risk / max(config.atr_risk_multiple, 0.1),
                     "sl_price": sl,
@@ -756,14 +792,20 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
         if str(row.get("status") or "active") == "active"
         and str(row.get("reached_state") or "holding") in {"holding", "tp1", "tp2", "tp3"}
     ]
-    pairs = sorted({(clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower()) for row in active_rows})
+    earliest_by_pair: dict[tuple[str, str], int] = {}
+    for row in active_rows:
+        pair = (clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower())
+        triggered_at_ms = int(row.get("triggered_at_ms") or 0)
+        if triggered_at_ms > 0:
+            earliest_by_pair[pair] = min(earliest_by_pair.get(pair, triggered_at_ms), triggered_at_ms)
+    pairs = sorted(earliest_by_pair)
     if not pairs:
         return {"checked": 0, "changed": 0, "closed": 0}
 
     def load(pair: tuple[str, str]) -> tuple[tuple[str, str], list[object]]:
         symbol, interval = pair
         with BinanceFuturesClient(timeout=15) as client:
-            return pair, client.klines(symbol, interval=interval, limit=500)
+            return pair, client.klines_since(symbol, interval=interval, start_time=earliest_by_pair[pair])
 
     histories: dict[tuple[str, str], list[object]] = {}
     with ThreadPoolExecutor(max_workers=min(8, max(1, len(pairs)))) as executor:
@@ -773,7 +815,8 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
             try:
                 key, klines = future.result()
             except Exception as exc:
-                print(f"WARN state replay skipped for {pair[0]} {pair[1]}: {exc}")
+                message = f"WARN state replay skipped for {pair[0]} {pair[1]}: {exc}"
+                print(message.encode("ascii", "backslashreplace").decode("ascii"))
                 continue
             histories[key] = klines
 
@@ -793,12 +836,31 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
         row["max_reached_state"] = max_reached
         row["hit_price"] = hit_price
         row["hit_at"] = hit_at
+        row["state_resolution"] = "chronological_ohlc_stop_first"
         if target_order(max_reached) >= target_order("tp2"):
             row["active_sl_price"] = row.get("trigger_price")
         if next_state in {"sl", "ftp"}:
             row["status"] = "closed"
             closed += 1
     return {"checked": len(active_rows), "changed": changed, "closed": closed}
+
+
+def validate_state_consistency(rows: list[dict[str, object]]) -> dict[str, int]:
+    changed = 0
+    closed = 0
+    for row in rows:
+        state = str(row.get("reached_state") or "holding")
+        status = str(row.get("status") or "active")
+        if state in {"sl", "ftp"} and status == "active":
+            row["status"] = "closed"
+            row["state_resolution"] = "terminal_state_consistency"
+            changed += 1
+            closed += 1
+        if target_order(row.get("max_reached_state")) >= target_order("tp2"):
+            if row.get("active_sl_price") != row.get("trigger_price"):
+                row["active_sl_price"] = row.get("trigger_price")
+                changed += 1
+    return {"checked": len(rows), "changed": changed, "closed": closed}
 
 
 def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfig) -> dict[str, object] | None:
@@ -934,7 +996,7 @@ def resolve_symbols() -> list[str]:
 
 
 def main() -> None:
-    existing = [normalize_row(row) for row in load_rows()]
+    existing = [row for raw in load_rows() if valid_signal_time(row := normalize_row(raw))]
     min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
     config = ScannerConfig(
         lookback_limit=int(os.getenv("LOOKBACK_LIMIT", "500")),
@@ -991,7 +1053,7 @@ def main() -> None:
     rows_for_state = list(by_id.values())
     state_audit = update_existing_states(rows_for_state)
     print(f"state_audit checked={state_audit['checked']} changed={state_audit['changed']} closed={state_audit['closed']}")
-    state_consistency = update_existing_states(rows_for_state)
+    state_consistency = validate_state_consistency(rows_for_state)
     print(
         f"state_consistency checked={state_consistency['checked']} "
         f"changed={state_consistency['changed']} closed={state_consistency['closed']}"

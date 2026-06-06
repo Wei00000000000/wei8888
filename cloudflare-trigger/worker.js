@@ -1,6 +1,7 @@
 const OWNER = "Wei00000000000";
 const REPOSITORY = "wei8888";
 const WORKFLOW = "update-signals.yml";
+const VERSION = "2026-06-06-signal-time-v2";
 
 async function dispatch(env) {
   if (!env.GITHUB_TOKEN) {
@@ -32,8 +33,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") {
-      return Response.json({ ok: true, workflow: WORKFLOW });
+      return Response.json({
+        ok: true,
+        version: VERSION,
+        workflow: WORKFLOW,
+        githubTokenConfigured: Boolean(env.GITHUB_TOKEN),
+      });
     }
-    return new Response("Wei signal trigger is running.", { status: 200 });
+    return Response.json({ ok: true, version: VERSION, health: "/health" });
   },
 };

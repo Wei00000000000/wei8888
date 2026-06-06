@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from time import time
 
 from .binance import BinanceFuturesClient, Kline, OpenInterestPoint, TakerPoint
 from .indicators import atr, percentile_rank
@@ -153,6 +154,8 @@ class SentimentScanner:
                 continue
             kline_index, kline = matched
             _, previous_kline = previous_matched
+            if kline.close_time > int(time() * 1000):
+                continue
             if previous_oi.open_interest == 0 or previous_kline.close == 0:
                 continue
 
@@ -178,7 +181,9 @@ class SentimentScanner:
             snapshots.append(
                 MarketSnapshot(
                     symbol=symbol,
-                    timestamp=current_oi.timestamp,
+                    # The setup only becomes knowable after the matched candle
+                    # closes, so this is the actual signal establishment time.
+                    timestamp=kline.close_time + 1,
                     price=kline.close,
                     atr=current_atr,
                     oi_prev=previous_oi.open_interest,
@@ -251,8 +256,8 @@ class SentimentScanner:
         )
 
     def _evaluate_signal(self, signal: Signal, kline_by_time: dict[int, Kline]) -> EvaluatedSignal:
-        interval_ms = 15 * 60 * 1000
-        bars = int(self.config.eval_window_hours * 60 / 15)
+        interval_minutes = int(self.config.interval.removesuffix("m"))
+        bars = int(self.config.eval_window_hours * 60 / interval_minutes)
         is_bullish = signal.signal_type == "reversal_bullish"
         reached_state = "holding"
         hit_at_ms: int | None = None
@@ -267,10 +272,11 @@ class SentimentScanner:
             ("tp1", signal.tp1_price),
         ]
 
-        for offset in range(1, bars + 1):
-            kline = kline_by_time.get(signal.triggered_at_ms + interval_ms * offset)
-            if kline is None:
-                continue
+        future_klines = sorted(
+            (kline for kline in kline_by_time.values() if kline.open_time >= signal.triggered_at_ms),
+            key=lambda kline: kline.open_time,
+        )[:bars]
+        for kline in future_klines:
 
             if is_bullish:
                 gain = (kline.high - signal.trigger_price) / signal.trigger_price * 100.0
@@ -313,4 +319,3 @@ class SentimentScanner:
             max_gain_pct=max_gain_pct,
             max_drawdown_pct=max_drawdown_pct,
         )
-

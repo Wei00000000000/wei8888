@@ -112,11 +112,20 @@ class BinanceFuturesClient:
                 prices[symbol] = float(item["price"])
         return prices
 
-    def klines(self, symbol: str, interval: str = "15m", limit: int = 500) -> list[Kline]:
+    def klines(
+        self,
+        symbol: str,
+        interval: str = "15m",
+        limit: int = 500,
+        start_time: int | None = None,
+    ) -> list[Kline]:
+        params: dict[str, Any] = {"symbol": symbol, "interval": interval, "limit": limit}
+        if start_time is not None:
+            params["startTime"] = start_time
         data = self._get(
             BINANCE_FAPI,
             "/fapi/v1/klines",
-            {"symbol": symbol, "interval": interval, "limit": limit},
+            params,
         )
         return [
             Kline(
@@ -130,6 +139,26 @@ class BinanceFuturesClient:
             )
             for row in data
         ]
+
+    def klines_since(
+        self,
+        symbol: str,
+        interval: str,
+        start_time: int,
+        max_pages: int = 8,
+    ) -> list[Kline]:
+        rows: list[Kline] = []
+        cursor = max(0, int(start_time))
+        for _ in range(max_pages):
+            page = self.klines(symbol, interval=interval, limit=1500, start_time=cursor)
+            if not page:
+                break
+            rows.extend(page)
+            next_cursor = page[-1].close_time + 1
+            if len(page) < 1500 or next_cursor <= cursor:
+                break
+            cursor = next_cursor
+        return rows
 
     def open_interest_hist(self, symbol: str, period: str = "15m", limit: int = 500) -> list[OpenInterestPoint]:
         data = self._get(
