@@ -307,8 +307,10 @@ def build_contract_radar_from_binance_tickers(
     tickers: list[dict[str, object]],
     funding_rows: list[dict[str, object]],
     min_volume: float,
+    short_changes: dict[str, dict[str, float]] | None = None,
 ) -> list[dict[str, object]]:
     funding = funding_map(funding_rows)
+    short_changes = short_changes or {}
     rows: list[dict[str, object]] = []
     now = datetime.now(timezone.utc).isoformat()
     for item in tickers:
@@ -320,22 +322,27 @@ def build_contract_radar_from_binance_tickers(
             continue
         price = first_float(item, ("lastPrice", "price"))
         change = first_float(item, ("priceChangePercent", "price_change_percent_24h"))
+        short = short_changes.get(symbol, {})
+        change_5m = short.get("price_change_5m")
+        change_15m = short.get("price_change_15m")
+        change_1h = short.get("price_change_1h")
         high = first_float(item, ("highPrice",))
         low = first_float(item, ("lowPrice",))
         open_price = first_float(item, ("openPrice",))
         range_pct = (high - low) / open_price * 100 if open_price > 0 else abs(change)
         fr = funding.get(clean_symbol(symbol), 0.0)
-        score = round(clamp(change * 1.8 + range_pct * (1 if change >= 0 else -1) + (-fr * 450), -100, 100))
+        intraday = change_15m if change_15m is not None else change_1h if change_1h is not None else 0.0
+        score = round(clamp(change * 1.15 + intraday * 4.5 + range_pct * (1 if change >= 0 else -1) + (-fr * 450), -100, 100))
         if score >= 12:
             bias, kind = "long", "bull"
         elif score <= -10:
             bias, kind = "short", "bear"
         else:
             bias, kind = "neutral", "neutral"
-        trigger = "price_24h" if abs(change) >= 3 else "funding" if abs(fr) >= 0.02 else "watch"
+        trigger = "price_5m" if change_5m is not None and abs(change_5m) >= 3 else "price_15m" if change_15m is not None and abs(change_15m) >= 3 else "price_24h" if abs(change) >= 3 else "funding" if abs(fr) >= 0.02 else "watch"
         temp_row = {
-            "price_change_percent_5m": 0,
-            "price_change_percent_15m": 0,
+            "price_change_percent_5m": change_5m if change_5m is not None else 0,
+            "price_change_percent_15m": change_15m if change_15m is not None else 0,
             "funding_rate": fr,
             "quote_volume": volume,
             "cvd_ratio_1h": 0,
@@ -355,9 +362,9 @@ def build_contract_radar_from_binance_tickers(
                 "trigger": trigger,
                 "market_label": "價格動能" if trigger == "price_24h" else "資金費率擁擠" if trigger == "funding" else "觀察",
                 "price": price,
-                "price_change_5m": 0,
-                "price_change_15m": 0,
-                "price_change_1h": 0,
+                "price_change_5m": change_5m,
+                "price_change_15m": change_15m,
+                "price_change_1h": change_1h,
                 "price_change_24h": change,
                 "oi_change_1h": 0,
                 "oi_change_15m": 0,
@@ -373,6 +380,48 @@ def build_contract_radar_from_binance_tickers(
             }
         )
     return sorted(rows, key=lambda row: (float(row["quality_score"]), abs(float(row["radar_score"])), abs(float(row["price_change_24h"])), float(row["volume_24h"])), reverse=True)[:160]
+
+
+def candidate_symbols_from_tickers(tickers: list[dict[str, object]], min_volume: float, limit: int = 180) -> list[str]:
+    ranked = sorted(
+        (
+            item
+            for item in tickers
+            if str(item.get("symbol") or "").endswith("USDT") and first_float(item, ("quoteVolume",)) >= min_volume
+        ),
+        key=lambda item: first_float(item, ("quoteVolume",)),
+        reverse=True,
+    )
+    return [str(item.get("symbol")) for item in ranked[:limit]]
+
+
+def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[str, float]]:
+    def load(symbol: str) -> tuple[str, dict[str, float]]:
+        with BinanceFuturesClient(timeout=12) as client:
+            rows = client.klines(symbol, interval="5m", limit=14)
+        if len(rows) < 4:
+            return symbol, {}
+        last = rows[-1].close
+        changes: dict[str, float] = {}
+        if rows[-2].close:
+            changes["price_change_5m"] = (last - rows[-2].close) / rows[-2].close * 100.0
+        if len(rows) >= 4 and rows[-4].close:
+            changes["price_change_15m"] = (last - rows[-4].close) / rows[-4].close * 100.0
+        if len(rows) >= 13 and rows[-13].close:
+            changes["price_change_1h"] = (last - rows[-13].close) / rows[-13].close * 100.0
+        return symbol, changes
+
+    book: dict[str, dict[str, float]] = {}
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(load, symbol): symbol for symbol in symbols}
+        for future in as_completed(futures):
+            try:
+                symbol, changes = future.result()
+            except Exception:
+                continue
+            if changes:
+                book[symbol] = changes
+    return book
 
 
 def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None:
@@ -694,10 +743,13 @@ def main() -> None:
         contract_radar = build_contract_radar(CoinGlassClient(timeout=20).coins_markets(), min_volume)
         if not contract_radar:
             with BinanceFuturesClient(timeout=20) as client:
+                tickers = client.ticker_24hr()
+                changes = short_kline_changes(candidate_symbols_from_tickers(tickers, min_volume), workers=8)
                 contract_radar = build_contract_radar_from_binance_tickers(
-                    client.ticker_24hr(),
+                    tickers,
                     CoinGlassClient(timeout=20).funding_rates(),
                     min_volume,
+                    changes,
                 )
         CONTRACT_RADAR.write_text(
             json.dumps({"rows": contract_radar, "updated_at": datetime.now(timezone.utc).isoformat(), "min_volume_usdt": min_volume}, ensure_ascii=False, indent=2),
@@ -708,7 +760,9 @@ def main() -> None:
         print(f"WARN coinglass contract radar skipped: {exc}")
         try:
             with BinanceFuturesClient(timeout=20) as client:
-                contract_radar = build_contract_radar_from_binance_tickers(client.ticker_24hr(), [], min_volume)
+                tickers = client.ticker_24hr()
+                changes = short_kline_changes(candidate_symbols_from_tickers(tickers, min_volume), workers=8)
+                contract_radar = build_contract_radar_from_binance_tickers(tickers, [], min_volume, changes)
                 CONTRACT_RADAR.write_text(
                     json.dumps({"rows": contract_radar, "updated_at": datetime.now(timezone.utc).isoformat(), "warning": str(exc), "min_volume_usdt": min_volume}, ensure_ascii=False, indent=2),
                     encoding="utf-8",

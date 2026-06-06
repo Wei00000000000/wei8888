@@ -652,7 +652,7 @@
     renderAll();
     status("Auto scanner warming up.");
     initialize();
-    setInterval(refreshPrices, 5000);
+    setInterval(refreshPrices, isMobileView() ? 12000 : 5000);
     setInterval(loadBook, 120000);
     setInterval(renderHealth, 1000);
 
@@ -897,13 +897,15 @@
       const symbols = [...new Set([
         ...state.signals.filter(isLivePricedSignal).map(s => clean(s.symbol)),
         ...MAIN_WATCH_SYMBOLS,
-        ...(state.volumeAnomalies || []).slice(0, 20).map(row => clean(row.symbol))
+        ...(state.volumeAnomalies || []).slice(0, 20).map(row => clean(row.symbol)),
+        ...(state.contractAnomalies || []).slice(0, isMobileView() ? 40 : 100).map(row => clean(row.symbol))
       ])];
       if (!symbols.length) return;
       try {
         const data = await apiJson("prices", `symbols=${encodeURIComponent(symbols.join(","))}`);
         const oldStates = new Map(seenStates);
         state.markets = mergeMarkets(state.markets, data.markets || []);
+        updateContractLiveMarkets(data.markets || []);
         updateLiveSignalStates();
         if (state.priceBaselineReady) {
           seenStates.clear();
@@ -913,7 +915,7 @@
           state.priceBaselineReady = true;
         }
         state.lastPriceAt = new Date();
-        renderAll();
+        renderFastMarketViews();
         if ($("symbolModal").classList.contains("open")) openSymbolModal($("modalSymbol").textContent);
       } catch (err) {
         rememberError(err, "Price update error");
@@ -959,6 +961,15 @@
       renderSignals();
       renderStable();
       renderReview();
+      renderNotifications();
+      renderHealth();
+    }
+    function renderFastMarketViews() {
+      renderStats();
+      renderWatchDashboard();
+      renderSignals();
+      renderStable();
+      renderContractRadar();
       renderNotifications();
       renderHealth();
     }
@@ -1064,11 +1075,12 @@
       if (!target) return;
       const q = $("contractSearch").value.trim().toUpperCase();
       const bias = $("contractBiasFilter").value;
+      const limit = q ? (isMobileView() ? 80 : 160) : (isMobileView() ? 24 : 72);
       const rows = (state.contractAnomalies || [])
         .filter(row => !q || clean(row.symbol).includes(q))
         .filter(row => bias === "all" || String(row.bias || "neutral") === bias)
         .sort((a,b) => Number(b.quality_score || 0) - Number(a.quality_score || 0) || Math.abs(Number(b.radar_score ?? b.score) || 0) - Math.abs(Number(a.radar_score ?? a.score) || 0) || Number(b.volume_24h || 0) - Number(a.volume_24h || 0))
-        .slice(0, 120);
+        .slice(0, limit);
       $("contractCount").textContent = `(${rows.length})`;
       const longs = rows.filter(row => row.bias === "long").length;
       const shorts = rows.filter(row => row.bias === "short").length;
@@ -1094,8 +1106,12 @@
       const radar = Number(row.radar_score ?? row.score) || 0;
       const quality = Number(row.quality_score || 0);
       const latest = latestSignalFor(symbol);
+      const group = oiMarketGroup(row);
+      const live = marketFor(symbol);
+      const livePrice = Number(live?.price || row.price);
+      const liveChange = Number.isFinite(Number(live?.price_change_pct)) ? Number(live.price_change_pct) : Number(row.price_change_24h);
       const reason = [
-        row.market_label,
+        group.label,
         row.trigger,
         row.quality_checks && row.quality_checks.length ? `品質 ${row.quality_checks.join("/")}` : "",
         ...(row.reasons || [])
@@ -1106,17 +1122,57 @@
           <div><div class="signal-symbol">${symbol}</div><div class="signal-time">${lastTimeText(state.lastContractAt)}</div><div class="signal-strategy ${kind === "bear" ? "bear" : ""}">合約異常雷達 · ${label}</div></div>
           <div class="signal-actions"><span class="score-badge bull">Q ${quality}/6</span><span class="score-badge ${kind}">R ${fmt(radar,0)}</span></div>
         </div>
-        <div class="pnl-box"><div class="metric-label">品質 / 雷達</div><div class="pnl-value ${kind === "bear" ? "bear-text" : "bull-text"}">${quality}/6 · ${fmt(radar,0)}</div></div>
+        <div class="pnl-box"><div class="metric-label">品質 / 雷達 / 分組</div><div class="pnl-value ${group.kind === "bear" ? "bear-text" : "bull-text"}">${quality}/6 · ${fmt(radar,0)} · ${group.label}</div></div>
         <div class="metric-grid">
-          <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(row.price, 6)}</div></div>
-          <div class="metric-box"><div class="metric-label">24H 成交量</div><div class="metric-value">${compact(row.volume_24h)}</div></div>
-          <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${signed(row.oi_change_1h)}</div></div>
-          <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${signed(row.cvd_ratio_1h)}</div></div>
-          <div class="metric-box tp"><div class="metric-label">價格 5M</div><div class="metric-value">${signed(row.price_change_5m)}</div></div>
-          <div class="metric-box tp"><div class="metric-label">價格 15M</div><div class="metric-value">${signed(row.price_change_15m)}</div></div>
+          <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(livePrice, 6)}</div></div>
+          <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}">${signed(liveChange)}</div></div>
+          <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${contractMetric(row.oi_change_1h, "待 API")}</div></div>
+          <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${contractMetric(row.cvd_ratio_1h, "待 API")}</div></div>
+          <div class="metric-box tp"><div class="metric-label">價格 5M</div><div class="metric-value">${contractMetric(row.price_change_5m, "等待掃描")}</div></div>
+          <div class="metric-box tp"><div class="metric-label">價格 15M</div><div class="metric-value">${contractMetric(row.price_change_15m, "等待掃描")}</div></div>
         </div>
         <div class="stable-rule">${reason || "等待更多共振"}${latest ? ` · 最新訊號 ${strategyNameForSignal(latest)} ${shortTime(latest.triggered_at)}` : ""}</div>
       </article>`;
+    }
+    function contractMetric(value, emptyText = "待 API") {
+      const n = Number(value);
+      if (!Number.isFinite(n) || Math.abs(n) < 0.000001) return `<span class="muted">${emptyText}</span>`;
+      return `<span class="${numClass(n)}">${signed(n)}</span>`;
+    }
+    function oiMarketGroup(row) {
+      const oi = Number(row.oi_change_1h);
+      const cvd = Number(row.cvd_ratio_1h);
+      const price = Number(row.price_change_15m || row.price_change_1h || row.price_change_24h);
+      if (Number.isFinite(oi) && Math.abs(oi) > 0.000001 && Number.isFinite(cvd) && Math.abs(cvd) > 0.000001) {
+        if (oi > 0 && cvd > 0) return {label: "多頭建倉", kind: "bull"};
+        if (oi < 0 && cvd > 0) return {label: "空頭回補", kind: "bull"};
+        if (oi > 0 && cvd < 0) return {label: "空頭建倉", kind: "bear"};
+        if (oi < 0 && cvd < 0) return {label: "多頭出場", kind: "bear"};
+      }
+      if (Number.isFinite(oi) && Math.abs(oi) > 0.000001 && Number.isFinite(price)) {
+        if (oi > 0 && price > 0) return {label: "多頭建倉", kind: "bull"};
+        if (oi < 0 && price > 0) return {label: "空頭回補", kind: "bull"};
+        if (oi > 0 && price < 0) return {label: "空頭建倉", kind: "bear"};
+        if (oi < 0 && price < 0) return {label: "多頭出場", kind: "bear"};
+      }
+      const bias = String(row.bias || "");
+      if (bias === "long") return {label: "價格動能偏多", kind: "bull"};
+      if (bias === "short") return {label: "價格動能偏空", kind: "bear"};
+      return {label: "觀察", kind: "warn"};
+    }
+    function updateContractLiveMarkets(rows) {
+      if (!rows.length || !state.contractAnomalies.length) return;
+      const book = new Map(rows.map(row => [clean(row.symbol), row]));
+      state.contractAnomalies = state.contractAnomalies.map(row => {
+        const live = book.get(clean(row.symbol));
+        if (!live) return row;
+        return {
+          ...row,
+          price: Number.isFinite(Number(live.price)) ? Number(live.price) : row.price,
+          price_change_24h: Number.isFinite(Number(live.price_change_pct)) ? Number(live.price_change_pct) : row.price_change_24h,
+          volume_24h: Number.isFinite(Number(live.quote_volume)) ? Number(live.quote_volume) : row.volume_24h
+        };
+      });
     }
     function renderWatchDashboard() {
       const rows = watchMarkets().map(m => ({...m, analysis: classifyMarket(m)}));
@@ -1193,10 +1249,12 @@
       const q = $("stableSearch").value.trim().toUpperCase();
       const sideFilter = $("stableSideFilter").value;
       const day = $("stableDate").value;
+      const historyMode = Boolean(q || day || sideFilter !== "all");
       const rows = stableSignals()
         .filter(s => !q || s.symbol.includes(q))
         .filter(s => !day || sameDay(s.triggered_at, day))
         .filter(s => sideFilter === "all" || stableTradeMeta(s).side === sideFilter)
+        .filter(s => historyMode || isOpenSignal(s) || isPartialActiveSignal(s))
         .sort((a,b) => signalRank(b) - signalRank(a) || stableTradeMeta(b).score - stableTradeMeta(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
       $("stableCount").textContent = `(${rows.length})`;
       const metas = rows.map(stableTradeMeta);
@@ -1679,9 +1737,11 @@
       const q = querySymbol();
       const filter = $("signalFilter").value;
       const day = $("signalDate").value;
+      const historyMode = Boolean(q || day || filter !== "all");
       return sortSignals(dataSignals()).filter(s => {
         if (q && !clean(s.symbol).includes(q)) return false;
         if (day && !sameDay(s.triggered_at, day)) return false;
+        if (!historyMode && !(isOpenSignal(s) || isPartialActiveSignal(s))) return false;
         if (filter !== "sl" && s.reached_state === "sl") return false;
         if (filter === "open" && !(isOpenSignal(s) || isPartialActiveSignal(s))) return false;
         if (filter === "tp" && !["tp1","tp2","tp3","ftp"].includes(s.reached_state)) return false;
@@ -2196,6 +2256,7 @@
     function querySymbol() { return $("symbolSearch").value.trim().toUpperCase(); }
     function signalKey(s) { return `${clean(s.symbol)}|${s.signal_type}|${s.triggered_at || s.triggered_at_ms || ""}`; }
     function clean(s) { return String(s || "").toUpperCase().replace(/USDT$/,""); }
+    function isMobileView() { return window.matchMedia && window.matchMedia("(max-width: 760px)").matches; }
     function numClass(v) { return Number(v) > 0 ? "bull-text" : Number(v) < 0 ? "bear-text" : "muted"; }
     function clamp(value, min, max) { return Math.max(min, Math.min(max, Number(value) || 0)); }
     function signed(v) {
