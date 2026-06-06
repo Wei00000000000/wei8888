@@ -713,10 +713,12 @@ def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[s
     trigger_ms = int(row.get("triggered_at_ms") or 0)
     entry = as_float(row.get("trigger_price"))
     original_stop = as_float(row.get("sl_price"))
-    current = str(row.get("reached_state") or "holding")
-    max_reached = str(row.get("max_reached_state") or current if current in {"tp1", "tp2", "tp3", "ftp"} else "holding")
-    hit_price = as_float(row.get("hit_price"))
-    hit_at = str(row.get("hit_at") or "") or None
+    # Always rebuild chronologically from the trigger. Starting from the stored TP
+    # would incorrectly apply a moved stop before that TP was actually reached.
+    current = "holding"
+    max_reached = "holding"
+    hit_price = None
+    hit_at = None
 
     for kline in klines:
         if int(getattr(kline, "open_time")) <= trigger_ms:
@@ -747,7 +749,7 @@ def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[s
     return current, hit_price, hit_at, max_reached
 
 
-def update_existing_states(rows: list[dict[str, object]]) -> None:
+def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
     active_rows = [
         row
         for row in rows
@@ -755,6 +757,8 @@ def update_existing_states(rows: list[dict[str, object]]) -> None:
         and str(row.get("reached_state") or "holding") in {"holding", "tp1", "tp2", "tp3"}
     ]
     pairs = sorted({(clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower()) for row in active_rows})
+    if not pairs:
+        return {"checked": 0, "changed": 0, "closed": 0}
 
     def load(pair: tuple[str, str]) -> tuple[tuple[str, str], list[object]]:
         symbol, interval = pair
@@ -773,6 +777,8 @@ def update_existing_states(rows: list[dict[str, object]]) -> None:
                 continue
             histories[key] = klines
 
+    changed = 0
+    closed = 0
     for row in active_rows:
         key = (clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower())
         klines = histories.get(key)
@@ -782,6 +788,7 @@ def update_existing_states(rows: list[dict[str, object]]) -> None:
         next_state, hit_price, hit_at, max_reached = replay_signal_state(row, klines)
         if next_state == prev and max_reached == str(row.get("max_reached_state") or prev):
             continue
+        changed += 1
         row["reached_state"] = next_state
         row["max_reached_state"] = max_reached
         row["hit_price"] = hit_price
@@ -790,6 +797,8 @@ def update_existing_states(rows: list[dict[str, object]]) -> None:
             row["active_sl_price"] = row.get("trigger_price")
         if next_state in {"sl", "ftp"}:
             row["status"] = "closed"
+            closed += 1
+    return {"checked": len(active_rows), "changed": changed, "closed": closed}
 
 
 def format_divergence_signal(symbol: str, snapshot: object, config: ScannerConfig) -> dict[str, object] | None:
@@ -980,7 +989,13 @@ def main() -> None:
             new_count += 1
         by_id[row_id] = row
     rows_for_state = list(by_id.values())
-    update_existing_states(rows_for_state)
+    state_audit = update_existing_states(rows_for_state)
+    print(f"state_audit checked={state_audit['checked']} changed={state_audit['changed']} closed={state_audit['closed']}")
+    state_consistency = update_existing_states(rows_for_state)
+    print(
+        f"state_consistency checked={state_consistency['checked']} "
+        f"changed={state_consistency['changed']} closed={state_consistency['closed']}"
+    )
 
     rows = sorted(
         rows_for_state,
@@ -998,6 +1013,8 @@ def main() -> None:
                 "signals_found": len(found),
                 "new_signals": new_count,
                 "errors": errors[:20],
+                "state_audit": state_audit,
+                "state_consistency": state_consistency,
                 "min_volume_usdt": min_volume,
                 **radar_meta,
             },
