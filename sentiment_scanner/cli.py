@@ -27,6 +27,8 @@ def main() -> None:
     config = ScannerConfig(
         lookback_limit=args.limit,
         oi_percentile_threshold=args.oi_percentile,
+        oi_change_min_pct=args.oi_change_min_pct,
+        oi_change_strong_pct=args.oi_change_strong_pct,
         atr_risk_multiple=args.atr_multiple,
         max_risk_pct=args.max_risk_pct,
         eval_window_hours=args.eval_hours,
@@ -48,6 +50,8 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--symbols", default="BTCUSDT,ETHUSDT,SOLUSDT", help="Comma separated symbols, e.g. BTCUSDT,ETHUSDT.")
     parser.add_argument("--limit", type=int, default=500, help="Lookback bars, max 500 for OI history.")
     parser.add_argument("--oi-percentile", type=float, default=99.0, help="OI change percentile trigger threshold.")
+    parser.add_argument("--oi-change-min-pct", type=float, default=3.0, help="Minimum absolute OI change percentage.")
+    parser.add_argument("--oi-change-strong-pct", type=float, default=5.0, help="Strong absolute OI change percentage.")
     parser.add_argument("--atr-multiple", type=float, default=2.5, help="ATR stop risk multiple.")
     parser.add_argument("--max-risk-pct", type=float, default=0.10, help="Maximum stop distance as price percentage.")
     parser.add_argument("--eval-hours", type=float, default=6.0, help="Backtest evaluation window in hours.")
@@ -145,4 +149,3 @@ def iso_ms(timestamp_ms: int) -> str:
 
 if __name__ == "__main__":
     main()
-

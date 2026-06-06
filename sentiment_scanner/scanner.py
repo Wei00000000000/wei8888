@@ -13,6 +13,8 @@ class ScannerConfig:
     lookback_limit: int = 500
     atr_period: int = 14
     oi_percentile_threshold: float = 99.0
+    oi_change_min_pct: float = 3.0
+    oi_change_strong_pct: float = 5.0
     atr_risk_multiple: float = 2.5
     max_risk_pct: float = 0.10
     eval_window_hours: float = 6.0
@@ -200,7 +202,7 @@ class SentimentScanner:
         return snapshots
 
     def _signal_from_snapshot(self, snapshot: MarketSnapshot) -> Signal | None:
-        if snapshot.oi_percentile < self.config.oi_percentile_threshold:
+        if abs(snapshot.oi_change_pct) < self.config.oi_change_min_pct:
             return None
 
         if snapshot.oi_change_pct > 0 and snapshot.price_change_pct > 0:

@@ -1009,18 +1009,24 @@ def apply_5m_confluence(row: dict[str, object], snapshot: object) -> dict[str, o
         (signal_type == "reversal_bullish" and bullish_5m)
         or (signal_type == "reversal_bearish" and bearish_5m)
     )
+    oi_min = float(os.getenv("OI_CHANGE_MIN_PCT", "3"))
+    oi_strong = float(os.getenv("OI_CHANGE_STRONG_PCT", "5"))
+    oi_confluence = confluence and abs(oi_change) >= oi_min
     snapshot_data = row.get("snapshot_data")
     if not isinstance(snapshot_data, dict):
         snapshot_data = {}
     snapshot_data.update(
         {
             "mtf_5m_confluence": confluence,
+            "mtf_5m_oi_confluence": oi_confluence,
+            "mtf_5m_oi_strength": "strong" if abs(oi_change) >= oi_strong else "normal" if abs(oi_change) >= oi_min else "weak",
             "mtf_5m_oi_change_pct": oi_change,
             "mtf_5m_price_change_pct": price_change,
             "mtf_5m_oi_percentile": oi_percentile,
         }
     )
     row["mtf_5m_confluence"] = confluence
+    row["mtf_5m_oi_confluence"] = oi_confluence
     row["mtf_5m_oi_change_pct"] = oi_change
     row["mtf_5m_price_change_pct"] = price_change
     row["mtf_5m_oi_percentile"] = oi_percentile
@@ -1041,7 +1047,10 @@ def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerCo
             row = normalize_row(format_signal(signal))
             if snapshots:
                 row = apply_5m_confluence(row, snapshots[-1])
-            rows.append(row)
+            if os.getenv("REQUIRE_5M_OI_CONFLUENCE", "true").lower() == "true" and not row.get("mtf_5m_oi_confluence"):
+                row = None
+            if row is not None:
+                rows.append(row)
         if snapshots:
             row = format_cvd_divergence_signal(symbol, snapshots, divergence_config)
             if row is not None:
@@ -1074,6 +1083,8 @@ def main() -> None:
     config = ScannerConfig(
         lookback_limit=int(os.getenv("LOOKBACK_LIMIT", "500")),
         oi_percentile_threshold=float(os.getenv("OI_PERCENTILE", "99")),
+        oi_change_min_pct=float(os.getenv("OI_CHANGE_MIN_PCT", "3")),
+        oi_change_strong_pct=float(os.getenv("OI_CHANGE_STRONG_PCT", "5")),
         atr_risk_multiple=float(os.getenv("ATR_MULTIPLE", "2.5")),
         eval_window_hours=float(os.getenv("EVAL_HOURS", "6")),
     )
