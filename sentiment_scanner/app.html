@@ -231,10 +231,19 @@
     .history-stat-label { color: var(--faint); font-size: 9px; margin-top: 2px; }
     .signal-visuals { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: center; margin-top: 12px; }
     .sparkline { height: 52px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.14); padding: 6px; }
+    .support-radar { min-height: 128px; border: 1px solid var(--line); border-radius: 10px; background: rgba(4,8,13,.62); padding: 10px; margin-top: 12px; }
+    .support-title { display: flex; justify-content: space-between; align-items: center; color: #9db6d9; font: 850 11px var(--mono); }
+    .support-body { display: grid; grid-template-columns: 1fr 104px 1fr; align-items: center; gap: 8px; margin-top: 6px; }
+    .support-side { display: grid; gap: 6px; color: #8ea2bc; font-size: 10px; font-weight: 850; }
+    .support-item { display: flex; justify-content: space-between; gap: 6px; }
+    .radar-mini svg { width: 104px; height: 86px; display: block; }
+    .support-score { text-align: center; font: 950 18px var(--mono); color: var(--warn); }
+    .support-verdict { text-align: center; margin-top: 3px; font-weight: 950; color: var(--warn); }
     .tp-progress { display: grid; gap: 6px; }
     .tp-progress-line { height: 8px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.08); }
     .tp-progress-line span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--bull), #f5df00); }
     .tp-progress-labels { display: flex; justify-content: space-between; color: var(--muted); font: 800 10px var(--mono); }
+    .reversal-alert { margin-top: 12px; border: 1px solid rgba(255,177,59,.4); border-left: 4px solid var(--warn); border-radius: 10px; padding: 10px 12px; background: var(--warn-soft); color: #ffd28a; font-weight: 950; }
     .notify-panel { position: fixed; top: 60px; right: 18px; width: 360px; max-width: calc(100vw - 24px); max-height: 480px; overflow: hidden; z-index: 1200; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 36px rgba(0,0,0,.55); display: none; }
     .notify-panel.open { display: block; }
     .notify-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
@@ -1107,6 +1116,11 @@
     }
     function renderStats() {
       const stableMode = state.currentView === "stable";
+      if (state.currentView === "contract") {
+        renderContractTopStats();
+        updateBell();
+        return;
+      }
       const sourceRows = stableMode ? stableUniverse() : dataSignals();
       const open = sourceRows.filter(isOpenSignal);
       const partial = sourceRows.filter(isPartialActiveSignal);
@@ -1139,6 +1153,32 @@
       ];
       $("stats").innerHTML = cells.map(([label, value, detail]) => `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value ${String(value).startsWith("-") ? "bear-text" : "bull-text"}">${value}</div><div class="subline">${detail || ""}</div></div>`).join("");
       updateBell();
+    }
+    function renderContractTopStats() {
+      const rows = state.contractAnomalies || [];
+      const active = rows.filter(row => contractBias(row) === "long" || contractBias(row) === "short");
+      const warnings = active.filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 4 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 75));
+      const aligned = active.filter(row => {
+        const move = Number(row.price_change_1h || row.price_change_15m || row.price_change_24h || 0);
+        return contractBias(row) === "long" ? move > 0 : move < 0;
+      }).length;
+      const rate = active.length ? aligned / active.length * 100 : 0;
+      const avgRadar = active.length ? active.reduce((sum, row) => sum + Math.abs(Number(row.radar_score ?? row.score) || 0), 0) / active.length : 0;
+      const avgQuality = active.length ? active.reduce((sum, row) => sum + Number(row.quality_score || 0), 0) / active.length : 0;
+      const groups = active.reduce((acc, row) => {
+        const label = oiMarketGroup(row).label;
+        acc[label] = (acc[label] || 0) + 1;
+        return acc;
+      }, {});
+      const cells = [
+        ["雷達樣本", active.length, `${rows.length} 個候選`],
+        ["方向命中率", `${fmt(rate, 1)}%`, `${aligned} 對 / ${active.length - aligned} 錯`],
+        ["高分預警", warnings.length, "獨立於嘎多嘎空"],
+        ["平均品質", `${fmt(avgQuality, 1)}/6`, `雷達 ${fmt(avgRadar, 0)}`],
+        ["偏多 / 偏空", `${active.filter(r => contractBias(r) === "long").length} / ${active.filter(r => contractBias(r) === "short").length}`, "依 OI 分組判斷"],
+        ["主要分組", Object.entries(groups).sort((a,b) => b[1]-a[1])[0]?.[0] || "-", "合約異常雷達"]
+      ];
+      $("stats").innerHTML = cells.map(([label, value, detail]) => `<div class="stat"><div class="stat-label">${label}</div><div class="stat-value ${String(value).startsWith("-") ? "bear-text" : "bull-text"}">${value}</div><div class="subline">${detail || ""}</div></div>`).join("");
     }
     function renderSectorFlows() {
       const target = $("sectorFlows");
@@ -1190,12 +1230,12 @@
       const limit = q ? (isMobileView() ? 80 : 160) : (isMobileView() ? 24 : 72);
       const rows = (state.contractAnomalies || [])
         .filter(row => !q || clean(row.symbol).includes(q))
-        .filter(row => bias === "all" || String(row.bias || "neutral") === bias)
+        .filter(row => bias === "all" || contractBias(row) === bias)
         .sort((a,b) => Number(b.quality_score || 0) - Number(a.quality_score || 0) || Math.abs(Number(b.radar_score ?? b.score) || 0) - Math.abs(Number(a.radar_score ?? a.score) || 0) || Number(b.volume_24h || 0) - Number(a.volume_24h || 0))
         .slice(0, limit);
       $("contractCount").textContent = `(${rows.length})`;
-      const longs = rows.filter(row => row.bias === "long").length;
-      const shorts = rows.filter(row => row.bias === "short").length;
+      const longs = rows.filter(row => contractBias(row) === "long").length;
+      const shorts = rows.filter(row => contractBias(row) === "short").length;
       const neutral = rows.filter(row => row.bias === "neutral").length;
       const avgScore = rows.length ? rows.reduce((sum, row) => sum + Math.abs(Number(row.radar_score ?? row.score) || 0), 0) / rows.length : 0;
       const avgQuality = rows.length ? rows.reduce((sum, row) => sum + Number(row.quality_score || 0), 0) / rows.length : 0;
@@ -1220,11 +1260,11 @@
     }
     function renderContractBacktest(rows) {
       const samples = rows
-        .filter(row => row.bias === "long" || row.bias === "short")
+        .filter(row => contractBias(row) === "long" || contractBias(row) === "short")
         .map(row => {
           const plan = contractTradePlan(row);
           const move = Number(row.price_change_1h || row.price_change_15m || row.price_change_24h || 0);
-          const aligned = row.bias === "long" ? move > 0 : move < 0;
+          const aligned = contractBias(row) === "long" ? move > 0 : move < 0;
           return {...row, plan, move, aligned, score: Math.abs(Number(row.radar_score ?? row.score) || 0)};
         })
         .sort((a,b) => Number(b.quality_score || 0) - Number(a.quality_score || 0) || b.score - a.score);
@@ -1265,8 +1305,9 @@
     }
     function contractCard(row) {
       const symbol = clean(row.symbol);
-      const kind = row.bias === "long" ? "bull" : row.bias === "short" ? "bear" : "warn";
-      const label = row.bias === "long" ? "偏多" : row.bias === "short" ? "偏空" : "觀察";
+      const bias = contractBias(row);
+      const kind = bias === "long" ? "bull" : bias === "short" ? "bear" : "warn";
+      const label = bias === "long" ? "偏多" : bias === "short" ? "偏空" : "觀察";
       const radar = Number(row.radar_score ?? row.score) || 0;
       const quality = Number(row.quality_score || 0);
       const latest = latestSignalFor(symbol);
@@ -1274,7 +1315,7 @@
       const live = marketFor(symbol);
       const livePrice = Number(live?.price || row.price);
       const liveChange = Number.isFinite(Number(live?.price_change_pct)) ? Number(live.price_change_pct) : Number(row.price_change_24h);
-      const plan = contractTradePlan({...row, price: livePrice});
+      const plan = contractTradePlan(row);
       const reason = [
         group.label,
         row.trigger,
@@ -1288,6 +1329,7 @@
           <div class="signal-actions"><span class="score-badge bull">Q ${quality}/6</span><span class="score-badge ${kind}">R ${fmt(radar,0)}</span></div>
         </div>
         <div class="pnl-box"><div class="metric-label">品質 / 雷達 / 分組</div><div class="pnl-value ${group.kind === "bear" ? "bear-text" : "bull-text"}">${quality}/6 · ${fmt(radar,0)} · ${group.label}</div></div>
+        ${contractAnalysisGraph(row)}
         <div class="metric-grid">
           <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(livePrice, 6)}</div></div>
           <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}">${signed(liveChange)}</div></div>
@@ -1305,8 +1347,9 @@
       </article>`;
     }
     function contractTradePlan(row) {
-      const entry = Number(row.price || row.alert_price || 0);
-      const side = row.bias === "long" ? 1 : row.bias === "short" ? -1 : 0;
+      const entry = Number(row.alert_price || row.entry_price || row.price || 0);
+      const bias = contractBias(row);
+      const side = bias === "long" ? 1 : bias === "short" ? -1 : 0;
       const riskPctValue = clamp(1.2 + Math.abs(Number(row.radar_score ?? row.score) || 0) / 100 * 1.8, 1, 4);
       if (!entry || !side) return {entry, sl: NaN, tp: NaN, riskPct: riskPctValue};
       const risk = entry * riskPctValue / 100;
@@ -1316,6 +1359,14 @@
         tp: side > 0 ? entry + risk * 1.8 : entry - risk * 1.8,
         riskPct: riskPctValue
       };
+    }
+    function contractBias(row) {
+      const group = oiMarketGroup(row);
+      if (group.label === "多頭建倉" || group.label === "空頭回補") return "long";
+      if (group.label === "空頭建倉" || group.label === "多頭出場") return "short";
+      const bias = String(row.bias || "");
+      if (bias === "long" || bias === "short") return bias;
+      return "neutral";
     }
     function contractMetric(value, emptyText = "待 API") {
       const n = Number(value);
@@ -1596,6 +1647,7 @@
           <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
         </div>
+        ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
         <div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
         ${visual}
@@ -1628,6 +1680,7 @@
           <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
+        ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">觸發價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
         ${visual}
@@ -1652,7 +1705,78 @@
       return `<div class="signal-visuals">
         ${sparklineHtml(s)}
         ${tpProgressHtml(s, score)}
+      </div>
+      ${supportRadarHtml(signalSupportMetrics(s, score))}`;
+    }
+    function signalSupportMetrics(s, score = 0) {
+      const dir = s.signal_type === "reversal_bullish" ? 1 : -1;
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
+      const oi = Number(signalMetric(s, "oi_change_pct")) || 0;
+      const price = Number(signalMetric(s, "price_change_pct")) || 0;
+      const oiPct = Number(signalMetric(s, "oi_percentile")) || 0;
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
+      return {
+        title: "情緒支撐度",
+        score,
+        items: [
+          ["資金費率", clamp(50 + price * dir * 8, 0, 100)],
+          ["散戶合約反指", clamp(50 + takerBias, 0, 100)],
+          ["大戶合值", clamp(oiPct, 0, 100)],
+          ["清算結構", clamp(50 + Math.abs(oi) * 10, 0, 100)],
+          ["合約主動成交", clamp(50 + takerBias * 0.7, 0, 100)],
+          ["現貨主動成交", clamp(50 + price * dir * 12, 0, 100)]
+        ]
+      };
+    }
+    function contractAnalysisGraph(row) {
+      const score = Math.abs(Number(row.radar_score ?? row.score) || 0);
+      const group = oiMarketGroup(row);
+      const dir = contractBias(row) === "long" ? 1 : contractBias(row) === "short" ? -1 : 0;
+      const oi = Number(row.oi_change_1h || row.oi_change_15m || 0);
+      const cvd = Number(row.cvd_ratio_1h || 0);
+      const price = Number(row.price_change_15m || row.price_change_1h || row.price_change_24h || 0);
+      return supportRadarHtml({
+        title: "合約支撐度",
+        score,
+        items: [
+          ["OI 結構", clamp(50 + Math.abs(oi) * 10, 0, 100)],
+          ["CVD 共振", clamp(50 + cvd * dir * 2, 0, 100)],
+          ["價格共振", clamp(50 + price * dir * 8, 0, 100)],
+          ["品質分", clamp(Number(row.quality_score || 0) / 6 * 100, 0, 100)],
+          ["雷達分", clamp(score, 0, 100)],
+          [group.label, group.kind === "warn" ? 50 : 80]
+        ]
+      });
+    }
+    function supportRadarHtml(model) {
+      const items = model.items || [];
+      const values = items.map(item => clamp(item[1], 0, 100));
+      const points = radarPoints(values, 46, 42, 34).join(" ");
+      const axes = radarPoints(new Array(values.length).fill(100), 46, 42, 34);
+      const verdict = Number(model.score) >= 65 ? "支撐偏強" : Number(model.score) >= 50 ? "中性偏弱" : "支撐不足";
+      return `<div class="support-radar">
+        <div class="support-title"><span>${model.title || "分析圖形"}</span><span>${fmt(model.score, 0)}</span></div>
+        <div class="support-body">
+          <div class="support-side">${items.slice(0, 3).map(([label, value]) => `<div class="support-item"><span>${label}</span><b class="${Number(value) >= 65 ? "bull-text" : Number(value) < 35 ? "bear-text" : "warn-text"}">${fmt(value,0)}</b></div>`).join("")}</div>
+          <div class="radar-mini"><svg viewBox="0 0 92 84" role="img" aria-label="${model.title || "radar"}">
+            <polygon points="${axes.join(" ")}" fill="rgba(255,255,255,.025)" stroke="rgba(255,255,255,.08)"/>
+            <polygon points="${radarPoints(new Array(values.length).fill(65), 46, 42, 34).join(" ")}" fill="none" stroke="rgba(255,255,255,.08)"/>
+            ${axes.map(point => `<line x1="46" y1="42" x2="${point.split(",")[0]}" y2="${point.split(",")[1]}" stroke="rgba(255,255,255,.08)"/>`).join("")}
+            <polygon points="${points}" fill="rgba(255,177,59,.22)" stroke="#ffb13b" stroke-width="2"/>
+            <circle cx="46" cy="42" r="2.5" fill="#ffb13b"/>
+          </svg><div class="support-score">${fmt(model.score,0)}</div></div>
+          <div class="support-side">${items.slice(3, 6).map(([label, value]) => `<div class="support-item"><span>${label}</span><b class="${Number(value) >= 65 ? "bull-text" : Number(value) < 35 ? "bear-text" : "warn-text"}">${fmt(value,0)}</b></div>`).join("")}</div>
+        </div>
+        <div class="support-verdict">${verdict}</div>
       </div>`;
+    }
+    function radarPoints(values, cx, cy, radius) {
+      const n = Math.max(3, values.length);
+      return values.map((value, index) => {
+        const angle = -Math.PI / 2 + index / n * Math.PI * 2;
+        const r = radius * clamp(value, 0, 100) / 100;
+        return `${(cx + Math.cos(angle) * r).toFixed(1)},${(cy + Math.sin(angle) * r).toFixed(1)}`;
+      });
     }
     function sparklineHtml(s) {
       const isBull = s.signal_type === "reversal_bullish";
