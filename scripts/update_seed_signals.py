@@ -115,7 +115,12 @@ def valid_signal_time(row: dict[str, object]) -> bool:
 
 
 def is_legacy_oi_divergence(row: dict[str, object]) -> bool:
-    return str(row.get("setup_id") or "").startswith("oi_5m_")
+    setup = str(row.get("setup_id") or "")
+    if setup.startswith("oi_5m_"):
+        return True
+    if setup.startswith("oi_15m_") and str(row.get("source") or "") != "sentiment_gaga_scan":
+        return True
+    return False
 
 
 def clean_symbol(symbol: object) -> str:
@@ -804,6 +809,164 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
     return rows
 
 
+def recent_active_strategy_key(row: dict[str, object], setup_prefix: str) -> tuple[str, str] | None:
+    setup = str(row.get("setup_id") or "")
+    if not setup.startswith(setup_prefix):
+        return None
+    if str(row.get("status") or "active") != "active":
+        return None
+    if str(row.get("reached_state") or "holding") not in {"holding", "tp1", "tp2", "tp3"}:
+        return None
+    return clean_symbol(row.get("symbol")), str(row.get("signal_type") or "")
+
+
+def sentiment_direction_score(row: dict[str, object], direction: str) -> tuple[int, list[str]]:
+    sign = 1 if direction == "long" else -1
+    price_5m = as_float(row.get("price_change_5m"))
+    price_15m = as_float(row.get("price_change_15m"))
+    cvd = as_float(row.get("cvd_ratio_1h"))
+    funding = as_float(row.get("funding_rate"))
+    ls_ratio = as_float(row.get("long_short_ratio_1h"))
+    top_account = as_float(row.get("top_account_long_short_ratio_1h"))
+    top_position = as_float(row.get("top_position_long_short_ratio_1h"))
+    score = 0
+    reasons: list[str] = []
+
+    if price_5m is None or price_15m is None:
+        return 0, ["缺少 5M/15M 價格資料"]
+    if price_5m * sign <= 0 or price_15m * sign <= 0:
+        return 0, ["5M 與 15M 方向不同或未共振"]
+
+    score += 28
+    reasons.append("5M/15M 同方向")
+
+    if cvd is not None and cvd * sign > 0:
+        score += min(22, int(abs(cvd) * 1.4))
+        reasons.append("CVD 支持方向")
+    elif cvd is not None:
+        score -= 18
+        reasons.append("CVD 不支持")
+
+    if funding is not None:
+        if direction == "long" and funding <= 0:
+            score += 12
+            reasons.append("Funding 偏空擁擠，反指支持做多")
+        elif direction == "short" and funding >= 0:
+            score += 12
+            reasons.append("Funding 偏多擁擠，反指支持做空")
+        elif abs(funding) < 0.01:
+            score += 4
+            reasons.append("Funding 中性")
+        else:
+            score -= 10
+            reasons.append("Funding 與方向矛盾")
+
+    if ls_ratio is not None:
+        if direction == "long" and ls_ratio <= 0.9:
+            score += 14
+            reasons.append("散戶偏空擁擠")
+        elif direction == "short" and ls_ratio >= 1.1:
+            score += 14
+            reasons.append("散戶偏多擁擠")
+        elif 0.95 <= ls_ratio <= 1.05:
+            score += 4
+            reasons.append("散戶多空均衡")
+        else:
+            score -= 8
+            reasons.append("散戶擁擠方向不利")
+
+    for name, ratio in (("大戶帳戶比", top_account), ("大戶持倉比", top_position)):
+        if ratio is None:
+            continue
+        if direction == "long" and ratio >= 1.05:
+            score += 5
+            reasons.append(f"{name}支持多方")
+        elif direction == "short" and ratio <= 0.95:
+            score += 5
+            reasons.append(f"{name}支持空方")
+
+    return int(clamp(score, 0, 100)), reasons
+
+
+def signals_from_sentiment_radar(radar_rows: list[dict[str, object]], existing: list[dict[str, object]], config: ScannerConfig) -> list[dict[str, object]]:
+    active_keys = {key for row in existing if (key := recent_active_strategy_key(row, "gaga_")) is not None}
+    rows: list[dict[str, object]] = []
+    max_new = int(os.getenv("GAGA_SIGNAL_MAX_NEW", "20"))
+    min_score = int(os.getenv("GAGA_SIGNAL_MIN_SCORE", "70"))
+    min_volume = float(os.getenv("GAGA_MIN_VOLUME_USDT", os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000")))
+    for row in radar_rows:
+        if float(row.get("volume_24h") or 0) < min_volume:
+            continue
+        price_5m = as_float(row.get("price_change_5m"))
+        price_15m = as_float(row.get("price_change_15m"))
+        if price_5m is None or price_15m is None or price_5m == 0 or price_15m == 0:
+            continue
+        if price_5m > 0 and price_15m > 0:
+            direction = "long"
+        elif price_5m < 0 and price_15m < 0:
+            direction = "short"
+        else:
+            continue
+        score, reasons = sentiment_direction_score(row, direction)
+        if score < min_score:
+            continue
+        signal_type = "reversal_bullish" if direction == "long" else "reversal_bearish"
+        symbol = clean_symbol(row.get("symbol"))
+        if (symbol, signal_type) in active_keys:
+            continue
+        price = as_float(row.get("trigger_price")) or as_float(row.get("price"))
+        if price is None or price <= 0:
+            continue
+        triggered_at_ms = int(row.get("triggered_at_ms") or datetime.now(timezone.utc).timestamp() * 1000)
+        risk = price * float(os.getenv("GAGA_RISK_PCT", "0.025"))
+        if signal_type == "reversal_bullish":
+            sl, tp1, tp2, tp3, ftp = price - risk, price + risk, price + risk * 2, price + risk * 3, price + risk * 5
+        else:
+            sl, tp1, tp2, tp3, ftp = price + risk, price - risk, price - risk * 2, price - risk * 3, price - risk * 5
+        rows.append(
+            normalize_row(
+                {
+                    "symbol": symbol,
+                    "timeframe": "15M",
+                    "signal_type": signal_type,
+                    "setup_id": f"gaga_{direction}_sentiment_confluence",
+                    "triggered_at_ms": triggered_at_ms,
+                    "triggered_at": iso_ms(triggered_at_ms),
+                    "trigger_price": price,
+                    "atr_at_trigger": risk / max(config.atr_risk_multiple, 0.1),
+                    "sl_price": sl,
+                    "tp1_price": tp1,
+                    "tp2_price": tp2,
+                    "tp3_price": tp3,
+                    "ftp_price": ftp,
+                    "risk": risk,
+                    "sl_source": "sentiment_risk_pct",
+                    "oi_percentile": None,
+                    "oi_change_pct": None,
+                    "price_change_pct": row.get("price_change_15m") or row.get("price_change_5m"),
+                    "taker_buy_ratio": None,
+                    "oi_value": 0,
+                    "oi_value_usdt": row.get("oi_usd"),
+                    "source": "sentiment_gaga_scan",
+                    "snapshot_data": {
+                        "sentiment_gaga": True,
+                        "score": score,
+                        "reasons": reasons,
+                        "cvd_ratio_1h": row.get("cvd_ratio_1h"),
+                        "funding_rate": row.get("funding_rate"),
+                        "long_short_ratio_1h": row.get("long_short_ratio_1h"),
+                        "price_change_5m": row.get("price_change_5m"),
+                        "price_change_15m": row.get("price_change_15m"),
+                    },
+                }
+            )
+        )
+        active_keys.add((symbol, signal_type))
+        if len(rows) >= max_new:
+            break
+    return rows
+
+
 def target_order(value: object) -> int:
     return TARGET_ORDER.get(str(value or "holding"), 0)
 
@@ -1000,6 +1163,11 @@ def format_cvd_divergence_signal(symbol: str, snapshots: list[object], config: S
     raw_risk = config.atr_risk_multiple * atr_value
     capped_risk = price * config.max_risk_pct
     risk = min(raw_risk, capped_risk)
+    risk_pct = risk / price * 100.0 if price > 0 else 0.0
+    min_risk_pct = float(os.getenv("STABLE_MIN_RISK_PCT", "0.5"))
+    max_risk_pct = float(os.getenv("STABLE_MAX_RISK_PCT", "8"))
+    if risk_pct < min_risk_pct or risk_pct > max_risk_pct:
+        return None
     sl_source = "atr" if risk == raw_risk else "capped_10pct"
 
     if price_change < 0 and cvd_change > 0:
@@ -1094,20 +1262,20 @@ def apply_5m_confluence(row: dict[str, object], snapshot: object) -> dict[str, o
 def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerConfig) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     with market_client(timeout=20) as client:
-        scanner = SentimentScanner(client, config)
-        signal = scanner.latest_signal(symbol)
-
         divergence_scanner = SentimentScanner(client, divergence_config)
         klines, oi_points, taker_points = divergence_scanner._load(symbol)
         snapshots = divergence_scanner._snapshots(symbol, klines, oi_points, taker_points)
-        if signal is not None:
-            row = normalize_row(format_signal(signal))
-            if snapshots:
-                row = apply_5m_confluence(row, snapshots[-1])
-            if os.getenv("REQUIRE_5M_OI_CONFLUENCE", "true").lower() == "true" and not row.get("mtf_5m_oi_confluence"):
-                row = None
-            if row is not None:
-                rows.append(row)
+        if os.getenv("ENABLE_LEGACY_OI_SIGNALS", "false").lower() == "true":
+            scanner = SentimentScanner(client, config)
+            signal = scanner.latest_signal(symbol)
+            if signal is not None:
+                row = normalize_row(format_signal(signal))
+                if snapshots:
+                    row = apply_5m_confluence(row, snapshots[-1])
+                if os.getenv("REQUIRE_5M_OI_CONFLUENCE", "true").lower() == "true" and not row.get("mtf_5m_oi_confluence"):
+                    row = None
+                if row is not None:
+                    rows.append(row)
         if snapshots:
             row = format_cvd_divergence_signal(symbol, snapshots, divergence_config)
             if row is not None:
@@ -1181,6 +1349,9 @@ def main() -> None:
                 continue
             found.extend(rows)
     if contract_radar:
+        sentiment_signals = signals_from_sentiment_radar(contract_radar, existing + found, config)
+        found.extend(sentiment_signals)
+        print(f"sentiment_gaga_signals={len(sentiment_signals)}")
         contract_signals = signals_from_contract_radar(contract_radar, existing + found, config)
         found.extend(contract_signals)
         print(f"coinglass_contract_signals={len(contract_signals)}")
