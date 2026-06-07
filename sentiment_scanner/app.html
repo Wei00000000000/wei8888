@@ -399,7 +399,7 @@
       </div>
       <nav class="nav">
         <button class="active" data-view="dashboard">儀表板</button>
-        <button data-view="signals">嘎多嘎空</button>
+        <button data-view="signals">數據交易訊號</button>
         <button data-view="contract">合約異常雷達</button>
         <button data-view="stable">穩如老狗</button>
         <button data-view="review">交易檢討</button>
@@ -418,7 +418,7 @@
       <div class="panel-head">
         <div>
           <div class="kicker">Sentiment Scanner</div>
-          <h2>嘎多嘎空訊號系統</h2>
+          <h2>數據交易訊號系統</h2>
           <div class="subline">OKX / Bybit 主行情源 · CoinGlass 全市場資料 · 嘎空 / 嘎多 · 終端雷達掃描</div>
         </div>
         <span class="pill accent" id="statusPill">Live</span>
@@ -446,10 +446,10 @@
         <div>
           <div class="kicker">Wei Strategy Intelligence</div>
           <h2>Wei 策略情報室</h2>
-          <div class="subline">整合嘎多嘎空、穩如老狗、合約異常、5M CVD 頂底背離、板塊資金流與模擬回測。</div>
+          <div class="subline">整合 15M OI 訊號、穩如老狗、5M 頂底背離、板塊資金流與模擬回測。</div>
         </div>
       </section>
-      <div class="tabs-line"><span class="active">儀表板</span><span>嘎多嘎空</span><span>穩如老狗</span><span>諧波交易訊號</span></div>
+      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>諧波交易訊號</span></div>
       <div class="section-head">
         <div><span class="watch-title">板塊資金流動</span><span class="watch-sub" id="sectorMeta">等待更新</span></div>
       </div>
@@ -485,7 +485,7 @@
 
     <section id="signals" class="view">
       <div class="section-head">
-        <h2 class="section-title">嘎多嘎空訊號 <span id="signalCount" class="section-count">(0)</span></h2>
+        <h2 class="section-title">全部數據交易訊號 <span id="signalCount" class="section-count">(0)</span></h2>
         <div class="section-actions">
           <input id="signalSearch" class="search-input" placeholder="搜尋幣種，例如 ETH">
           <input id="signalDate" type="date" title="查詢日期">
@@ -501,9 +501,9 @@
       <section class="backtest-panel">
         <div class="backtest-head">
           <div>
-            <div class="kicker">Gaga Backtest</div>
-            <h2>嘎多嘎空回測</h2>
-            <div class="subline">只計算嘎多嘎空正式訊號，不混入穩如老狗、CVD 背離或合約異常雷達。</div>
+            <div class="kicker">訊號回測</div>
+            <h2>數據交易訊號回測</h2>
+            <div class="subline">只計算 OI 嘎空/嘎多訊號，不混入穩如老狗或 5M 背離。</div>
           </div>
           <div class="section-actions">
             <input id="signalBtFrom" type="date" title="開始日期">
@@ -553,11 +553,6 @@
         <div class="oi-rank-grid" id="oiRankGroups"></div>
       </section>
       <div class="section-head">
-        <h2 class="section-title">正式持倉 <span id="contractSignalCount" class="section-count">(0)</span></h2>
-        <div class="subline">只有預警升級成正式訊號後才顯示進場、SL、TP；點位成立後鎖定。</div>
-      </div>
-      <div class="signals-grid" id="contractSignalCards"></div>
-      <div class="section-head">
         <h2 class="section-title">高分預警 <span id="contractWarningCount" class="section-count">(0)</span></h2>
         <div class="subline">尚未形成正式持倉，優先追蹤高品質、高雷達分數與多空比擁擠的候選。</div>
       </div>
@@ -572,7 +567,7 @@
       <section class="radar-strip">
         <div class="kicker">Conservative Contract Matrix</div>
         <h2>穩如老狗</h2>
-        <div class="subline">獨立計算區域：必須有 5M CVD 底背離做多 / 頂背離做空，且實盤 R 不小於 0.5%。</div>
+        <div class="subline">獨立計算區域：依 OI、價格、Taker 代理 CVD、風險距離與訊號狀態做保守共振評分，不混入數據交易訊號清單。</div>
       </section>
       <div class="section-head">
         <h2 class="section-title">穩健共振清單 <span id="stableCount" class="section-count">(0)</span></h2>
@@ -1126,7 +1121,7 @@
         updateBell();
         return;
       }
-      const sourceRows = stableMode ? stableUniverse() : gagaSignals();
+      const sourceRows = stableMode ? stableUniverse() : dataSignals();
       const open = sourceRows.filter(isOpenSignal);
       const partial = sourceRows.filter(isPartialActiveSignal);
       const closed = sourceRows.filter(s => !isOpenSignal(s) && !isPartialActiveSignal(s));
@@ -1161,9 +1156,8 @@
     }
     function renderContractTopStats() {
       const rows = state.contractAnomalies || [];
-      const formal = contractSignals();
       const active = rows.filter(row => contractBias(row) === "long" || contractBias(row) === "short");
-      const warnings = active.filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 2 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 70));
+      const warnings = active.filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 4 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 75));
       const aligned = active.filter(row => {
         const move = Number(row.price_change_1h || row.price_change_15m || row.price_change_24h || 0);
         return contractBias(row) === "long" ? move > 0 : move < 0;
@@ -1177,7 +1171,7 @@
         return acc;
       }, {});
       const cells = [
-        ["正式持倉", formal.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length, `${formal.length} 筆合約訊號`],
+        ["雷達樣本", active.length, `${rows.length} 個候選`],
         ["方向命中率", `${fmt(rate, 1)}%`, `${aligned} 對 / ${active.length - aligned} 錯`],
         ["高分預警", warnings.length, "獨立於嘎多嘎空"],
         ["平均品質", `${fmt(avgQuality, 1)}/6`, `雷達 ${fmt(avgRadar, 0)}`],
@@ -1256,26 +1250,13 @@
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
       renderContractBacktest(rows);
       renderOiRankGroups(rows);
-      const formalSignals = filteredContractSignals(q, bias);
-      $("contractSignalCount").textContent = `(${formalSignals.length})`;
-      $("contractSignalCards").innerHTML = formalSignals.map(signalCard).join("") || `<section class="panel"><div class="empty">目前沒有正式合約異常持倉。</div></section>`;
       const warnings = rows
-        .filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 2 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 70))
+        .filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 4 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 75))
         .slice(0, isMobileView() ? 4 : 8);
       $("contractWarningCount").textContent = `(${warnings.length})`;
-      $("contractWarningCards").innerHTML = warnings.map(contractWarningCard).join("") || `<section class="panel"><div class="empty">目前沒有高分預警。</div></section>`;
-      target.innerHTML = rows.map(contractWarningCard).join("") || `<section class="panel"><div class="empty">目前沒有符合成交量門檻的合約異常。</div></section>`;
-      [$("contractSignalCards"), target, $("contractWarningCards")].forEach(area => area.querySelectorAll("[data-contract-symbol],[data-symbol]").forEach(card => {
-        const symbol = card.dataset.contractSymbol || card.dataset.symbol;
-        card.addEventListener("click", () => openSymbolModal(symbol));
-      }));
-    }
-    function filteredContractSignals(q = "", bias = "all") {
-      return sortSignals(contractSignals())
-        .filter(s => isOpenSignal(s) || isPartialActiveSignal(s))
-        .filter(s => !q || clean(s.symbol).includes(q))
-        .filter(s => bias === "all" || (s.signal_type === "reversal_bullish" ? "long" : "short") === bias)
-        .slice(0, isMobileView() ? 12 : 24);
+      $("contractWarningCards").innerHTML = warnings.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有高分預警。</div></section>`;
+      target.innerHTML = rows.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有符合成交量門檻的合約異常。</div></section>`;
+      [target, $("contractWarningCards")].forEach(area => area.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol))));
     }
     function renderContractBacktest(rows) {
       const samples = rows
@@ -1322,7 +1303,7 @@
         </section>`;
       }).join("");
     }
-    function contractWarningCard(row) {
+    function contractCard(row) {
       const symbol = clean(row.symbol);
       const bias = contractBias(row);
       const kind = bias === "long" ? "bull" : bias === "short" ? "bear" : "warn";
@@ -1334,6 +1315,7 @@
       const live = marketFor(symbol);
       const livePrice = Number(live?.price || row.price);
       const liveChange = Number.isFinite(Number(live?.price_change_pct)) ? Number(live.price_change_pct) : Number(row.price_change_24h);
+      const plan = contractTradePlan(row);
       const reason = [
         group.label,
         row.trigger,
@@ -1351,6 +1333,8 @@
         <div class="metric-grid">
           <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(livePrice, 6)}</div></div>
           <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}">${signed(liveChange)}</div></div>
+          <div class="metric-box"><div class="metric-label">進場</div><div class="metric-value">${fmt(plan.entry, 6)}</div></div>
+          <div class="metric-box warn"><div class="metric-label">SL / TP</div><div class="metric-value">${fmt(plan.sl, 6)} / ${fmt(plan.tp, 6)}</div></div>
           <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${contractMetric(row.oi_change_1h, "待 API")}</div></div>
           <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${contractMetric(row.cvd_ratio_1h, "待 API")}</div></div>
           <div class="metric-box"><div class="metric-label">散戶多空比</div><div class="metric-value">${ratioMetric(row.long_short_ratio_1h)}</div></div>
@@ -1487,7 +1471,7 @@
     }
     function renderSignals() {
       const rows = filteredSignals();
-      const backtestRows = dateRangeRows(gagaSignals(), $("signalBtFrom").value, $("signalBtTo").value);
+      const backtestRows = dateRangeRows(dataSignals(), $("signalBtFrom").value, $("signalBtTo").value);
       $("signalCount").textContent = `(${rows.length})`;
       const dashRows = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).slice(0, 8);
       $("dashboardSignalCount").textContent = `(${dashRows.length})`;
@@ -1621,7 +1605,7 @@
     }
     function reviewAdvice(tag) {
       if (tag.includes("止損")) return "下一次同方向訊號需等待重新站回結構，避免連續追同一段。";
-      if (tag.includes("OI")) return "合約持倉極端代表槓桿擁擠，只能在合約異常雷達內作為輔助分組。";
+      if (tag.includes("OI")) return "OI 極端代表槓桿擁擠，進場要搭配價格延續與 Taker 共振。";
       if (tag.includes("追價")) return "價格已大幅移動時，降低倉位或等待回踩後再進。";
       if (tag.includes("Taker")) return "主動買賣不明確時，訊號只列觀察。";
       if (tag.includes("R")) return "止損太遠代表位置不好，應等待更貼近失效點的進場。";
@@ -1709,10 +1693,10 @@
           <div class="level tp ${targetHit(s, "ftp") ? "hit" : ""}"><span>FTP</span><b>${fmt(s.ftp_price, 6)}</b><i class="copy">▢</i></div>
         </div>
         <div class="history-stats">
+          <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "oi_percentile"), 1)}</div><div class="history-stat-label">OI %ile</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "oi_change_pct"))}">${signed(signalMetric(s, "oi_change_pct"))}</div><div class="history-stat-label">OI Chg</div></div>
           <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "price_change_pct"))}">${signed(signalMetric(s, "price_change_pct"))}</div><div class="history-stat-label">Price</div></div>
-          <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "cvd_ratio_1h"))}">${signed(signalMetric(s, "cvd_ratio_1h"))}</div><div class="history-stat-label">CVD 1H</div></div>
-          <div class="history-stat-cell"><div class="history-stat-value ${numClass(Number(signalMetric(s, "funding_rate")) * -1)}">${fmt(signalMetric(s, "funding_rate"), 4)}</div><div class="history-stat-label">Funding</div></div>
-          <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "long_short_ratio_1h"), 2)}</div><div class="history-stat-label">多空比</div></div>
+          <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "taker_buy_ratio"), 2)}</div><div class="history-stat-label">Taker</div></div>
           <div class="history-stat-cell"><div class="history-stat-value ${score.kind}-text">${score.value}</div><div class="history-stat-label">${score.label}</div></div>
         </div>
       </article>`;
@@ -1726,23 +1710,20 @@
     }
     function signalSupportMetrics(s, score = 0) {
       const dir = s.signal_type === "reversal_bullish" ? 1 : -1;
-      const cvd = Number(signalMetric(s, "cvd_ratio_1h")) || 0;
-      const funding = Number(signalMetric(s, "funding_rate")) || 0;
-      const longShort = Number(signalMetric(s, "long_short_ratio_1h"));
+      const taker = Number(signalMetric(s, "taker_buy_ratio"));
+      const oi = Number(signalMetric(s, "oi_change_pct")) || 0;
       const price = Number(signalMetric(s, "price_change_pct")) || 0;
-      const crowd = Number.isFinite(longShort)
-        ? (s.signal_type === "reversal_bullish" ? (1 - longShort) * 90 : (longShort - 1) * 90)
-        : 0;
-      const fundingSupport = s.signal_type === "reversal_bullish" ? -funding * 900 : funding * 900;
+      const oiPct = Number(signalMetric(s, "oi_percentile")) || 0;
+      const takerBias = Number.isFinite(taker) ? (taker - 0.5) * 200 * dir : 0;
       return {
         title: "情緒支撐度",
         score,
         items: [
-          ["資金費率", clamp(50 + fundingSupport, 0, 100)],
-          ["散戶合約反指", clamp(50 + crowd, 0, 100)],
-          ["CVD 共振", clamp(50 + cvd * dir * 2, 0, 100)],
-          ["價格 15M", clamp(50 + price * dir * 12, 0, 100)],
-          ["多空比擁擠", clamp(50 + crowd * 0.8, 0, 100)],
+          ["資金費率", clamp(50 + price * dir * 8, 0, 100)],
+          ["散戶合約反指", clamp(50 + takerBias, 0, 100)],
+          ["大戶合值", clamp(oiPct, 0, 100)],
+          ["清算結構", clamp(50 + Math.abs(oi) * 10, 0, 100)],
+          ["合約主動成交", clamp(50 + takerBias * 0.7, 0, 100)],
           ["現貨主動成交", clamp(50 + price * dir * 12, 0, 100)]
         ]
       };
@@ -1886,7 +1867,7 @@
       $("notifyList").innerHTML = `
         <div class="notify-section"><span>即時提示</span><span>${liveNotes.length}</span></div>
         ${liveNotes.map(note => `<div class="notify-item" data-symbol="${note.symbol}"><div class="notify-row"><span class="notify-symbol">${note.symbol}</span><span class="pill ${note.kind}">${note.title}</span></div><div class="notify-meta">${note.body}</div></div>`).join("") || `<div class="empty">暫無新的即時提示。</div>`}
-        <div class="notify-section"><span>嘎多嘎空 / 策略訊號</span><span>${recentSignals.length}</span></div>
+        <div class="notify-section"><span>數據交易訊號</span><span>${recentSignals.length}</span></div>
         ${recentSignals.map(s => `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${s.signal_type === "reversal_bullish" ? "bull" : "bear"}">${strategyNameForSignal(s)}</span></div><div class="notify-meta">${stateLabel(s.reached_state)} · ${shortTime(s.triggered_at)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}</div></div>`).join("")}
         <div class="notify-section"><span>諧波交易訊號</span><span>0</span></div>
         <div class="empty" style="padding:16px">尚未接入諧波訊號來源。</div>`;
@@ -1994,8 +1975,8 @@
         addNotification({
           kind: s.signal_type === "reversal_bullish" ? "bull" : "bear",
           symbol: clean(s.symbol),
-          title: `新持倉：${strategyNameForSignal(s)}`,
-          body: `${shortTime(s.triggered_at)} · CVD ${signed(signalMetric(s, "cvd_ratio_1h"))} · 價格 ${signed(signalMetric(s, "price_change_pct"))}`
+          title: s.signal_type === "reversal_bullish" ? "新持倉：嘎空" : "新持倉：嘎多",
+          body: `${shortTime(s.triggered_at)} · OI ${signed(s.oi_change_pct)} · 價格 ${signed(s.price_change_pct)}`
         });
       }
       saveNotificationMemory();
@@ -2069,20 +2050,11 @@
       ].map(metricCard).join("");
       const hh = rows.filter(s => s.signal_type === "reversal_bullish");
       const ct = rows.filter(s => s.signal_type === "reversal_bearish");
-      const regularRows = rows.filter(isGagaSignal);
-      const stableRows = rows.filter(s => stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s));
-      const contractRows = rows.filter(isContractSignal);
-      $("modalStrategies").innerHTML = [
-        modalStrategy("嘎空", regularRows.filter(s => s.signal_type === "reversal_bullish"), "bull"),
-        modalStrategy("嘎多", regularRows.filter(s => s.signal_type === "reversal_bearish"), "bear"),
-        modalStrategy("穩如老狗", stableRows, "bull"),
-        modalStrategy("合約異常雷達", contractRows, "accent"),
-        strategyFitCard(symbol, rows)
-      ].join("");
+      $("modalStrategies").innerHTML = [modalStrategy("嘎空", hh, "bull"), modalStrategy("嘎多", ct, "bear")].join("");
       $("modalMarket").innerHTML = market ? [
         ["所屬板塊", sectorForSymbol(symbol), "依幣種分類"],
         ["目前價格", fmt(market.price, 6), `最新漲跌 ${signed(market.price_change_pct)}`],
-        ["合約持倉", signed(market.oi_change_pct), `百分位 ${fmt(market.oi_percentile,1)}`],
+        ["OI 變化", signed(market.oi_change_pct), `百分位 ${fmt(market.oi_percentile,1)}`],
         ["Taker / OI USD", fmt(market.taker_buy_ratio, 2), compact(market.oi_value_usdt)]
       ].map(metricCard).join("") : `<div class="modal-card"><div class="subline">市場快照</div><div class="stat-value warn-text">尚無資料</div><div class="subline">等待下一輪掃描</div></div>`;
       $("modalRows").innerHTML = rows.slice(0, 20).map(s => {
@@ -2108,23 +2080,6 @@
       const pnl = rows.reduce((sum, s) => sum + pnlPct(s, isLivePricedSignal(s)), 0);
       return `<div class="modal-card"><strong class="${kind}-text">${name}</strong><span class="subline"> ${rows.length} 筆</span><div class="mini-grid"><div class="mini">勝率 <b class="accent-text">${fmt(rate,1)}%</b><span>${wins}W / ${losses}L</span></div><div class="mini">累計盈虧 <b class="${pnl >= 0 ? "bull-text" : "bear-text"}">${signed(pnl)}</b></div></div></div>`;
     }
-    function strategyFitCard(symbol, rows) {
-      const groups = [
-        ["嘎空", rows.filter(s => !isContractSignal(s) && !isDivergenceSignal(s) && s.signal_type === "reversal_bullish")],
-        ["嘎多", rows.filter(s => !isContractSignal(s) && !isDivergenceSignal(s) && s.signal_type === "reversal_bearish")],
-        ["穩如老狗", rows.filter(s => stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s))],
-        ["合約異常", rows.filter(isContractSignal)]
-      ].map(([name, list]) => {
-        const wins = winsOf(list);
-        const losses = lossesOf(list);
-        const rate = wins + losses ? wins / (wins + losses) * 100 : 0;
-        const pnl = list.reduce((sum, s) => sum + pnlPct(s, isLivePricedSignal(s)), 0);
-        const fit = Math.round(clamp(rate * 0.65 + Math.max(0, pnl) * 1.2 + Math.min(list.length, 20), 0, 100));
-        return {name, list, fit, rate, pnl};
-      }).sort((a,b) => b.fit - a.fit);
-      const best = groups[0];
-      return `<div class="modal-card"><strong class="accent-text">策略適配度</strong><div class="subline">${symbol} 目前較適合：${best?.name || "等待樣本"}</div><div class="mistake-list">${groups.map(g => `<span>${g.name}：<b class="${g.fit >= 70 ? "bull-text" : g.fit < 45 ? "bear-text" : "warn-text"}">${g.fit}</b> · 勝率 ${fmt(g.rate,1)}% · ${signed(g.pnl)}</span>`).join("")}</div></div>`;
-    }
     function metricCard([a,b,c]) {
       return `<div class="modal-card"><div class="subline">${a}</div><div class="stat-value ${String(b).startsWith("-") ? "bear-text" : "bull-text"}">${b}</div><div class="subline">${c || ""}</div></div>`;
     }
@@ -2136,16 +2091,15 @@
       const risk = riskPct(s);
       const reasons = [];
       if (stopped) reasons.push(`止損原因：價格觸及 SL ${fmt(s.sl_price, 6)}，代表進場後市場沒有延續預期方向。`);
-      if (isContractSignal(s)) reasons.push(`合約異常來源：${signalMetric(s, "market_label") || "雷達共振"}，正式進場後 entry/SL/TP 已鎖定，不隨最新價重算。`);
       if (isDivergenceSignal(s)) reasons.push(`CVD 背離結構：${strategyNameForSignal(s)}，${divergenceKind(s) === "top" ? "價格創短線高但 CVD 轉弱，偏空。" : "價格下殺但 CVD 轉強，偏多反轉。"}`);
-      if (isContractSignal(s) && Math.abs(oi) > 2) reasons.push(`OI 變化過大：${signed(oi)}，槓桿擁擠，容易出現反向掃損。`);
+      if (Math.abs(oi) > 2) reasons.push(`OI 變化過大：${signed(oi)}，槓桿擁擠，容易出現反向掃損。`);
       if (Math.abs(price) > 2) reasons.push(`價格波動過大：${signed(price)}，追價風險升高。`);
       if (Number.isFinite(taker) && Math.abs(taker - 0.5) < 0.04) reasons.push(`Taker 買賣不夠偏向：${fmt(taker, 2)}，主動成交沒有明確站隊。`);
       if (Number.isFinite(risk) && risk > 5) reasons.push(`止損距離偏大：R=${fmt(risk, 2)}%，部位需要更小或等待更好的進場價。`);
       if (!reasons.length) reasons.push("此筆交易沒有明顯單一錯誤，主要依訊號規則完成。");
       const lessons = [
         stopped ? "同類型止損後，下次等待價格重新站回進場結構再進場。" : "若已觸發 TP，後續不要把獲利單重新當成新進場訊號。",
-        "分數未達標或多空比不支持時，只列預警，不升正式持倉。",
+        "OI 極端但價格沒有延續時，優先降低倉位。",
         "分數低於 80 或多週期不共振時，只列觀察，不急著進。"
       ];
       return `<strong>${stopped ? "止損檢討" : "交易備註"}</strong><div class="mistake-list">${reasons.map(r => `<span>• ${r}</span>`).join("")}</div><strong>避免再犯</strong><div class="mistake-list">${lessons.map(r => `<span>• ${r}</span>`).join("")}</div>`;
@@ -2156,7 +2110,7 @@
       const filter = $("signalFilter").value;
       const day = $("signalDate").value;
       const historyMode = Boolean(q || day || filter !== "all");
-      return sortSignals(gagaSignals()).filter(s => {
+      return sortSignals(dataSignals()).filter(s => {
         if (q && !clean(s.symbol).includes(q)) return false;
         if (day && !sameDay(s.triggered_at, day)) return false;
         if (!historyMode && !(isOpenSignal(s) || isPartialActiveSignal(s))) return false;
@@ -2211,12 +2165,12 @@
           advice: "依原訊號 SL / TP 階梯管理"
         };
       }
-      if (m.signal_type === "reversal_bullish") return {kind:"bull", label:"嘎空訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`CVD、Funding、多空比與價格共振，觸發嘎空多方訊號。`, advice:"順勢做多 / 回檔進場"};
-      if (m.signal_type === "reversal_bearish") return {kind:"bear", label:"嘎多訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`CVD、Funding、多空比與價格共振，觸發嘎多空方訊號。`, advice:"順勢做空 / 反彈觀察"};
-      if (price > 0 && Number.isFinite(taker) && taker > 0.54) return {kind:"bull", label:"健康多頭", tf1:"↘", tf4:"●", tfD:"-", reason:`價格與主動買盤同步推進，Taker 買盤 ${fmt(taker,2)}，多方結構偏健康。`, advice:"順勢做多 / 回檔進場"};
-      if (price < 0 && Number.isFinite(taker) && taker < 0.46) return {kind:"bear", label:"趨勢空頭", tf1:"↘", tf4:"-", tfD:"-", reason:"價格與主動賣盤同步走弱，短線結構偏空。", advice:"觀望 / 等明確訊號"};
-      if (Math.abs(price) < 0.1) return {kind:"warn", label:"過熱警戒", tf1:"↘", tf4:"-", tfD:"-", reason:"價格尚未明確表態，等待 CVD、Funding、多空比共振。", advice:"降低追價 / 等待突破"};
-      return {kind:"neutral", label:"盤整", tf1:"-", tf4:"-", tfD:"-", reason:"市場結構暫無明確共振，價格與主動成交未形成高分訊號。", advice:"觀望 / 等明確訊號"};
+      if (m.signal_type === "reversal_bullish") return {kind:"bull", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速擴張 ${signed(oi)}，價格同步上行，OI 百分位 ${fmt(pct,1)}，觸發嘎空多方訊號。`, advice:"順勢做多 / 回檔進場"};
+      if (m.signal_type === "reversal_bearish") return {kind:"bear", label:"反轉訊號", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 快速收縮 ${signed(oi)}，價格同步走弱，OI 百分位 ${fmt(pct,1)}，觸發嘎多空方訊號。`, advice:"順勢做空 / 反彈觀察"};
+      if (oi > 0 && price > 0 && pct > 80) return {kind:"bull", label:"健康多頭", tf1:"↘", tf4:"●", tfD:"-", reason:`OI 位於高分位，價格與資金同步推進，Taker 買盤 ${Number.isFinite(taker) ? fmt(taker,2) : "未知"}，多方結構偏健康。`, advice:"順勢做多 / 回檔進場"};
+      if (oi < 0 && price < 0 && pct > 70) return {kind:"bear", label:"趨勢空頭", tf1:"↘", tf4:"-", tfD:"-", reason:"OI 與價格同時下行，槓桿多頭退場，短線結構偏空。", advice:"觀望 / 等明確訊號"};
+      if (Math.abs(oi) > 0.5 && Math.abs(price) < 0.1) return {kind:"warn", label:"過熱警戒", tf1:"↘", tf4:"-", tfD:"-", reason:"OI 有明顯變化但價格尚未跟進，可能正在累積槓桿部位。", advice:"降低追價 / 等待突破"};
+      return {kind:"neutral", label:"盤整", tf1:"-", tf4:"-", tfD:"-", reason:"市場結構暫無明確共振，OI 與價格未形成高分位趨勢訊號。", advice:"觀望 / 等明確訊號"};
     }
     function analysisRows(m, analysis) {
       const oi = Number(m.oi_change_pct) || 0;
@@ -2265,7 +2219,7 @@
           value: fmt(0.75 + Math.max(-0.35, Math.min(0.35, (oi + price) / 20)), 2),
           kind: oi + price > 0.5 ? "bull" : oi + price < -0.5 ? "bear" : "warn",
           width: clamp(50 + (oi + price) * 8, 10, 95),
-          note: "用合約資料與價格共振估算大型部位方向。"
+          note: "用 OI 與價格共振估算大型部位方向。"
         },
         {
           label: "現貨買賣差",
@@ -2292,10 +2246,6 @@
     }
 
     function signalScore(s) {
-      if (isGagaSignal(s)) {
-        const saved = Number(signalMetric(s, "score"));
-        if (Number.isFinite(saved) && saved > 0) return {...scoreGrade(saved), value: Math.round(clamp(saved, 0, 100))};
-      }
       const isBull = s.signal_type === "reversal_bullish";
       const dir = isBull ? 1 : -1;
       const oiPct = clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100);
@@ -2350,7 +2300,7 @@
       const label = side === "bull" ? "嘎空候選" : side === "bear" ? "嘎多候選" : "保守觀望";
       const riskText = Number.isFinite(risk) ? `${fmt(risk, 2)}%` : "N/A";
       const reason = side === "bull"
-        ? `價格與主動買盤偏多，Taker 主動買盤 ${Number.isFinite(taker) ? fmt(taker,2) : "未知"}，屬於保守做多/嘎空觀察。`
+        ? `OI 與價格同步偏多，Taker 主動買盤 ${Number.isFinite(taker) ? fmt(taker,2) : "未知"}，屬於保守做多/嘎空觀察。`
         : side === "bear"
           ? `價格走弱且槓桿退潮，Taker 偏賣，屬於保守做空/嘎多觀察。`
           : `共振不足，等待 OI、價格、Taker 三者方向更一致。`;
@@ -2402,8 +2352,8 @@
       const side = isBull ? "bull" : "bear";
       const label = isBull ? "嘎空方向" : "嘎多方向";
       const reason = isBull
-        ? `穩如老狗條件成立：5M CVD 底背離，進場沿用訊號觸發價。`
-        : `穩如老狗條件成立：5M CVD 頂背離，進場沿用訊號觸發價。`;
+        ? `穩如老狗條件成立：OI 極端分位 ${fmt(oiPct,1)}，價格與 OI 偏多共振，進場沿用訊號觸發價。`
+        : `穩如老狗條件成立：OI 極端分位 ${fmt(oiPct,1)}，價格轉弱且槓桿退潮，進場沿用訊號觸發價。`;
       return {score, kind, side, label, reason};
     }
     function signalMetric(s, name) {
@@ -2463,12 +2413,10 @@
       return [...book.values()].sort((a,b) => Number(b.oi_value_usdt || 0) - Number(a.oi_value_usdt || 0));
     }
     function isOpenSignal(s) {
-      if (!s || s.status === "closed" || ["sl","ftp"].includes(s.reached_state)) return false;
-      return (s.status === "active" || !s.status) && (s.reached_state === "holding" || !s.reached_state);
+      return (s.reached_state === "holding" || !s.reached_state) && (s.status === "active" || s.reached_state === "holding");
     }
     function isPartialActiveSignal(s) {
-      if (!s || s.status === "closed") return false;
-      return (s.status === "active" || !s.status) && ["tp1","tp2","tp3"].includes(s.reached_state);
+      return s.status === "active" && ["tp1","tp2","tp3"].includes(s.reached_state);
     }
     function isLivePricedSignal(s) {
       return isOpenSignal(s) || isPartialActiveSignal(s);
@@ -2563,7 +2511,6 @@
     }
     function displayState(s) {
       const saved = s.reached_state;
-      if (s.status === "closed" || ["sl","ftp"].includes(saved)) return saved;
       if (!isLivePricedSignal(s)) return saved;
       const current = Number(currentMarketPrice(s));
       if (!Number.isFinite(current)) return saved;
@@ -2600,7 +2547,6 @@
     }
     function strategyName(type) { return type === "reversal_bullish" ? "嘎空" : "嘎多"; }
     function strategyNameForSignal(s) {
-      if (isContractSignal(s)) return "合約異常雷達";
       if (isDivergenceSignal(s)) return divergenceKind(s) === "top" ? "頂背離" : "底背離";
       return strategyName(s.signal_type);
     }
@@ -2626,28 +2572,13 @@
     function strategyTagsForSymbol(symbol) {
       const rows = sortSignals(state.signals).filter(s => clean(s.symbol) === clean(symbol)).slice(0, 12);
       const tags = [];
-      if (rows.some(isGagaSignal)) tags.push({label:"嘎空/嘎多", kind:"accent"});
+      if (rows.some(s => !isDivergenceSignal(s))) tags.push({label:"嘎空/嘎多", kind:"accent"});
       if (rows.some(s => stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s))) tags.push({label:"穩如老狗", kind:"bull"});
       if (rows.some(isDivergenceSignal)) tags.push({label:"5M背離", kind:"warn"});
       return tags;
     }
-    function gagaSignals() {
-      return state.signals.filter(isGagaSignal);
-    }
     function dataSignals() {
-      return gagaSignals();
-    }
-    function contractSignals() {
-      return state.signals.filter(isContractSignal);
-    }
-    function isGagaSignal(s) {
-      if (!s || isDivergenceSignal(s) || isContractSignal(s)) return false;
-      const setup = String(s.setup_id || "");
-      if (s.source === "sentiment_gaga_scan" || setup.startsWith("gaga_") || s?.snapshot_data?.sentiment_gaga) return true;
-      return setup.startsWith("oi_15m_");
-    }
-    function isContractSignal(s) {
-      return s?.source === "coinglass_contract_scan" || String(s?.setup_id || "").includes("coinglass_contract") || Boolean(s?.snapshot_data?.contract_radar);
+      return state.signals.filter(s => !isDivergenceSignal(s));
     }
     function sameDay(value, yyyyMmDd) {
       if (!value || !yyyyMmDd) return false;
