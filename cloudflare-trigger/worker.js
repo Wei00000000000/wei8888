@@ -1,7 +1,7 @@
 const OWNER = "Wei00000000000";
 const REPOSITORY = "wei8888";
 const WORKFLOW = "update-signals.yml";
-const VERSION = "2026-06-06-binance-batch-v1";
+const VERSION = "2026-06-07-mixed-market-dispatch-v1";
 const BINANCE_HOSTS = {
   fapi: "https://fapi.binance.com",
   fdata: "https://fapi.binance.com/futures/data",
@@ -94,6 +94,10 @@ export default {
         githubTokenConfigured: Boolean(env.GITHUB_TOKEN),
         proxyTokenConfigured: Boolean(env.PROXY_TOKEN),
       });
+    }
+    if (url.pathname === "/dispatch") {
+      await dispatch(env);
+      return Response.json({ ok: true, version: VERSION, dispatched: true, workflow: WORKFLOW });
     }
     if (url.pathname === "/binance/batch" && request.method === "POST") {
       return binanceBatch(request, env);
