@@ -690,14 +690,33 @@ def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None
         return None
     if str(row.get("status") or "active") != "active":
         return None
-    triggered = row.get("triggered_at") or row.get("detected_at")
-    try:
-        age = datetime.now(timezone.utc) - datetime.fromisoformat(str(triggered).replace("Z", "+00:00"))
-    except Exception:
-        return None
-    if age.total_seconds() > int(os.getenv("CONTRACT_SIGNAL_COOLDOWN_MINUTES", "60")) * 60:
-        return None
     return clean_symbol(row.get("symbol")), str(row.get("signal_type") or "")
+
+
+def contract_group_bias(row: dict[str, object]) -> str:
+    oi = as_float(row.get("oi_change_1h"))
+    cvd = as_float(row.get("cvd_ratio_1h"))
+    price = as_float(row.get("price_change_15m")) or as_float(row.get("price_change_1h")) or as_float(row.get("price_change_24h"))
+    if oi is not None and abs(oi) > 0.000001 and cvd is not None and abs(cvd) > 0.000001:
+        if oi > 0 and cvd > 0:
+            return "long"
+        if oi < 0 and cvd > 0:
+            return "long"
+        if oi > 0 and cvd < 0:
+            return "short"
+        if oi < 0 and cvd < 0:
+            return "short"
+    if oi is not None and abs(oi) > 0.000001 and price is not None:
+        if oi > 0 and price > 0:
+            return "long"
+        if oi < 0 and price > 0:
+            return "long"
+        if oi > 0 and price < 0:
+            return "short"
+        if oi < 0 and price < 0:
+            return "short"
+    bias = str(row.get("bias") or "neutral")
+    return bias if bias in {"long", "short"} else "neutral"
 
 
 def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: list[dict[str, object]], config: ScannerConfig) -> list[dict[str, object]]:
@@ -705,9 +724,13 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
     rows: list[dict[str, object]] = []
     max_new = int(os.getenv("CONTRACT_SIGNAL_MAX_NEW", "30"))
     for row in radar_rows:
-        bias = str(row.get("bias") or "neutral")
+        bias = contract_group_bias(row)
         trigger = str(row.get("trigger") or "watch")
         if bias not in {"long", "short"} or trigger == "watch":
+            continue
+        if int(row.get("quality_score") or 0) < int(os.getenv("CONTRACT_SIGNAL_MIN_QUALITY", "4")):
+            continue
+        if abs(float(row.get("radar_score", row.get("score")) or 0)) < float(os.getenv("CONTRACT_SIGNAL_MIN_RADAR", "40")):
             continue
         signal_type = "reversal_bullish" if bias == "long" else "reversal_bearish"
         symbol = clean_symbol(row.get("symbol"))
