@@ -64,6 +64,11 @@ jobs:
             echo "No signal updates"
           else
             git commit -m "Update live sentiment signals"
-            git pull --rebase
-            git push
+            for attempt in 1 2 3; do
+              git pull --rebase -X theirs
+              git push && exit 0
+              echo "Push attempt ${attempt} failed; retrying after rebase"
+              sleep 5
+            done
+            exit 1
           fi
