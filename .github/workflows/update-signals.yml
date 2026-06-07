@@ -64,5 +64,6 @@ jobs:
             echo "No signal updates"
           else
             git commit -m "Update live sentiment signals"
+            git pull --rebase
             git push
           fi
