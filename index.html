@@ -2070,7 +2070,7 @@
       const hh = rows.filter(s => s.signal_type === "reversal_bullish");
       const ct = rows.filter(s => s.signal_type === "reversal_bearish");
       const regularRows = rows.filter(isGagaSignal);
-      const stableRows = rows.filter(isStableSignal);
+      const stableRows = rows.filter(s => stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s));
       const contractRows = rows.filter(isContractSignal);
       $("modalStrategies").innerHTML = [
         modalStrategy("嘎空", regularRows.filter(s => s.signal_type === "reversal_bullish"), "bull"),
@@ -2112,7 +2112,7 @@
       const groups = [
         ["嘎空", rows.filter(s => !isContractSignal(s) && !isDivergenceSignal(s) && s.signal_type === "reversal_bullish")],
         ["嘎多", rows.filter(s => !isContractSignal(s) && !isDivergenceSignal(s) && s.signal_type === "reversal_bearish")],
-        ["穩如老狗", rows.filter(isStableSignal)],
+        ["穩如老狗", rows.filter(s => stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s))],
         ["合約異常", rows.filter(isContractSignal)]
       ].map(([name, list]) => {
         const wins = winsOf(list);
@@ -2364,13 +2364,8 @@
       return sortSignals(state.signals)
         .filter(s => {
           const meta = stableTradeMeta(s);
-          return isStableSignal(s) && (!applyThreshold || meta.score >= STABLE_THRESHOLD);
+          return isDivergenceSignal(s) || !applyThreshold || meta.score >= STABLE_THRESHOLD;
         });
-    }
-    function isStableSignal(s) {
-      if (!isDivergenceSignal(s)) return false;
-      const risk = riskPct(s);
-      return Number.isFinite(risk) && risk >= 0.5 && risk <= 8;
     }
     function stableTradeMeta(s) {
       if (isDivergenceSignal(s)) {
@@ -2632,7 +2627,7 @@
       const rows = sortSignals(state.signals).filter(s => clean(s.symbol) === clean(symbol)).slice(0, 12);
       const tags = [];
       if (rows.some(isGagaSignal)) tags.push({label:"嘎空/嘎多", kind:"accent"});
-      if (rows.some(isStableSignal)) tags.push({label:"穩如老狗", kind:"bull"});
+      if (rows.some(s => stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s))) tags.push({label:"穩如老狗", kind:"bull"});
       if (rows.some(isDivergenceSignal)) tags.push({label:"5M背離", kind:"warn"});
       return tags;
     }
