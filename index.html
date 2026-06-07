@@ -308,6 +308,15 @@
     .abnormal-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
     .abnormal-symbol { font-size: 18px; font-weight: 950; }
     .abnormal-value { font: 950 18px var(--mono); }
+    .oi-ranking { border: 1px solid rgba(255,177,59,.18); border-radius: 12px; background: rgba(4,7,10,.86); padding: 14px; margin-bottom: 22px; }
+    .oi-ranking h3 { margin: 0 0 12px; font-size: 17px; }
+    .oi-rank-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 12px; }
+    .oi-rank-group { border-left: 3px solid var(--bull); background: rgba(255,255,255,.025); border-radius: 8px; padding: 12px; min-height: 150px; }
+    .oi-rank-group.bear { border-left-color: var(--bear); }
+    .oi-rank-title { font-weight: 950; margin-bottom: 8px; color: var(--bull); }
+    .oi-rank-group.bear .oi-rank-title { color: var(--bear); }
+    .oi-rank-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid rgba(255,255,255,.055); font: 850 12px var(--mono); }
+    .oi-rank-score { color: var(--muted); }
     .backtest-panel { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.92); margin-bottom: 22px; padding: 16px; }
     .backtest-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
     .equity-chart { width: 100%; height: 180px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(rgba(102,167,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.04) 1px, transparent 1px), #060b12; background-size: 28px 28px; }
@@ -349,6 +358,7 @@
       .signal-actions { grid-column: 1 / -1; justify-content: flex-start; }
       .price-grid, .levels, .modal-stats, .modal-strategies { grid-template-columns: 1fr; }
       .signal-visuals { grid-template-columns: 1fr; }
+      .oi-rank-grid { grid-template-columns: 1fr; }
       .analysis-row { grid-template-columns: 1fr; gap: 5px; }
       .analysis-value { text-align: left; }
       .watch-footer { align-items: flex-start; flex-direction: column; }
@@ -517,6 +527,22 @@
         </div>
       </div>
       <div class="watch-stats" id="contractStats"></div>
+      <section class="backtest-panel">
+        <div class="backtest-head">
+          <div>
+            <div class="kicker">Contract Radar Backtest</div>
+            <h2>合約異常雷達回測</h2>
+            <div class="subline">獨立計算後續行情是否與雷達方向一致，不混入嘎多/嘎空或穩如老狗盈虧。</div>
+          </div>
+          <span class="pill accent" id="contractBacktestMeta">0 samples</span>
+        </div>
+        <div id="contractBacktestChart" class="equity-chart"></div>
+        <div class="chart-stats" id="contractBacktestStats"></div>
+      </section>
+      <section class="oi-ranking">
+        <h3>OI 異動排名</h3>
+        <div class="oi-rank-grid" id="oiRankGroups"></div>
+      </section>
       <div class="section-head">
         <h2 class="section-title">高分預警 <span id="contractWarningCount" class="section-count">(0)</span></h2>
         <div class="subline">尚未形成正式持倉，優先追蹤高品質、高雷達分數與多空比擁擠的候選。</div>
@@ -831,15 +857,41 @@
       const fallbackRes = await fetch(`data/markets.json?ts=${Date.now()}`);
       const fallbackData = fallbackRes.ok ? await fallbackRes.json() : {rows: []};
       try {
-        const res = await fetch("https://api.bybit.com/v5/market/tickers?category=linear");
-        if (!res.ok) throw new Error("Bybit ticker unavailable");
-        const payload = await res.json();
-        const tickers = (payload.result && payload.result.list) || [];
+        let tickers = [];
+        let source = "bybit";
+        try {
+          const res = await fetch("https://api.bybit.com/v5/market/tickers?category=linear");
+          if (!res.ok) throw new Error("Bybit ticker unavailable");
+          const payload = await res.json();
+          tickers = ((payload.result && payload.result.list) || []).map(row => ({
+            symbol: row.symbol,
+            lastPrice: Number(row.lastPrice),
+            changePct: Number(row.price24hPcnt) * 100,
+            quoteVolume: Number(row.turnover24h)
+          }));
+        } catch {
+          source = "okx";
+          const res = await fetch("https://www.okx.com/api/v5/market/tickers?instType=SWAP");
+          if (!res.ok) throw new Error("OKX ticker unavailable");
+          const payload = await res.json();
+          tickers = (payload.data || [])
+            .filter(row => String(row.instId || "").endsWith("-USDT-SWAP"))
+            .map(row => {
+              const price = Number(row.last);
+              const open = Number(row.open24h);
+              return {
+                symbol: String(row.instId).replace("-USDT-SWAP", "USDT").replaceAll("-", ""),
+                lastPrice: price,
+                changePct: open > 0 ? (price - open) / open * 100 : 0,
+                quoteVolume: Number(row.volCcy24h) * price
+              };
+            });
+        }
         const prices = {};
         const liveRows = tickers
           .filter(row => wanted.has(clean(row.symbol)))
           .map(row => {
-            const change = Number(row.price24hPcnt) * 100;
+            const change = Number(row.changePct);
             prices[clean(row.symbol)] = Number(row.lastPrice);
             const prev = (fallbackData.rows || []).find(m => clean(m.symbol) === clean(row.symbol)) || {};
             return {
@@ -847,8 +899,9 @@
               symbol: row.symbol,
               price: Number(row.lastPrice),
               price_change_pct: change,
-              quote_volume: Number(row.turnover24h),
-              live_price: true
+              quote_volume: Number(row.quoteVolume),
+              live_price: true,
+              live_source: source
             };
           });
         return {markets: liveRows.length ? liveRows : (fallbackData.rows || []), prices};
@@ -1155,6 +1208,8 @@
         ["成交量門檻", "500萬", ""],
         ["更新", lastTimeText(state.lastContractAt), ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      renderContractBacktest(rows);
+      renderOiRankGroups(rows);
       const warnings = rows
         .filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 4 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 75))
         .slice(0, isMobileView() ? 4 : 8);
@@ -1162,6 +1217,51 @@
       $("contractWarningCards").innerHTML = warnings.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有高分預警。</div></section>`;
       target.innerHTML = rows.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有符合成交量門檻的合約異常。</div></section>`;
       [target, $("contractWarningCards")].forEach(area => area.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol))));
+    }
+    function renderContractBacktest(rows) {
+      const samples = rows
+        .filter(row => row.bias === "long" || row.bias === "short")
+        .map(row => {
+          const plan = contractTradePlan(row);
+          const move = Number(row.price_change_1h || row.price_change_15m || row.price_change_24h || 0);
+          const aligned = row.bias === "long" ? move > 0 : move < 0;
+          return {...row, plan, move, aligned, score: Math.abs(Number(row.radar_score ?? row.score) || 0)};
+        })
+        .sort((a,b) => Number(b.quality_score || 0) - Number(a.quality_score || 0) || b.score - a.score);
+      const wins = samples.filter(row => row.aligned).length;
+      const rate = samples.length ? wins / samples.length * 100 : 0;
+      const equity = [];
+      let value = 0;
+      for (const row of samples.slice().reverse()) {
+        value += row.aligned ? 1 : -1;
+        equity.push(value);
+      }
+      $("contractBacktestMeta").textContent = `${samples.length} samples`;
+      $("contractBacktestStats").innerHTML = [
+        ["樣本數", samples.length, ""],
+        ["方向命中率", `${fmt(rate, 1)}%`, rate >= 50 ? "bull-text" : "bear-text"],
+        ["命中 / 失誤", `${wins} / ${samples.length - wins}`, ""],
+        ["平均雷達分", fmt(samples.reduce((sum, row) => sum + row.score, 0) / Math.max(1, samples.length), 0), "accent-text"]
+      ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
+      $("contractBacktestChart").innerHTML = equitySvg(equity);
+    }
+    function renderOiRankGroups(rows) {
+      const groups = [
+        ["多頭建倉", "bull", row => oiMarketGroup(row).label === "多頭建倉"],
+        ["空頭回補", "bull", row => oiMarketGroup(row).label === "空頭回補"],
+        ["空頭建倉", "bear", row => oiMarketGroup(row).label === "空頭建倉"],
+        ["多頭出場", "bear", row => oiMarketGroup(row).label === "多頭出場"],
+      ];
+      $("oiRankGroups").innerHTML = groups.map(([title, kind, predicate]) => {
+        const items = rows
+          .filter(predicate)
+          .sort((a,b) => Math.abs(Number(b.radar_score ?? b.score) || 0) - Math.abs(Number(a.radar_score ?? a.score) || 0))
+          .slice(0, 6);
+        return `<section class="oi-rank-group ${kind}">
+          <div class="oi-rank-title">${title}</div>
+          ${items.map((row, index) => `<div class="oi-rank-row"><span>${index + 1}</span><strong>${clean(row.symbol)}</strong><span class="oi-rank-score">${fmt(Math.abs(Number(row.radar_score ?? row.score) || 0), 0)}</span></div>`).join("") || `<div class="empty" style="padding:18px 0">等待資料</div>`}
+        </section>`;
+      }).join("");
     }
     function contractCard(row) {
       const symbol = clean(row.symbol);
@@ -1174,6 +1274,7 @@
       const live = marketFor(symbol);
       const livePrice = Number(live?.price || row.price);
       const liveChange = Number.isFinite(Number(live?.price_change_pct)) ? Number(live.price_change_pct) : Number(row.price_change_24h);
+      const plan = contractTradePlan({...row, price: livePrice});
       const reason = [
         group.label,
         row.trigger,
@@ -1190,6 +1291,8 @@
         <div class="metric-grid">
           <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(livePrice, 6)}</div></div>
           <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}">${signed(liveChange)}</div></div>
+          <div class="metric-box"><div class="metric-label">進場</div><div class="metric-value">${fmt(plan.entry, 6)}</div></div>
+          <div class="metric-box warn"><div class="metric-label">SL / TP</div><div class="metric-value">${fmt(plan.sl, 6)} / ${fmt(plan.tp, 6)}</div></div>
           <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${contractMetric(row.oi_change_1h, "待 API")}</div></div>
           <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${contractMetric(row.cvd_ratio_1h, "待 API")}</div></div>
           <div class="metric-box"><div class="metric-label">散戶多空比</div><div class="metric-value">${ratioMetric(row.long_short_ratio_1h)}</div></div>
@@ -1200,6 +1303,19 @@
         </div>
         <div class="stable-rule">${reason || "等待更多共振"}${latest ? ` · 最新訊號 ${strategyNameForSignal(latest)} ${shortTime(latest.triggered_at)}` : ""}</div>
       </article>`;
+    }
+    function contractTradePlan(row) {
+      const entry = Number(row.price || row.alert_price || 0);
+      const side = row.bias === "long" ? 1 : row.bias === "short" ? -1 : 0;
+      const riskPctValue = clamp(1.2 + Math.abs(Number(row.radar_score ?? row.score) || 0) / 100 * 1.8, 1, 4);
+      if (!entry || !side) return {entry, sl: NaN, tp: NaN, riskPct: riskPctValue};
+      const risk = entry * riskPctValue / 100;
+      return {
+        entry,
+        sl: side > 0 ? entry - risk : entry + risk,
+        tp: side > 0 ? entry + risk * 1.8 : entry - risk * 1.8,
+        riskPct: riskPctValue
+      };
     }
     function contractMetric(value, emptyText = "待 API") {
       const n = Number(value);

@@ -13,6 +13,8 @@ sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import BinanceFuturesClient
 from sentiment_scanner.bybit import BybitFuturesClient
+from sentiment_scanner.market_data import MixedFuturesClient
+from sentiment_scanner.okx import OkxFuturesClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 APP_HTML = ROOT / "sentiment_scanner" / "app.html"
 SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
@@ -29,12 +31,19 @@ MAIN_SYMBOLS = [
 
 
 def provider_name() -> str:
-    return os.getenv("MARKET_DATA_PROVIDER", "bybit").strip().lower()
+    return os.getenv("MARKET_DATA_PROVIDER", "mixed").strip().lower()
 
 
 def market_client(timeout: float = 20.0):
-    if provider_name() == "binance":
+    provider = provider_name()
+    if provider == "binance":
         return BinanceFuturesClient(timeout=timeout)
+    if provider == "bybit":
+        return BybitFuturesClient(timeout=timeout)
+    if provider == "okx":
+        return OkxFuturesClient(timeout=timeout)
+    if provider == "mixed":
+        return MixedFuturesClient(timeout=timeout)
     return BybitFuturesClient(timeout=timeout)
 SECTOR_KEYWORDS = [
     ("Layer 1", ("layer-1", "smart-contract-platform")),

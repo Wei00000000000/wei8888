@@ -17,6 +17,8 @@ from sentiment_scanner.binance import BINANCE_FAPI, BINANCE_FDATA
 from sentiment_scanner.bybit import BybitFuturesClient
 from sentiment_scanner.cli import format_signal
 from sentiment_scanner.coinglass import CoinGlassClient
+from sentiment_scanner.market_data import MixedFuturesClient
+from sentiment_scanner.okx import OkxFuturesClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 
 
@@ -27,12 +29,19 @@ TARGET_ORDER = {"holding": 0, "tp1": 1, "tp2": 2, "tp3": 3, "ftp": 4, "sl": -1}
 
 
 def provider_name() -> str:
-    return os.getenv("MARKET_DATA_PROVIDER", "bybit").strip().lower()
+    return os.getenv("MARKET_DATA_PROVIDER", "mixed").strip().lower()
 
 
 def market_client(timeout: float = 20.0):
-    if provider_name() == "binance":
+    provider = provider_name()
+    if provider == "binance":
         return BinanceFuturesClient(timeout=timeout)
+    if provider == "bybit":
+        return BybitFuturesClient(timeout=timeout)
+    if provider == "okx":
+        return OkxFuturesClient(timeout=timeout)
+    if provider == "mixed":
+        return MixedFuturesClient(timeout=timeout)
     return BybitFuturesClient(timeout=timeout)
 
 
@@ -879,7 +888,8 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
             return pair, client.klines_since(symbol, interval=interval, start_time=earliest_by_pair[pair])
 
     histories: dict[tuple[str, str], list[object]] = {}
-    with ThreadPoolExecutor(max_workers=min(8, max(1, len(pairs)))) as executor:
+    replay_workers = int(os.getenv("STATE_REPLAY_WORKERS", "3" if provider_name() in {"okx", "mixed"} else "8"))
+    with ThreadPoolExecutor(max_workers=min(replay_workers, max(1, len(pairs)))) as executor:
         futures = {executor.submit(load, pair): pair for pair in pairs}
         for future in as_completed(futures):
             pair = futures[future]
