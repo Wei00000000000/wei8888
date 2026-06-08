@@ -326,6 +326,14 @@
     .oi-rank-group.bear .oi-rank-title { color: var(--bear); }
     .oi-rank-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid rgba(255,255,255,.055); font: 850 12px var(--mono); }
     .oi-rank-score { color: var(--muted); }
+    .visual-screener { position: relative; min-height: 360px; border: 1px solid var(--line); border-radius: 8px; background: radial-gradient(circle at 70% 20%, rgba(0,224,164,.13), transparent 32%), radial-gradient(circle at 20% 80%, rgba(255,85,119,.12), transparent 32%), var(--panel); overflow: hidden; margin-bottom: 22px; }
+    .visual-screener::before, .visual-screener::after { content: ""; position: absolute; background: rgba(255,255,255,.18); }
+    .visual-screener::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+    .visual-screener::after { top: 50%; left: 0; right: 0; height: 1px; }
+    .quadrant-label { position: absolute; font: 950 13px var(--mono); color: var(--muted); text-shadow: 0 1px 10px #000; }
+    .dot-symbol { position: absolute; transform: translate(-50%, -50%); border: 1px solid currentColor; border-radius: 999px; padding: 4px 7px; background: rgba(5,10,16,.88); font: 950 11px var(--mono); cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .dot-symbol.bull { color: var(--bull); }
+    .dot-symbol.bear { color: var(--bear); }
     .backtest-panel { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.92); margin-bottom: 22px; padding: 16px; }
     .backtest-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
     .equity-chart { width: 100%; height: 180px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(rgba(102,167,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.04) 1px, transparent 1px), #060b12; background-size: 28px 28px; }
@@ -361,7 +369,7 @@
     }
     @media (max-width: 620px) {
       .main { padding-left: 10px; padding-right: 10px; padding-bottom: 94px; }
-      .nav { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 900; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8,13,19,.95); backdrop-filter: blur(14px); box-shadow: 0 14px 36px rgba(0,0,0,.45); }
+      .nav { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 900; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8,13,19,.95); backdrop-filter: blur(14px); box-shadow: 0 14px 36px rgba(0,0,0,.45); }
       .nav button { min-width: 0; padding: 0 4px; height: 38px; font-size: 12px; }
       .signal-main { grid-template-columns: auto 1fr; }
       .signal-actions { grid-column: 1 / -1; justify-content: flex-start; }
@@ -401,6 +409,7 @@
         <button class="active" data-view="dashboard">儀表板</button>
         <button data-view="signals">數據交易訊號</button>
         <button data-view="contract">合約異常雷達</button>
+        <button data-view="quality">高品質訊號</button>
         <button data-view="stable">穩如老狗</button>
         <button data-view="review">交易檢討</button>
         <button data-view="harmonic">諧波交易訊號</button>
@@ -539,6 +548,17 @@
       <section class="backtest-panel">
         <div class="backtest-head">
           <div>
+            <div class="kicker">Visual Screener</div>
+            <h2>合約異常視覺篩選器</h2>
+            <div class="subline">X 軸為 OI 變化，Y 軸為價格/CVD 動能；只作篩選與預警，不代表已進場。</div>
+          </div>
+          <span class="pill accent">四象限</span>
+        </div>
+        <div id="contractVisualScreener" class="visual-screener"></div>
+      </section>
+      <section class="backtest-panel">
+        <div class="backtest-head">
+          <div>
             <div class="kicker">Contract Radar Backtest</div>
             <h2>合約異常雷達回測</h2>
             <div class="subline">獨立計算後續行情是否與雷達方向一致，不混入嘎多/嘎空或穩如老狗盈虧。</div>
@@ -561,6 +581,39 @@
         <h2 class="section-title">完整雷達清單</h2>
       </div>
       <div class="terminal-grid" id="contractCards"></div>
+    </section>
+
+    <section id="quality" class="view">
+      <section class="radar-strip">
+        <div class="kicker">High Quality Signal Desk</div>
+        <h2>高品質訊號交易</h2>
+        <div class="subline">依訊號判斷邏輯整理：成交量、CVD、Funding、多空比、價格動能與分數共振；回測從今天開始，獨立統計。</div>
+      </section>
+      <div class="section-head">
+        <h2 class="section-title">高品質持倉 <span id="qualityCount" class="section-count">(0)</span></h2>
+        <div class="section-actions">
+          <input id="qualitySearch" class="search-input" placeholder="搜尋幣種，例如 ETH">
+          <select id="qualitySideFilter">
+            <option value="all">全部</option>
+            <option value="bull">嘎空</option>
+            <option value="bear">嘎多</option>
+          </select>
+        </div>
+      </div>
+      <div class="watch-stats" id="qualityStats"></div>
+      <section class="backtest-panel">
+        <div class="backtest-head">
+          <div>
+            <div class="kicker">Today Backtest</div>
+            <h2>今日高品質回測</h2>
+            <div class="subline">只計算今天之後成立的高品質正式訊號，不混入其他頁面。</div>
+          </div>
+          <span class="pill accent" id="qualityBacktestMeta">0 trades</span>
+        </div>
+        <div id="qualityBacktestChart" class="equity-chart"></div>
+        <div class="chart-stats" id="qualityBacktestStats"></div>
+      </section>
+      <div class="terminal-grid" id="qualityCards"></div>
     </section>
 
     <section id="stable" class="view">
@@ -725,6 +778,8 @@
     $("stableSideFilter").addEventListener("change", renderStable);
     $("contractSearch").addEventListener("input", () => syncSearch("contractSearch"));
     $("contractBiasFilter").addEventListener("change", renderContractRadar);
+    $("qualitySearch").addEventListener("input", () => syncSearch("qualitySearch"));
+    $("qualitySideFilter").addEventListener("change", renderHighQuality);
     $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
     $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
     $("modalClose").addEventListener("click", closeSymbolModal);
@@ -844,12 +899,17 @@
         if (!manifestRes.ok) throw new Error("manifest missing");
         const manifest = await manifestRes.json();
         const chunkNames = manifest.signal_chunks || [];
-        const chunks = await Promise.all(chunkNames.map(async name => {
+        const initialCount = isMobileView() ? 8 : 14;
+        const initialNames = chunkNames.slice(0, initialCount);
+        const chunks = await Promise.all(initialNames.map(async name => {
           const res = await fetch(`data/${name}?ts=${Date.now()}`);
           if (!res.ok) return {rows: []};
           return res.json();
         }));
         const rows = chunks.flatMap(chunk => chunk.rows || []);
+        if (chunkNames.length > initialCount) {
+          setTimeout(() => loadRemainingSignalChunks(chunkNames.slice(initialCount)), 200);
+        }
         const marketsRes = await fetch(`data/${manifest.markets || "markets.json"}?ts=${Date.now()}`);
         const marketsData = marketsRes.ok ? await marketsRes.json() : {rows: []};
         const statusRes = await fetch(`data/${manifest.scanner_status || "scanner_status.json"}?ts=${Date.now()}`);
@@ -1077,6 +1137,7 @@
       renderContractRadar();
       renderWatchDashboard();
       renderSignals();
+      renderHighQuality();
       renderStable();
       renderReview();
       renderNotifications();
@@ -1086,6 +1147,7 @@
       renderStats();
       renderWatchDashboard();
       renderSignals();
+      renderHighQuality();
       renderStable();
       renderContractRadar();
       renderNotifications();
@@ -1093,13 +1155,13 @@
     }
     function syncSearch(sourceId) {
       const value = $(sourceId).value;
-      ["symbolSearch", "signalSearch", "stableSearch", "contractSearch"].forEach(id => {
+      ["symbolSearch", "signalSearch", "stableSearch", "contractSearch", "qualitySearch"].forEach(id => {
         if ($(id) && id !== sourceId) $(id).value = value;
       });
       renderAll();
     }
     function focusCurrentSearch() {
-      const map = {dashboard: "symbolSearch", signals: "signalSearch", stable: "stableSearch", contract: "contractSearch"};
+      const map = {dashboard: "symbolSearch", signals: "signalSearch", stable: "stableSearch", contract: "contractSearch", quality: "qualitySearch"};
       const target = $(map[state.currentView] || "symbolSearch");
       target.focus();
       target.select?.();
@@ -1121,7 +1183,8 @@
         updateBell();
         return;
       }
-      const sourceRows = stableMode ? stableUniverse() : dataSignals();
+      const qualityMode = state.currentView === "quality";
+      const sourceRows = stableMode ? stableOfficialRows() : qualityMode ? highQualitySignals(false) : dataSignals();
       const open = sourceRows.filter(isOpenSignal);
       const partial = sourceRows.filter(isPartialActiveSignal);
       const closed = sourceRows.filter(s => !isOpenSignal(s) && !isPartialActiveSignal(s));
@@ -1248,15 +1311,39 @@
         ["成交量門檻", "500萬", ""],
         ["更新", lastTimeText(state.lastContractAt), ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      renderContractVisualScreener(rows);
       renderContractBacktest(rows);
       renderOiRankGroups(rows);
       const warnings = rows
         .filter(row => row.trigger !== "watch" && (Number(row.quality_score || 0) >= 4 || Math.abs(Number(row.radar_score ?? row.score) || 0) >= 75))
         .slice(0, isMobileView() ? 4 : 8);
+      const formalRows = contractFormalSignals()
+        .filter(s => !q || clean(s.symbol).includes(q))
+        .filter(s => bias === "all" || (s.signal_type === "reversal_bullish" ? "long" : "short") === bias)
+        .slice(0, displayLimit(48, 20));
       $("contractWarningCount").textContent = `(${warnings.length})`;
       $("contractWarningCards").innerHTML = warnings.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有高分預警。</div></section>`;
-      target.innerHTML = rows.map(contractCard).join("") || `<section class="panel"><div class="empty">目前沒有符合成交量門檻的合約異常。</div></section>`;
-      [target, $("contractWarningCards")].forEach(area => area.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol))));
+      target.innerHTML = formalRows.map(signalCard).join("") || `<section class="panel"><div class="empty">目前沒有正式合約異常持倉；預警達標後才會鎖定進場、SL、TP。</div></section>`;
+      $("contractCards").previousElementSibling.querySelector(".section-title").textContent = `正式持倉 (${formalRows.length})`;
+      $("contractWarningCards").querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol)));
+      target.querySelectorAll("[data-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
+    }
+    async function loadRemainingSignalChunks(chunkNames) {
+      try {
+        const chunks = [];
+        for (const name of chunkNames) {
+          const res = await fetch(`data/${name}?ts=${Date.now()}`);
+          if (res.ok) chunks.push(await res.json());
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        const rows = chunks.flatMap(chunk => chunk.rows || []);
+        if (!rows.length) return;
+        mergeSignals(rows);
+        renderAll();
+        status(`背景補齊歷史 · ${state.signals.length} signals`);
+      } catch (err) {
+        rememberError(err, "History load error");
+      }
     }
     function renderContractBacktest(rows) {
       const samples = rows
@@ -1315,7 +1402,6 @@
       const live = marketFor(symbol);
       const livePrice = Number(live?.price || row.price);
       const liveChange = Number.isFinite(Number(live?.price_change_pct)) ? Number(live.price_change_pct) : Number(row.price_change_24h);
-      const plan = contractTradePlan(row);
       const reason = [
         group.label,
         row.trigger,
@@ -1333,8 +1419,6 @@
         <div class="metric-grid">
           <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(livePrice, 6)}</div></div>
           <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}">${signed(liveChange)}</div></div>
-          <div class="metric-box"><div class="metric-label">進場</div><div class="metric-value">${fmt(plan.entry, 6)}</div></div>
-          <div class="metric-box warn"><div class="metric-label">SL / TP</div><div class="metric-value">${fmt(plan.sl, 6)} / ${fmt(plan.tp, 6)}</div></div>
           <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${contractMetric(row.oi_change_1h, "待 API")}</div></div>
           <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${contractMetric(row.cvd_ratio_1h, "待 API")}</div></div>
           <div class="metric-box"><div class="metric-label">散戶多空比</div><div class="metric-value">${ratioMetric(row.long_short_ratio_1h)}</div></div>
@@ -1345,6 +1429,34 @@
         </div>
         <div class="stable-rule">${reason || "等待更多共振"}${latest ? ` · 最新訊號 ${strategyNameForSignal(latest)} ${shortTime(latest.triggered_at)}` : ""}</div>
       </article>`;
+    }
+    function contractFormalSignals() {
+      return sortSignals(state.signals)
+        .filter(s => String(s.source || "").includes("coinglass_contract") || String(s.setup_id || "").includes("coinglass_contract"))
+        .filter(s => isOpenSignal(s) || isPartialActiveSignal(s));
+    }
+    function renderContractVisualScreener(rows) {
+      const target = $("contractVisualScreener");
+      if (!target) return;
+      const points = rows
+        .filter(row => contractBias(row) !== "neutral")
+        .slice(0, isMobileView() ? 36 : 80)
+        .map(row => {
+          const x = clamp(Number(row.oi_change_1h || row.oi_change_15m || 0), -16, 16);
+          const yRaw = Number(row.cvd_ratio_1h);
+          const y = clamp(Number.isFinite(yRaw) && Math.abs(yRaw) > 0.0001 ? yRaw : Number(row.price_change_15m || row.price_change_1h || 0), -16, 16);
+          const left = 50 + x / 32 * 86;
+          const top = 50 - y / 32 * 86;
+          const kind = contractBias(row) === "long" ? "bull" : "bear";
+          return `<button class="dot-symbol ${kind}" data-contract-symbol="${clean(row.symbol)}" style="left:${left}%;top:${top}%">${clean(row.symbol)}</button>`;
+        }).join("");
+      target.innerHTML = `
+        <div class="quadrant-label bull-text" style="left:56%;top:9%">Q1 多頭建倉</div>
+        <div class="quadrant-label bull-text" style="left:8%;top:9%">Q2 空頭回補</div>
+        <div class="quadrant-label bear-text" style="left:8%;bottom:9%">Q3 多頭出場</div>
+        <div class="quadrant-label bear-text" style="right:8%;bottom:9%">Q4 空頭建倉</div>
+        ${points || `<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">等待合約異常資料</div>`}`;
+      target.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol)));
     }
     function contractTradePlan(row) {
       const entry = Number(row.alert_price || row.entry_price || row.price || 0);
@@ -1480,11 +1592,70 @@
         statsId: "signalBacktestStats",
         metaId: "signalBacktestMeta"
       });
-      const allHtml = rows.map(signalCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的訊號。</div></section>`;
+      const hasFocusedQuery = Boolean($("signalSearch").value.trim() || $("signalDate").value || $("signalStatusFilter").value !== "all");
+      const displayRows = hasFocusedQuery ? rows.slice(0, displayLimit(240, 100)) : rows.slice(0, displayLimit(120, 40));
+      const allHtml = displayRows.map(signalCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的訊號。</div></section>`;
       const dashHtml = dashRows.map(signalCard).join("") || `<section class="panel"><div class="empty">目前沒有持倉中訊號。</div></section>`;
       $("signalCards").innerHTML = allHtml;
       $("dashboardSignalCards").innerHTML = dashHtml;
       document.querySelectorAll(".signal-card").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
+    }
+    function renderHighQuality() {
+      const target = $("qualityCards");
+      if (!target) return;
+      const q = $("qualitySearch").value.trim().toUpperCase();
+      const side = $("qualitySideFilter").value;
+      const rows = highQualitySignals(false)
+        .filter(s => !q || clean(s.symbol).includes(q))
+        .filter(s => side === "all" || qualitySide(s) === side)
+        .sort((a,b) => highQualityScore(b).score - highQualityScore(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
+      const todayRows = rows.filter(s => new Date(s.triggered_at || 0) >= todayStartTaipei());
+      const open = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s));
+      const wins = todayRows.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length;
+      const losses = todayRows.filter(s => s.reached_state === "sl").length;
+      const avg = rows.length ? rows.reduce((sum, s) => sum + highQualityScore(s).score, 0) / rows.length : 0;
+      $("qualityCount").textContent = `(${rows.length})`;
+      $("qualityStats").innerHTML = [
+        ["正式持倉", open.length, "bull-text"],
+        ["今日樣本", todayRows.length, ""],
+        ["今日勝率", `${fmt(wins + losses ? wins / (wins + losses) * 100 : 0, 1)}%`, "accent-text"],
+        ["平均品質", fmt(avg, 0), "bull-text"],
+        ["嘎空 / 嘎多", `${rows.filter(s => qualitySide(s) === "bull").length} / ${rows.filter(s => qualitySide(s) === "bear").length}`, ""],
+        ["回測起點", todayStartTaipei().toLocaleDateString(), ""]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      renderBacktestChart(todayRows, {
+        chartId: "qualityBacktestChart",
+        statsId: "qualityBacktestStats",
+        metaId: "qualityBacktestMeta"
+      });
+      target.innerHTML = rows.slice(0, displayLimit(120, 40)).map(s => signalCard({...s, snapshot_data: {...(s.snapshot_data || {}), quality_desk: true}})).join("") || `<section class="panel"><div class="empty">目前沒有高品質正式訊號。</div></section>`;
+      target.querySelectorAll("[data-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
+    }
+    function highQualitySignals(activeOnly = true) {
+      return dataSignals()
+        .filter(s => !activeOnly || isOpenSignal(s) || isPartialActiveSignal(s))
+        .filter(s => highQualityScore(s).tradable);
+    }
+    function highQualityScore(s) {
+      const base = signalScore(s).value;
+      const volume = Number(marketFor(s.symbol)?.quote_volume || signalMetric(s, "volume_24h") || 0);
+      const risk = riskPct(s);
+      const mtf = signalMetric(s, "mtf_5m_confluence") || signalMetric(s, "mtf_5m_oi_confluence");
+      const price = Math.abs(Number(signalMetric(s, "price_change_pct")) || 0);
+      let score = base;
+      if (mtf) score += 8;
+      if (Number.isFinite(risk) && risk >= 0.5 && risk <= 8) score += 6;
+      if (price >= 0.5) score += 3;
+      if (volume >= 5_000_000 || volume === 0) score += 3;
+      const tradable = score >= 70 && (volume >= 5_000_000 || volume === 0) && Number.isFinite(risk) && risk >= 0.5;
+      return {score: Math.round(clamp(score, 0, 100)), tradable};
+    }
+    function qualitySide(s) {
+      return s.signal_type === "reversal_bullish" ? "bull" : "bear";
+    }
+    function todayStartTaipei() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
     function renderStable() {
       const q = $("stableSearch").value.trim().toUpperCase();
@@ -1510,8 +1681,8 @@
         ["觀望", wait, "warn-text"],
         ["高分", tradable, ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
-      renderBacktestChart(dateRangeRows(stableUniverse(), $("stableBtFrom").value, $("stableBtTo").value));
-      $("stableCards").innerHTML = rows.map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
+      renderBacktestChart(dateRangeRows(stableOfficialRows(), $("stableBtFrom").value, $("stableBtTo").value));
+      $("stableCards").innerHTML = rows.slice(0, displayLimit(120, 40)).map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
       $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
     }
     function renderBacktestChart(rows, options = {}) {
@@ -1649,7 +1820,7 @@
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
         <div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
-        <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
+        <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(entryPrice(s), 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
         ${visual}
         <div class="levels">
           <div class="level"><span>R</span><b>${fmt(rPct, 2)}%</b><i class="copy">▢</i></div>
@@ -1682,7 +1853,7 @@
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
-        <div class="price-grid"><div class="price-box"><div class="price-label">觸發價</div><div class="price-num">${fmt(s.trigger_price, 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
+        <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(entryPrice(s), 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
         ${visual}
         <div class="levels">
           <div class="level"><span>R</span><b>${fmt(rPct, 2)}%</b><i class="copy">▢</i></div>
@@ -2310,11 +2481,15 @@
       return stableUniverse(applyThreshold)
         .filter(s => s.reached_state !== "sl")
     }
+    function stableOfficialRows() {
+      return stableUniverse(true);
+    }
     function stableUniverse(applyThreshold = true) {
       return sortSignals(state.signals)
         .filter(s => {
           const meta = stableTradeMeta(s);
-          return isDivergenceSignal(s) || !applyThreshold || meta.score >= STABLE_THRESHOLD;
+          const candidate = isDivergenceSignal(s) || meta.score >= STABLE_THRESHOLD;
+          return candidate && (!applyThreshold || meta.score >= STABLE_THRESHOLD);
         });
     }
     function stableTradeMeta(s) {
@@ -2456,7 +2631,7 @@
     function protectiveStopText(s) {
       const state = displayState(s);
       if (state === "tp3") return `保護價 TP1 ${fmt(s.tp1_price, 6)}`;
-      if (state === "tp2") return `保護價 進場 ${fmt(s.trigger_price, 6)}`;
+      if (state === "tp2") return `保護價 進場 ${fmt(entryPrice(s), 6)}`;
       if (state === "tp1") return `原始SL ${fmt(s.sl_price, 6)}`;
       if (state === "ftp") return "已完全止盈";
       return `SL ${fmt(s.sl_price, 6)}`;
@@ -2464,21 +2639,26 @@
     function marketFor(symbol) {
       return state.markets.find(m => clean(m.symbol) === clean(symbol));
     }
+    function entryPrice(s) {
+      const entry = Number(s.entry_price);
+      if (Number.isFinite(entry) && entry > 0) return entry;
+      return Number(s.trigger_price);
+    }
     function currentPrice(s) {
       const market = marketFor(s.symbol);
       if (market && Number.isFinite(Number(market.price))) return Number(market.price);
-      const entry = Number(s.trigger_price);
+      const entry = Number(entryPrice(s));
       const pnl = pnlPct(s, false) / 100;
       if (!Number.isFinite(entry)) return NaN;
       return s.signal_type === "reversal_bullish" ? entry * (1 + pnl) : entry * (1 - pnl);
     }
     function riskPct(s) {
-      const entry = Number(s.trigger_price);
-      const risk = Math.abs(Number(s.trigger_price) - Number(s.sl_price));
+      const entry = Number(entryPrice(s));
+      const risk = Math.abs(entry - Number(s.sl_price));
       return entry ? risk / entry * 100 : NaN;
     }
     function pnlPct(s, live = false) {
-      const entry = Number(s.trigger_price);
+      const entry = Number(entryPrice(s));
       const livePrice = Number(currentMarketPrice(s));
       const r = riskPct(s);
       if (!Number.isFinite(r)) return 0;
@@ -2679,6 +2859,7 @@
     function signalKey(s) { return `${clean(s.symbol)}|${s.signal_type}|${s.triggered_at || s.triggered_at_ms || ""}`; }
     function clean(s) { return String(s || "").toUpperCase().replace(/USDT$/,""); }
     function isMobileView() { return window.matchMedia && window.matchMedia("(max-width: 760px)").matches; }
+    function displayLimit(desktop = 120, mobile = 40) { return isMobileView() ? mobile : desktop; }
     function numClass(v) { return Number(v) > 0 ? "bull-text" : Number(v) < 0 ? "bear-text" : "muted"; }
     function clamp(value, min, max) { return Math.max(min, Math.min(max, Number(value) || 0)); }
     function signed(v) {

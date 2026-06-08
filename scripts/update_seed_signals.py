@@ -87,6 +87,14 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
         row["triggered_at"] = iso_ms(int(triggered_at_ms))
         row.setdefault("established_at", row["triggered_at"])
     row.setdefault("id", signal_id(row))
+    row.setdefault("signal_id", row["id"])
+    entry = as_float(row.get("entry_price"))
+    if entry is None:
+        entry = as_float(row.get("trigger_price"))
+        if entry is not None:
+            row["entry_price"] = entry
+    elif row.get("trigger_price") is None:
+        row["trigger_price"] = entry
     row.setdefault("status", "active")
     row.setdefault("reached_state", "holding")
     row.setdefault("detected_at", datetime.now(timezone.utc).isoformat())
@@ -684,6 +692,26 @@ def preserve_previous_detail(rows: list[dict[str, object]]) -> list[dict[str, ob
     return rows
 
 
+def is_active_position(row: dict[str, object]) -> bool:
+    return (
+        str(row.get("status") or "active") == "active"
+        and str(row.get("reached_state") or "holding") in {"holding", "tp1", "tp2", "tp3"}
+    )
+
+
+def position_key(row: dict[str, object]) -> tuple[str, str]:
+    return clean_symbol(row.get("symbol")), str(row.get("signal_type") or "")
+
+
+def active_position_counts(rows: list[dict[str, object]]) -> dict[tuple[str, str], int]:
+    counts: dict[tuple[str, str], int] = {}
+    for row in rows:
+        if is_active_position(row):
+            key = position_key(row)
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
 def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None:
     setup = str(row.get("setup_id") or "")
     if "coinglass_contract" not in setup:
@@ -701,7 +729,8 @@ def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None
 
 
 def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: list[dict[str, object]], config: ScannerConfig) -> list[dict[str, object]]:
-    active_keys = {key for row in existing if (key := recent_active_contract_key(row)) is not None}
+    active_counts = active_position_counts(existing)
+    max_same_side = int(os.getenv("MAX_ACTIVE_PER_SYMBOL_SIDE", "2"))
     rows: list[dict[str, object]] = []
     max_new = int(os.getenv("CONTRACT_SIGNAL_MAX_NEW", "30"))
     for row in radar_rows:
@@ -711,7 +740,8 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
             continue
         signal_type = "reversal_bullish" if bias == "long" else "reversal_bearish"
         symbol = clean_symbol(row.get("symbol"))
-        if (symbol, signal_type) in active_keys:
+        key = (symbol, signal_type)
+        if active_counts.get(key, 0) >= max_same_side:
             continue
         price = as_float(row.get("trigger_price")) or as_float(row.get("price"))
         if price is None or price <= 0:
@@ -745,6 +775,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "triggered_at_ms": triggered_at_ms,
                     "triggered_at": iso_ms(triggered_at_ms),
                     "trigger_price": price,
+                    "entry_price": price,
                     "atr_at_trigger": risk / max(config.atr_risk_multiple, 0.1),
                     "sl_price": sl,
                     "tp1_price": tp1,
@@ -775,7 +806,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                 }
             )
         )
-        active_keys.add((symbol, signal_type))
+        active_counts[key] = active_counts.get(key, 0) + 1
         if len(rows) >= max_new:
             break
     return rows
@@ -815,7 +846,7 @@ def state_from_price(row: dict[str, object], price: float) -> str:
 def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[str, float | None, str | None, str]:
     bullish = row.get("signal_type") == "reversal_bullish"
     trigger_ms = int(row.get("triggered_at_ms") or 0)
-    entry = as_float(row.get("trigger_price"))
+    entry = as_float(row.get("entry_price")) or as_float(row.get("trigger_price"))
     original_stop = as_float(row.get("sl_price"))
     # Always rebuild chronologically from the trigger. Starting from the stored TP
     # would incorrectly apply a moved stop before that TP was actually reached.
@@ -919,11 +950,54 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
         row["hit_at"] = hit_at
         row["state_resolution"] = "chronological_ohlc_stop_first"
         if target_order(max_reached) >= target_order("tp2"):
-            row["active_sl_price"] = row.get("trigger_price")
+            row["active_sl_price"] = row.get("entry_price") or row.get("trigger_price")
         if next_state in {"sl", "ftp"}:
             row["status"] = "closed"
             closed += 1
     return {"checked": len(active_rows), "changed": changed, "closed": closed}
+
+
+LOCKED_SIGNAL_FIELDS = {
+    "entry_price",
+    "trigger_price",
+    "sl_price",
+    "tp1_price",
+    "tp2_price",
+    "tp3_price",
+    "ftp_price",
+    "risk",
+    "atr_at_trigger",
+    "triggered_at",
+    "triggered_at_ms",
+    "signal_id",
+    "id",
+}
+
+
+LIVE_UPDATE_FIELDS = {
+    "current_price",
+    "price",
+    "price_change_pct",
+    "oi_change_pct",
+    "oi_value",
+    "oi_value_usdt",
+    "taker_buy_ratio",
+    "detected_at",
+    "snapshot_data",
+    "mtf_5m_confluence",
+    "mtf_5m_oi_confluence",
+    "mtf_5m_oi_change_pct",
+    "mtf_5m_price_change_pct",
+    "mtf_5m_oi_percentile",
+}
+
+
+def merge_locked_signal(old: dict[str, object], new: dict[str, object]) -> dict[str, object]:
+    merged = dict(old)
+    for field in LIVE_UPDATE_FIELDS:
+        if field in new and field not in LOCKED_SIGNAL_FIELDS:
+            merged[field] = new[field]
+    return normalize_row(merged)
 
 
 def validate_state_consistency(rows: list[dict[str, object]]) -> dict[str, int]:
@@ -938,8 +1012,9 @@ def validate_state_consistency(rows: list[dict[str, object]]) -> dict[str, int]:
             changed += 1
             closed += 1
         if target_order(row.get("max_reached_state")) >= target_order("tp2"):
-            if row.get("active_sl_price") != row.get("trigger_price"):
-                row["active_sl_price"] = row.get("trigger_price")
+            entry = row.get("entry_price") or row.get("trigger_price")
+            if row.get("active_sl_price") != entry:
+                row["active_sl_price"] = entry
                 changed += 1
     return {"checked": len(rows), "changed": changed, "closed": closed}
 
@@ -1006,6 +1081,7 @@ def format_cvd_divergence_signal(symbol: str, snapshots: list[object], config: S
         "triggered_at_ms": int(getattr(snapshot, "timestamp")),
         "triggered_at": iso_ms(int(getattr(snapshot, "timestamp"))),
         "trigger_price": price,
+        "entry_price": price,
         "atr_at_trigger": atr_value,
         "sl_price": sl,
         "tp1_price": tp1,
@@ -1163,12 +1239,21 @@ def main() -> None:
         print(f"coinglass_contract_signals={len(contract_signals)}")
 
     by_id = {str(row.get("id") or signal_id(row)): row for row in existing}
+    max_same_side = int(os.getenv("MAX_ACTIVE_PER_SYMBOL_SIDE", "2"))
+    active_counts = active_position_counts(existing)
     new_count = 0
     for row in found:
         row_id = str(row.get("id") or signal_id(row))
-        if row_id not in by_id:
-            new_count += 1
-        by_id[row_id] = row
+        if row_id in by_id:
+            by_id[row_id] = merge_locked_signal(by_id[row_id], row)
+            continue
+        key = position_key(row)
+        if active_counts.get(key, 0) >= max_same_side:
+            continue
+        new_count += 1
+        by_id[row_id] = normalize_row(row)
+        if is_active_position(row):
+            active_counts[key] = active_counts.get(key, 0) + 1
     rows_for_state = list(by_id.values())
     state_audit = update_existing_states(rows_for_state)
     print(f"state_audit checked={state_audit['checked']} changed={state_audit['changed']} closed={state_audit['closed']}")
@@ -1183,7 +1268,7 @@ def main() -> None:
         key=lambda row: str(row.get("triggered_at") or row.get("detected_at") or ""),
         reverse=True,
     )
-    max_rows = int(os.getenv("MAX_SEED_ROWS", "3000"))
+    max_rows = int(os.getenv("MAX_SEED_ROWS", "10000"))
     allowed_errors = int(os.getenv("MAX_SCAN_ERRORS", str(max(5, int(len(symbols) * 0.05)))))
     scan_ok = bool(found) and len(errors) <= allowed_errors
     if scan_ok:
