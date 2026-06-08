@@ -326,7 +326,13 @@
     .oi-rank-group.bear .oi-rank-title { color: var(--bear); }
     .oi-rank-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid rgba(255,255,255,.055); font: 850 12px var(--mono); }
     .oi-rank-score { color: var(--muted); }
-    .visual-screener { position: relative; min-height: 360px; border: 1px solid var(--line); border-radius: 8px; background: radial-gradient(circle at 70% 20%, rgba(0,224,164,.13), transparent 32%), radial-gradient(circle at 20% 80%, rgba(255,85,119,.12), transparent 32%), var(--panel); overflow: hidden; margin-bottom: 22px; }
+    .visual-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .visual-toolbar button, .visual-toolbar input { height: 30px; }
+    .visual-toolbar button { padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; background: #101926; color: var(--muted); font-weight: 900; }
+    .visual-toolbar button.active { color: #061018; background: var(--bull); border-color: rgba(0,224,164,.7); }
+    .visual-toolbar input[type="range"] { width: 110px; accent-color: var(--accent); }
+    .visual-screener { position: relative; min-height: 420px; border: 1px solid var(--line); border-radius: 8px; background: radial-gradient(circle at 70% 20%, rgba(0,224,164,.13), transparent 32%), radial-gradient(circle at 20% 80%, rgba(255,85,119,.12), transparent 32%), linear-gradient(rgba(102,167,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.03) 1px, transparent 1px), var(--panel); background-size: auto, auto, 36px 36px, 36px 36px, auto; overflow: hidden; margin-bottom: 22px; touch-action: none; cursor: grab; }
+    .visual-screener.dragging { cursor: grabbing; }
     .visual-screener::before, .visual-screener::after { content: ""; position: absolute; background: rgba(255,255,255,.18); }
     .visual-screener::before { left: 50%; top: 0; bottom: 0; width: 1px; }
     .visual-screener::after { top: 50%; left: 0; right: 0; height: 1px; }
@@ -336,8 +342,8 @@
     .dot-symbol.bear { color: var(--bear); }
     .backtest-panel { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.92); margin-bottom: 22px; padding: 16px; }
     .backtest-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
-    .equity-chart { width: 100%; height: 180px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(rgba(102,167,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.04) 1px, transparent 1px), #060b12; background-size: 28px 28px; }
-    .chart-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 12px; }
+    .equity-chart { width: 100%; min-height: 320px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(rgba(102,167,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.04) 1px, transparent 1px), #060b12; background-size: 34px 34px; overflow: hidden; }
+    .chart-stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(118px,1fr)); gap: 10px; margin-top: 12px; }
     .chart-stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: rgba(255,255,255,.025); }
     .trade-row { cursor: pointer; }
     .trade-row:hover { background: rgba(255,255,255,.035); }
@@ -552,7 +558,13 @@
             <h2>合約異常視覺篩選器</h2>
             <div class="subline">X 軸為 OI 變化，Y 軸為價格/CVD 動能；只作篩選與預警，不代表已進場。</div>
           </div>
-          <span class="pill accent">四象限</span>
+          <div class="visual-toolbar">
+            <button class="active" data-visual-tf="5m">5M</button>
+            <button data-visual-tf="15m">15M</button>
+            <button data-visual-tf="1h">1H</button>
+            <input id="visualZoom" type="range" min="1" max="5" step="0.25" value="1.8" title="縮放">
+            <button id="visualReset">重置</button>
+          </div>
         </div>
         <div id="contractVisualScreener" class="visual-screener"></div>
       </section>
@@ -732,6 +744,11 @@
       lastError: "",
       busy: false,
       currentView: "dashboard",
+      visualTf: "5m",
+      visualZoom: 1.8,
+      visualPanX: 0,
+      visualPanY: 0,
+      visualDrag: null,
       soundUnlocked: false,
       priceBaselineReady: false
     };
@@ -780,6 +797,21 @@
     $("contractBiasFilter").addEventListener("change", renderContractRadar);
     $("qualitySearch").addEventListener("input", () => syncSearch("qualitySearch"));
     $("qualitySideFilter").addEventListener("change", renderHighQuality);
+    document.querySelectorAll("[data-visual-tf]").forEach(btn => btn.addEventListener("click", () => {
+      state.visualTf = btn.dataset.visualTf;
+      renderContractRadar();
+    }));
+    $("visualZoom").addEventListener("input", event => {
+      state.visualZoom = Number(event.target.value) || 1;
+      renderContractRadar();
+    });
+    $("visualReset").addEventListener("click", () => {
+      state.visualZoom = 1.8;
+      state.visualPanX = 0;
+      state.visualPanY = 0;
+      $("visualZoom").value = state.visualZoom;
+      renderContractRadar();
+    });
     $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
     $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
     $("modalClose").addEventListener("click", closeSymbolModal);
@@ -1357,6 +1389,7 @@
         .sort((a,b) => Number(b.quality_score || 0) - Number(a.quality_score || 0) || b.score - a.score);
       const wins = samples.filter(row => row.aligned).length;
       const rate = samples.length ? wins / samples.length * 100 : 0;
+      const formalTargets = targetHitStats(contractFormalSignals());
       const equity = [];
       let value = 0;
       for (const row of samples.slice().reverse()) {
@@ -1367,10 +1400,14 @@
       $("contractBacktestStats").innerHTML = [
         ["樣本數", samples.length, ""],
         ["方向命中率", `${fmt(rate, 1)}%`, rate >= 50 ? "bull-text" : "bear-text"],
+        ["正式TP1率", `${fmt(formalTargets.tp1, 1)}%`, "bull-text"],
+        ["正式TP2率", `${fmt(formalTargets.tp2, 1)}%`, "bull-text"],
+        ["正式TP3率", `${fmt(formalTargets.tp3, 1)}%`, "accent-text"],
+        ["正式FTP率", `${fmt(formalTargets.ftp, 1)}%`, "accent-text"],
         ["命中 / 失誤", `${wins} / ${samples.length - wins}`, ""],
         ["平均雷達分", fmt(samples.reduce((sum, row) => sum + row.score, 0) / Math.max(1, samples.length), 0), "accent-text"]
       ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
-      $("contractBacktestChart").innerHTML = equitySvg(equity);
+      $("contractBacktestChart").innerHTML = equitySvg(equity, [], {equity: value, rate, avgR: samples.length ? value / samples.length : 0, maxDrawdown: Math.min(0, ...equity), wins, losses: samples.length - wins});
     }
     function renderOiRankGroups(rows) {
       const groups = [
@@ -1438,17 +1475,24 @@
     function renderContractVisualScreener(rows) {
       const target = $("contractVisualScreener");
       if (!target) return;
+      document.querySelectorAll("[data-visual-tf]").forEach(btn => btn.classList.toggle("active", btn.dataset.visualTf === state.visualTf));
+      $("visualZoom").value = state.visualZoom;
+      const axis = visualAxisFields();
+      const scale = Number(state.visualZoom) || 1;
+      const panX = Number(state.visualPanX) || 0;
+      const panY = Number(state.visualPanY) || 0;
       const points = rows
         .filter(row => contractBias(row) !== "neutral")
-        .slice(0, isMobileView() ? 36 : 80)
+        .slice(0, isMobileView() ? 60 : 140)
         .map(row => {
-          const x = clamp(Number(row.oi_change_1h || row.oi_change_15m || 0), -16, 16);
-          const yRaw = Number(row.cvd_ratio_1h);
-          const y = clamp(Number.isFinite(yRaw) && Math.abs(yRaw) > 0.0001 ? yRaw : Number(row.price_change_15m || row.price_change_1h || 0), -16, 16);
-          const left = 50 + x / 32 * 86;
-          const top = 50 - y / 32 * 86;
+          const x = clamp(firstFinite(row, axis.x), -16, 16);
+          const yRaw = firstFinite(row, axis.yCvd, NaN);
+          const y = clamp(Number.isFinite(yRaw) && Math.abs(yRaw) > 0.0001 ? yRaw : firstFinite(row, axis.yPrice), -16, 16);
+          const left = 50 + panX + x / 32 * 86 * scale;
+          const top = 50 + panY - y / 32 * 86 * scale;
           const kind = contractBias(row) === "long" ? "bull" : "bear";
-          return `<button class="dot-symbol ${kind}" data-contract-symbol="${clean(row.symbol)}" style="left:${left}%;top:${top}%">${clean(row.symbol)}</button>`;
+          const size = clamp(Math.abs(Number(row.radar_score ?? row.score) || 0) / 14, 4, 9);
+          return `<button class="dot-symbol ${kind}" data-contract-symbol="${clean(row.symbol)}" title="${clean(row.symbol)} · OI ${fmt(x,2)} · 動能 ${fmt(y,2)}" style="left:${left}%;top:${top}%;font-size:${size + 7}px">${clean(row.symbol)}</button>`;
         }).join("");
       target.innerHTML = `
         <div class="quadrant-label bull-text" style="left:56%;top:9%">Q1 多頭建倉</div>
@@ -1457,6 +1501,44 @@
         <div class="quadrant-label bear-text" style="right:8%;bottom:9%">Q4 空頭建倉</div>
         ${points || `<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">等待合約異常資料</div>`}`;
       target.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol)));
+      bindVisualPanZoom(target);
+    }
+    function visualAxisFields() {
+      if (state.visualTf === "5m") return {x: ["oi_change_5m", "oi_change_15m", "oi_change_1h"], yCvd: ["cvd_ratio_5m", "cvd_ratio_15m", "cvd_ratio_1h"], yPrice: ["price_change_5m", "price_change_15m", "price_change_1h"]};
+      if (state.visualTf === "15m") return {x: ["oi_change_15m", "oi_change_1h"], yCvd: ["cvd_ratio_15m", "cvd_ratio_1h"], yPrice: ["price_change_15m", "price_change_1h"]};
+      return {x: ["oi_change_1h", "oi_change_15m"], yCvd: ["cvd_ratio_1h", "cvd_ratio_15m"], yPrice: ["price_change_1h", "price_change_15m", "price_change_24h"]};
+    }
+    function firstFinite(row, names, fallback = 0) {
+      const list = Array.isArray(names) ? names : [names];
+      for (const name of list) {
+        const value = Number(row[name]);
+        if (Number.isFinite(value)) return value;
+      }
+      return fallback;
+    }
+    function bindVisualPanZoom(target) {
+      target.onwheel = event => {
+        event.preventDefault();
+        state.visualZoom = clamp(state.visualZoom + (event.deltaY < 0 ? 0.25 : -0.25), 1, 5);
+        renderContractRadar();
+      };
+      target.onpointerdown = event => {
+        if (event.target.closest(".dot-symbol")) return;
+        target.setPointerCapture?.(event.pointerId);
+        target.classList.add("dragging");
+        state.visualDrag = {x: event.clientX, y: event.clientY, panX: state.visualPanX, panY: state.visualPanY};
+      };
+      target.onpointermove = event => {
+        if (!state.visualDrag) return;
+        const rect = target.getBoundingClientRect();
+        state.visualPanX = clamp(state.visualDrag.panX + (event.clientX - state.visualDrag.x) / rect.width * 100, -80, 80);
+        state.visualPanY = clamp(state.visualDrag.panY + (event.clientY - state.visualDrag.y) / rect.height * 100, -80, 80);
+        renderContractRadar();
+      };
+      target.onpointerup = target.onpointercancel = () => {
+        state.visualDrag = null;
+        target.classList.remove("dragging");
+      };
     }
     function contractTradePlan(row) {
       const entry = Number(row.alert_price || row.entry_price || row.price || 0);
@@ -1703,18 +1785,33 @@
       const wins = all.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).length;
       const losses = all.filter(s => s.reached_state === "sl").length;
       const rate = wins + losses ? wins / (wins + losses) * 100 : 0;
+      const avgWin = wins ? all.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).reduce((sum, s) => sum + pnlPct(s, false), 0) / wins : 0;
+      const avgR = all.length ? equity / all.length : 0;
+      const targetStats = targetHitStats(all);
       $(metaId).textContent = `${all.length} trades`;
       $(statsId).innerHTML = [
         ["交易數", all.length, ""],
         ["勝率", `${fmt(rate, 1)}%`, "bull-text"],
+        ["TP1率", `${fmt(targetStats.tp1, 1)}%`, "bull-text"],
+        ["TP2率", `${fmt(targetStats.tp2, 1)}%`, "bull-text"],
+        ["TP3率", `${fmt(targetStats.tp3, 1)}%`, "accent-text"],
+        ["FTP率", `${fmt(targetStats.ftp, 1)}%`, "accent-text"],
+        ["平均獲利", signed(avgWin), "bull-text"],
+        ["平均R", signed(avgR), avgR >= 0 ? "bull-text" : "bear-text"],
         ["最大回撤", signed(maxDrawdown), "bear-text"],
         ["累積盈虧", signed(equity), equity >= 0 ? "bull-text" : "bear-text"]
       ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
-      $(chartId).innerHTML = equitySvg(points);
+      $(chartId).innerHTML = equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses});
     }
-    function equitySvg(values) {
+    function targetHitStats(rows) {
+      const decided = rows.filter(s => ["sl","tp1","tp2","tp3","ftp"].includes(s.reached_state));
+      const total = Math.max(1, decided.length);
+      const hit = target => decided.filter(s => targetOrder(s.reached_state) >= targetOrder(target)).length / total * 100;
+      return {tp1: hit("tp1"), tp2: hit("tp2"), tp3: hit("tp3"), ftp: hit("ftp")};
+    }
+    function equitySvg(values, rows = [], summary = {}) {
       if (!values.length) return `<div class="empty">尚無可回測樣本。</div>`;
-      const w = 900, h = 180, pad = 18;
+      const w = 1200, h = 320, pad = 44;
       const min = Math.min(0, ...values);
       const max = Math.max(0, ...values);
       const span = Math.max(1, max - min);
@@ -1725,10 +1822,27 @@
       });
       const path = xy.map(([x,y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
       const zeroY = h - pad - ((0 - min) / span) * (h - pad * 2);
+      const lastY = xy.length ? xy[xy.length - 1][1] : zeroY;
+      const markers = xy.map(([x,y], i) => {
+        if (i % Math.max(1, Math.ceil(xy.length / 55)) !== 0 && i !== xy.length - 1) return "";
+        const row = rows[i] || {};
+        const cls = pnlPct(row, false) >= 0 ? "#b36bff" : "#ff5577";
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${cls}" stroke="#090f17" stroke-width="1.5"><title>${clean(row.symbol || "")} ${shortTime(row.triggered_at)} ${signed(pnlPct(row, false))}</title></circle>`;
+      }).join("");
       return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" role="img" aria-label="equity curve">
-        <line x1="${pad}" y1="${zeroY}" x2="${w-pad}" y2="${zeroY}" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 5"/>
-        <path d="${path}" fill="none" stroke="#00e0a4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="${path} L${w-pad} ${h-pad} L${pad} ${h-pad} Z" fill="rgba(0,224,164,.08)"/>
+        <defs>
+          <linearGradient id="eqFill" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#00e0a4" stop-opacity=".26"/><stop offset="1" stop-color="#00e0a4" stop-opacity=".02"/></linearGradient>
+        </defs>
+        ${[0, .25, .5, .75, 1].map(t => `<line x1="${pad}" y1="${pad + t * (h - pad * 2)}" x2="${w-pad}" y2="${pad + t * (h - pad * 2)}" stroke="rgba(255,255,255,.07)" stroke-dasharray="7 8"/>`).join("")}
+        <line x1="${pad}" y1="${zeroY}" x2="${w-pad}" y2="${zeroY}" stroke="rgba(255,255,255,.22)"/>
+        <path d="${path} L${w-pad} ${h-pad} L${pad} ${h-pad} Z" fill="url(#eqFill)"/>
+        <path d="${path}" fill="none" stroke="#00e0a4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        ${markers}
+        <line x1="${w-pad}" y1="${pad}" x2="${w-pad}" y2="${h-pad}" stroke="rgba(179,107,255,.35)" stroke-dasharray="6 7"/>
+        <text x="${pad}" y="${pad - 16}" fill="#b36bff" font-size="13" font-weight="900">累計R</text>
+        <text x="${pad}" y="${pad + 14}" fill="#00e0a4" font-size="24" font-weight="950">${signed(summary.equity || values[values.length - 1])}</text>
+        <text x="${pad}" y="${pad + 40}" fill="#7791ad" font-size="12">勝率 ${fmt(summary.rate || 0,1)}% · 平均 ${signed(summary.avgR || 0)} · 回撤 ${signed(summary.maxDrawdown || 0)}</text>
+        <text x="${w - pad - 8}" y="${lastY - 8}" text-anchor="end" fill="#dceaff" font-size="13" font-weight="900">${signed(values[values.length - 1])}</text>
       </svg>`;
     }
     function renderReview() {
