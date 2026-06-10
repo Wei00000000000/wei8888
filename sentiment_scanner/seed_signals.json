@@ -1,5 +1,43 @@
 [
   {
+    "symbol": "WIFUSDT",
+    "timeframe": "5M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "cvd_5m_bullish_divergence",
+    "triggered_at_ms": 1781120400000,
+    "triggered_at": "2026-06-10T19:40:00+00:00",
+    "trigger_price": 0.1488,
+    "entry_price": 0.1488,
+    "atr_at_trigger": 0.0007781548980004638,
+    "sl_price": 0.14685461275499884,
+    "tp1_price": 0.15074538724500114,
+    "tp2_price": 0.15269077449000232,
+    "tp3_price": 0.15463616173500347,
+    "ftp_price": 0.1585269362250058,
+    "risk": 0.0019453872450011594,
+    "sl_source": "atr",
+    "oi_percentile": 45.36082474226804,
+    "oi_change_pct": -0.07524551743009394,
+    "price_change_pct": -0.06715916722633763,
+    "taker_buy_ratio": 0.4816127603012849,
+    "oi_value": 22494701.0,
+    "oi_value_usdt": 3347211.5088,
+    "snapshot_data": {
+      "divergence": "price_down_cvd_up",
+      "divergence_label": "bottom_divergence",
+      "interval": "5m",
+      "cvd_change_pct": 23.00688976377953,
+      "cvd_percentile": 100.0,
+      "cvd_window_bars": 3
+    },
+    "established_at": "2026-06-10T19:40:00+00:00",
+    "id": "66abfa7c-39e8-58ae-b164-87871a614b62",
+    "signal_id": "66abfa7c-39e8-58ae-b164-87871a614b62",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-10T19:42:04.777566+00:00"
+  },
+  {
     "symbol": "BSBUSDT",
     "timeframe": "15M",
     "signal_type": "reversal_bullish",
@@ -900,8 +938,12 @@
     "id": "024fbe00-59f9-5c0d-8532-24d5bc26dd69",
     "signal_id": "024fbe00-59f9-5c0d-8532-24d5bc26dd69",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-10T19:29:01.142412+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-10T19:29:01.142412+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 201.87149076823863,
+    "hit_at": "2026-06-10T19:35:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "EWYUSDT",
@@ -11472,12 +11514,13 @@
     "id": "ee6f073e-cb7c-50e4-a012-fd931a4257f6",
     "signal_id": "ee6f073e-cb7c-50e4-a012-fd931a4257f6",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-06-10T15:07:12.198343+00:00",
-    "max_reached_state": "tp1",
-    "hit_price": 0.020531653431796908,
-    "hit_at": "2026-06-10T16:45:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 0.019923306863593816,
+    "hit_at": "2026-06-10T19:35:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 0.02114
   },
   {
     "symbol": "QCOMUSDT",
