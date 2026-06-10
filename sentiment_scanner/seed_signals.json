@@ -1,5 +1,43 @@
 [
   {
+    "symbol": "PUMPUSDT",
+    "timeframe": "5M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "cvd_5m_bullish_divergence",
+    "triggered_at_ms": 1781110800000,
+    "triggered_at": "2026-06-10T17:00:00+00:00",
+    "trigger_price": 0.00143,
+    "entry_price": 0.00143,
+    "atr_at_trigger": 1.0441994839243598e-05,
+    "sl_price": 0.001403895012901891,
+    "tp1_price": 0.0014561049870981091,
+    "tp2_price": 0.001482209974196218,
+    "tp3_price": 0.001508314961294327,
+    "ftp_price": 0.001560524935490545,
+    "risk": 2.6104987098108993e-05,
+    "sl_source": "atr",
+    "oi_percentile": 39.795918367346935,
+    "oi_change_pct": 0.09870532757420165,
+    "price_change_pct": -0.41782729805013435,
+    "taker_buy_ratio": 0.7307552619290569,
+    "oi_value": 4420534.0,
+    "oi_value_usdt": 6321363.62,
+    "snapshot_data": {
+      "divergence": "price_down_cvd_up",
+      "divergence_label": "bottom_divergence",
+      "interval": "5m",
+      "cvd_change_pct": 46.15105238581138,
+      "cvd_percentile": 100.0,
+      "cvd_window_bars": 3
+    },
+    "established_at": "2026-06-10T17:00:00+00:00",
+    "id": "3246a804-133d-53d0-9f8c-5eadcc2d7519",
+    "signal_id": "3246a804-133d-53d0-9f8c-5eadcc2d7519",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-10T17:01:41.612866+00:00"
+  },
+  {
     "symbol": "BLENDUSDT",
     "timeframe": "5M",
     "signal_type": "reversal_bearish",
@@ -191,8 +229,12 @@
     "id": "e151e183-9211-5f3a-aea4-3471bb05cbe4",
     "signal_id": "e151e183-9211-5f3a-aea4-3471bb05cbe4",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-10T16:57:33.177335+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-10T16:57:33.177335+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.11122960000000001,
+    "hit_at": "2026-06-10T17:00:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "ORDIUSDT",
@@ -975,12 +1017,13 @@
     "id": "6378ae99-3614-5072-bfeb-1829efd74f1c",
     "signal_id": "6378ae99-3614-5072-bfeb-1829efd74f1c",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-06-10T16:36:59.387326+00:00",
-    "max_reached_state": "tp1",
-    "hit_price": 0.21448192,
-    "hit_at": "2026-06-10T16:45:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 0.22032384,
+    "hit_at": "2026-06-10T17:00:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 0.20864
   },
   {
     "symbol": "SOXLUSDT",
