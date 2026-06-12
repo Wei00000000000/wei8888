@@ -1,5 +1,91 @@
 [
   {
+    "symbol": "EDENUSDT",
+    "timeframe": "15M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "coinglass_contract_long_price_24h",
+    "triggered_at_ms": 1781259967547,
+    "triggered_at": "2026-06-12T10:26:07.547000+00:00",
+    "trigger_price": 0.04317,
+    "entry_price": 0.04317,
+    "atr_at_trigger": 0.00048350400000000005,
+    "sl_price": 0.04196124,
+    "tp1_price": 0.04437876,
+    "tp2_price": 0.04558752,
+    "tp3_price": 0.04679628,
+    "ftp_price": 0.0492138,
+    "risk": 0.0012087600000000001,
+    "sl_source": "coinglass_risk_pct",
+    "oi_percentile": 90.75,
+    "oi_change_pct": null,
+    "price_change_pct": -2.6381059751972886,
+    "taker_buy_ratio": null,
+    "oi_value": 0,
+    "oi_value_usdt": null,
+    "source": "coinglass_contract_scan",
+    "snapshot_data": {
+      "contract_radar": true,
+      "radar_score": 22,
+      "bias": "long",
+      "trigger": "price_24h",
+      "market_label": "價格動能",
+      "cvd_ratio_1h": null,
+      "funding_rate": -0.008167559306494999,
+      "long_short_ratio_1h": null,
+      "quality_score": 1,
+      "quality_text": "一般"
+    },
+    "established_at": "2026-06-12T10:26:07.547000+00:00",
+    "id": "aa13190d-c3af-58b0-8fe5-5996e637bb34",
+    "signal_id": "aa13190d-c3af-58b0-8fe5-5996e637bb34",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-12T10:26:54.673887+00:00"
+  },
+  {
+    "symbol": "HOMEUSDT",
+    "timeframe": "15M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "coinglass_contract_long_price_5m",
+    "triggered_at_ms": 1781259900000,
+    "triggered_at": "2026-06-12T10:25:00+00:00",
+    "trigger_price": 0.02741,
+    "entry_price": 0.02741,
+    "atr_at_trigger": 0.000306992,
+    "sl_price": 0.02664252,
+    "tp1_price": 0.02817748,
+    "tp2_price": 0.02894496,
+    "tp3_price": 0.02971244,
+    "ftp_price": 0.0312474,
+    "risk": 0.0007674800000000001,
+    "sl_source": "coinglass_risk_pct",
+    "oi_percentile": 100.0,
+    "oi_change_pct": -1.25,
+    "price_change_pct": -5.2540615278257885,
+    "taker_buy_ratio": null,
+    "oi_value": 0,
+    "oi_value_usdt": 1074299232.1137,
+    "source": "coinglass_contract_scan",
+    "snapshot_data": {
+      "contract_radar": true,
+      "radar_score": 100,
+      "bias": "long",
+      "trigger": "price_5m",
+      "market_label": "觀察",
+      "cvd_ratio_1h": -4.504564315352697,
+      "funding_rate": -0.43173867056809745,
+      "long_short_ratio_1h": 0.7495,
+      "quality_score": 4,
+      "quality_text": "高品質"
+    },
+    "established_at": "2026-06-12T10:25:00+00:00",
+    "id": "1e48749a-2db3-5f35-a13f-8b4c446c79f0",
+    "signal_id": "1e48749a-2db3-5f35-a13f-8b4c446c79f0",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-12T10:26:54.673812+00:00"
+  },
+  {
     "symbol": "SOPHUSDT",
     "timeframe": "15M",
     "signal_type": "reversal_bullish",
@@ -249,8 +335,12 @@
     "id": "d1355535-fceb-577c-817e-e3df493c3b18",
     "signal_id": "d1355535-fceb-577c-817e-e3df493c3b18",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T10:16:44.843752+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T10:16:44.843752+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.09919219063116252,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "RENDERUSDT",
@@ -287,8 +377,12 @@
     "id": "808d3e8b-b5a5-59b4-bd4a-527ee5b27e9e",
     "signal_id": "808d3e8b-b5a5-59b4-bd4a-527ee5b27e9e",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T10:16:53.824061+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T10:16:53.824061+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 1.6618690226811466,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "ZBTUSDT",
@@ -367,9 +461,13 @@
     "established_at": "2026-06-12T10:11:03.180000+00:00",
     "id": "e9f3df72-5161-5931-9ef9-255e45ba5d28",
     "signal_id": "e9f3df72-5161-5931-9ef9-255e45ba5d28",
-    "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T10:11:49.312671+00:00"
+    "status": "closed",
+    "reached_state": "sl",
+    "detected_at": "2026-06-12T10:11:49.312671+00:00",
+    "max_reached_state": "holding",
+    "hit_price": 0.2270106,
+    "hit_at": "2026-06-12T10:15:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "ZBTUSDT",
@@ -525,8 +623,12 @@
     "id": "bb9233d3-3ee3-5dd9-ac03-2fc39f3042ce",
     "signal_id": "bb9233d3-3ee3-5dd9-ac03-2fc39f3042ce",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T10:11:31.734458+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T10:11:31.734458+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 212.89215877603465,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "ORDIUSDT",
@@ -865,8 +967,12 @@
     "id": "20e86d04-15a3-527d-881e-f39ae247d258",
     "signal_id": "20e86d04-15a3-527d-881e-f39ae247d258",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T10:06:23.258342+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T10:06:23.258342+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 224.07973511314168,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "ALLOUSDT",
@@ -941,8 +1047,12 @@
     "id": "5d30942f-365a-5c9a-ae0a-82665eeef81a",
     "signal_id": "5d30942f-365a-5c9a-ae0a-82665eeef81a",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T10:06:40.483674+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T10:06:40.483674+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 720.0346107129706,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "LITEUSDT",
@@ -1144,8 +1254,12 @@
     "id": "eda8ff64-ea56-529b-8312-7d048106d29b",
     "signal_id": "eda8ff64-ea56-529b-8312-7d048106d29b",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T10:01:54.400586+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T10:01:54.400586+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 42.89935819300961,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "LITEUSDT",
@@ -1301,8 +1415,12 @@
     "id": "3c48c7c6-33b2-50a9-914d-562f75703334",
     "signal_id": "3c48c7c6-33b2-50a9-914d-562f75703334",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:56:31.977294+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:56:31.977294+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 1.5871862128904037,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "WLFIUSDT",
@@ -1495,8 +1613,12 @@
     "id": "5ef07970-7adf-505f-8989-775d208129de",
     "signal_id": "5ef07970-7adf-505f-8989-775d208129de",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:56:59.389738+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:56:59.389738+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 160.97966650327757,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "COAIUSDT",
@@ -1538,11 +1660,11 @@
     "id": "4826783a-50c3-56b7-9ca8-36880a94f638",
     "signal_id": "4826783a-50c3-56b7-9ca8-36880a94f638",
     "status": "active",
-    "reached_state": "tp2",
+    "reached_state": "tp3",
     "detected_at": "2026-06-12T09:52:16.373039+00:00",
-    "max_reached_state": "tp2",
-    "hit_price": 0.32978880000000005,
-    "hit_at": "2026-06-12T10:00:00+00:00",
+    "max_reached_state": "tp3",
+    "hit_price": 0.33853320000000003,
+    "hit_at": "2026-06-12T10:15:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
     "active_sl_price": 0.3123
   },
@@ -1624,8 +1746,12 @@
     "id": "2d026f84-3ea8-5edf-a256-ddb9b38911ff",
     "signal_id": "2d026f84-3ea8-5edf-a256-ddb9b38911ff",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:51:26.017813+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:51:26.017813+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 2.819913116133514e-06,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "SUIUSDT",
@@ -1742,8 +1868,12 @@
     "id": "4cab0652-0656-5c46-8b0a-c937238b7070",
     "signal_id": "4cab0652-0656-5c46-8b0a-c937238b7070",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:51:47.099299+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:51:47.099299+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 64.67280698906129,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "DOTUSDT",
@@ -1780,8 +1910,12 @@
     "id": "9f04847f-1b67-5daf-9225-d06eb74d9b54",
     "signal_id": "9f04847f-1b67-5daf-9225-d06eb74d9b54",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:51:48.680984+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:51:48.680984+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.9588140772170062,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "APTUSDT",
@@ -1864,12 +1998,12 @@
     "established_at": "2026-06-12T09:50:00+00:00",
     "id": "d0a78129-60a7-5c19-88e6-6ef965052646",
     "signal_id": "d0a78129-60a7-5c19-88e6-6ef965052646",
-    "status": "active",
-    "reached_state": "tp1",
+    "status": "closed",
+    "reached_state": "sl",
     "detected_at": "2026-06-12T09:52:16.372993+00:00",
     "max_reached_state": "tp1",
-    "hit_price": 0.23877356,
-    "hit_at": "2026-06-12T10:00:00+00:00",
+    "hit_price": 0.22576644,
+    "hit_at": "2026-06-12T10:15:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first"
   },
   {
@@ -2025,8 +2159,12 @@
     "id": "17982a3e-1bef-5dc3-bd0f-d32b721e9f52",
     "signal_id": "17982a3e-1bef-5dc3-bd0f-d32b721e9f52",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:46:42.900161+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:46:42.900161+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 42.86286021011478,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "HUSDT",
@@ -2157,8 +2295,12 @@
     "id": "4e4eb8c0-2733-566d-aac2-47b12e2fc272",
     "signal_id": "4e4eb8c0-2733-566d-aac2-47b12e2fc272",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:41:17.915213+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:41:17.915213+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.08645259616509152,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "SOXLUSDT",
@@ -2233,8 +2375,12 @@
     "id": "023afdf6-8919-59b9-9e1b-4abdb408b58a",
     "signal_id": "023afdf6-8919-59b9-9e1b-4abdb408b58a",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:41:30.765782+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:41:30.765782+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 604.6807193985054,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "TAOUSDT",
@@ -2271,8 +2417,12 @@
     "id": "67c1110e-382c-5ad7-8fb0-f9651a62e69b",
     "signal_id": "67c1110e-382c-5ad7-8fb0-f9651a62e69b",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:41:51.666541+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:41:51.666541+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 213.1182057589915,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "ORDIUSDT",
@@ -2515,8 +2665,12 @@
     "id": "c2d6ddce-00bd-581f-ba4e-913445daca2e",
     "signal_id": "c2d6ddce-00bd-581f-ba4e-913445daca2e",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:36:24.090017+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:36:24.090017+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 2.81509767440568e-06,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "MSTRUSDT",
@@ -2553,8 +2707,12 @@
     "id": "271c40cb-d52a-5ff5-903d-dc45c924fc88",
     "signal_id": "271c40cb-d52a-5ff5-903d-dc45c924fc88",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:36:50.552820+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:36:50.552820+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 120.87443251904747,
+    "hit_at": "2026-06-12T10:20:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "PENGUUSDT",
@@ -2591,8 +2749,12 @@
     "id": "3a383033-059b-5139-9ab0-3f75b88d6fb4",
     "signal_id": "3a383033-059b-5139-9ab0-3f75b88d6fb4",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:36:56.858955+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:36:56.858955+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.006751806958520356,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "PYTHUSDT",
@@ -3123,8 +3285,12 @@
     "id": "8c2d0b74-56d6-5b39-a6b5-dd2419ecc90d",
     "signal_id": "8c2d0b74-56d6-5b39-a6b5-dd2419ecc90d",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T09:27:05.638861+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T09:27:05.638861+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.6164749536137543,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "WLFIUSDT",
@@ -4233,12 +4399,13 @@
     "id": "404c42e8-0bb0-57e0-8407-040a2c17b6e0",
     "signal_id": "404c42e8-0bb0-57e0-8407-040a2c17b6e0",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-06-12T08:57:10.621410+00:00",
-    "max_reached_state": "tp1",
-    "hit_price": 0.03161901427615119,
-    "hit_at": "2026-06-12T10:00:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 0.031128028552302383,
+    "hit_at": "2026-06-12T10:20:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 0.03211
   },
   {
     "symbol": "XPLUSDT",
@@ -4643,8 +4810,12 @@
     "id": "680103ec-9268-5fbd-82f3-cda5a30dbc5f",
     "signal_id": "680103ec-9268-5fbd-82f3-cda5a30dbc5f",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T08:41:26.477769+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T08:41:26.477769+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 83.32405953765203,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "BZUSDT",
@@ -4681,8 +4852,12 @@
     "id": "8f9ccd13-01fa-598c-acba-632d4a6f9ec1",
     "signal_id": "8f9ccd13-01fa-598c-acba-632d4a6f9ec1",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T08:41:42.606499+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T08:41:42.606499+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 86.29500637298418,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "EDENUSDT",
@@ -5164,12 +5339,12 @@
     "established_at": "2026-06-12T08:30:00+00:00",
     "id": "d86d3aca-1886-52d7-8a6e-2cf919484efc",
     "signal_id": "d86d3aca-1886-52d7-8a6e-2cf919484efc",
-    "status": "active",
-    "reached_state": "tp3",
+    "status": "closed",
+    "reached_state": "sl",
     "detected_at": "2026-06-12T08:32:19.535089+00:00",
     "max_reached_state": "tp3",
-    "hit_price": 0.00038059240000000005,
-    "hit_at": "2026-06-12T09:30:00+00:00",
+    "hit_price": 0.0003511,
+    "hit_at": "2026-06-12T10:15:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
     "active_sl_price": 0.0003511
   },
@@ -5340,8 +5515,12 @@
     "id": "5e6c26e6-6dde-5a67-803a-93ff7251236a",
     "signal_id": "5e6c26e6-6dde-5a67-803a-93ff7251236a",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T08:26:19.646905+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T08:26:19.646905+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 83.2985613888481,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "EWYUSDT",
@@ -5637,8 +5816,12 @@
     "id": "b967d5ad-8120-563e-b17d-49d4c1bf801d",
     "signal_id": "b967d5ad-8120-563e-b17d-49d4c1bf801d",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-12T08:21:32.887468+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-12T08:21:32.887468+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 86.07749868087679,
+    "hit_at": "2026-06-12T10:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "PIPPINUSDT",
@@ -47489,12 +47672,12 @@
     "established_at": "2026-06-11T15:25:00+00:00",
     "id": "f535859d-5b7f-556c-ab81-00ea4a9d7e17",
     "signal_id": "f535859d-5b7f-556c-ab81-00ea4a9d7e17",
-    "status": "active",
-    "reached_state": "tp2",
+    "status": "closed",
+    "reached_state": "sl",
     "detected_at": "2026-06-11T15:27:18.022979+00:00",
     "max_reached_state": "tp2",
-    "hit_price": 0.03279957028712212,
-    "hit_at": "2026-06-11T23:50:00+00:00",
+    "hit_price": 0.033619,
+    "hit_at": "2026-06-12T10:25:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
     "active_sl_price": 0.033619
   },
@@ -435539,90 +435722,5 @@
     "state_resolution": "chronological_ohlc_stop_first",
     "entry_price": 0.675,
     "signal_id": "461045a9-84df-5d89-b447-cdf53e8ad910"
-  },
-  {
-    "symbol": "SPCXUSDT",
-    "timeframe": "5M",
-    "signal_type": "reversal_bullish",
-    "setup_id": "cvd_5m_bullish_divergence",
-    "triggered_at_ms": 1780798200000,
-    "triggered_at": "2026-06-07T02:10:00+00:00",
-    "trigger_price": 164.67,
-    "atr_at_trigger": 0.6751593112365347,
-    "sl_price": 162.98210172190866,
-    "tp1_price": 166.3578982780913,
-    "tp2_price": 168.04579655618267,
-    "tp3_price": 169.733694834274,
-    "ftp_price": 173.10949139045667,
-    "risk": 1.6878982780913367,
-    "sl_source": "atr",
-    "oi_percentile": 61.224489795918366,
-    "oi_change_pct": -0.031727446545539,
-    "price_change_pct": -0.2846070001211087,
-    "taker_buy_ratio": 0.6641717791411044,
-    "oi_value": 108893.21,
-    "oi_value_usdt": 17904221.5882,
-    "snapshot_data": {
-      "divergence": "price_down_cvd_up",
-      "divergence_label": "bottom_divergence",
-      "interval": "5m",
-      "cvd_change_pct": 6.532534246575364,
-      "cvd_percentile": 100.0,
-      "cvd_window_bars": 3
-    },
-    "established_at": "2026-06-07T02:10:00+00:00",
-    "id": "d8084a79-7990-5025-8072-746497c87799",
-    "status": "closed",
-    "reached_state": "sl",
-    "detected_at": "2026-06-07T02:11:02.591042+00:00",
-    "max_reached_state": "holding",
-    "hit_price": 162.98210172190866,
-    "hit_at": "2026-06-07T02:30:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first",
-    "entry_price": 164.67,
-    "signal_id": "d8084a79-7990-5025-8072-746497c87799"
-  },
-  {
-    "symbol": "OPUSDT",
-    "timeframe": "5M",
-    "signal_type": "reversal_bearish",
-    "setup_id": "cvd_5m_bearish_divergence",
-    "triggered_at_ms": 1780798200000,
-    "triggered_at": "2026-06-07T02:10:00+00:00",
-    "trigger_price": 0.0961,
-    "atr_at_trigger": 0.0005398880896986251,
-    "sl_price": 0.09744972022424657,
-    "tp1_price": 0.09475027977575344,
-    "tp2_price": 0.09340055955150688,
-    "tp3_price": 0.09205083932726031,
-    "ftp_price": 0.0893513988787672,
-    "risk": 0.0013497202242465627,
-    "sl_source": "atr",
-    "oi_percentile": 94.89795918367348,
-    "oi_change_pct": -0.36234721455398516,
-    "price_change_pct": 0.20855057351408315,
-    "taker_buy_ratio": 0.4238722944438931,
-    "oi_value": 40586810.0,
-    "oi_value_usdt": 3892275.079,
-    "snapshot_data": {
-      "divergence": "price_up_cvd_down",
-      "divergence_label": "top_divergence",
-      "interval": "5m",
-      "cvd_change_pct": -23.287139145109876,
-      "cvd_percentile": 100.0,
-      "cvd_window_bars": 3
-    },
-    "established_at": "2026-06-07T02:10:00+00:00",
-    "id": "0f50a8ff-a2e9-52e2-b4a5-bf612e1c66ba",
-    "status": "closed",
-    "reached_state": "sl",
-    "detected_at": "2026-06-07T02:11:03.920037+00:00",
-    "max_reached_state": "tp3",
-    "hit_price": 0.0961,
-    "hit_at": "2026-06-07T22:10:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first",
-    "entry_price": 0.0961,
-    "signal_id": "0f50a8ff-a2e9-52e2-b4a5-bf612e1c66ba",
-    "active_sl_price": 0.0961
   }
 ]
