@@ -1,5 +1,43 @@
 [
   {
+    "symbol": "TONUSDT",
+    "timeframe": "5M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "cvd_5m_bullish_divergence",
+    "triggered_at_ms": 1781391000000,
+    "triggered_at": "2026-06-13T22:50:00+00:00",
+    "trigger_price": 1.725,
+    "entry_price": 1.725,
+    "atr_at_trigger": 0.0056937361285406855,
+    "sl_price": 1.7107656596786485,
+    "tp1_price": 1.7392343403213517,
+    "tp2_price": 1.7534686806427036,
+    "tp3_price": 1.7677030209640552,
+    "ftp_price": 1.7961717016067587,
+    "risk": 0.014234340321351714,
+    "sl_source": "atr",
+    "oi_percentile": 13.26530612244898,
+    "oi_change_pct": 0.02446626084012827,
+    "price_change_pct": -0.2313475997686526,
+    "taker_buy_ratio": 0.6836149668074833,
+    "oi_value": 6447188.0,
+    "oi_value_usdt": 11127846.488,
+    "snapshot_data": {
+      "divergence": "price_down_cvd_up",
+      "divergence_label": "bottom_divergence",
+      "interval": "5m",
+      "cvd_change_pct": 29.954805664356734,
+      "cvd_percentile": 98.93617021276596,
+      "cvd_window_bars": 3
+    },
+    "established_at": "2026-06-13T22:50:00+00:00",
+    "id": "c08f0687-9243-5164-a09d-3e5f709fae6c",
+    "signal_id": "c08f0687-9243-5164-a09d-3e5f709fae6c",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-13T22:50:58.267856+00:00"
+  },
+  {
     "symbol": "BSBUSDT",
     "timeframe": "5M",
     "signal_type": "reversal_bullish",
@@ -1522,8 +1560,12 @@
     "id": "8af239af-8c97-5648-b865-d0396e1d79c7",
     "signal_id": "8af239af-8c97-5648-b865-d0396e1d79c7",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-13T21:55:46.281231+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-13T21:55:46.281231+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 6.725917219165411,
+    "hit_at": "2026-06-13T22:45:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "AAVEUSDT",
@@ -2046,8 +2088,12 @@
     "id": "52615054-6674-5901-8130-8e59ac983ffd",
     "signal_id": "52615054-6674-5901-8130-8e59ac983ffd",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-13T21:50:55.342637+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-13T21:50:55.342637+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 6.724064697563082,
+    "hit_at": "2026-06-13T22:45:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "ASTERUSDT",
@@ -2084,8 +2130,12 @@
     "id": "545a1bc9-7db5-526d-86f7-611c0f0003d7",
     "signal_id": "545a1bc9-7db5-526d-86f7-611c0f0003d7",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-13T21:51:17.489283+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-13T21:51:17.489283+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.6386159458926093,
+    "hit_at": "2026-06-13T22:45:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "SAHARAUSDT",
@@ -5435,12 +5485,13 @@
     "id": "fed8478c-a5de-55e8-b896-daf92f839dcb",
     "signal_id": "fed8478c-a5de-55e8-b896-daf92f839dcb",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-06-13T19:05:50.228417+00:00",
-    "max_reached_state": "tp1",
-    "hit_price": 0.1307305458129233,
-    "hit_at": "2026-06-13T20:25:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 0.1326110916258466,
+    "hit_at": "2026-06-13T22:45:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 0.12885
   },
   {
     "symbol": "COREUSDT",
@@ -437303,47 +437354,5 @@
     "state_resolution": "chronological_ohlc_stop_first",
     "entry_price": 0.02283,
     "signal_id": "d77787da-6376-5649-8810-4e275da0661b"
-  },
-  {
-    "symbol": "GRASSUSDT",
-    "timeframe": "5M",
-    "signal_type": "reversal_bearish",
-    "setup_id": "cvd_5m_bearish_divergence",
-    "triggered_at_ms": 1780811100000,
-    "triggered_at": "2026-06-07T05:45:00+00:00",
-    "trigger_price": 0.3527,
-    "atr_at_trigger": 0.0019384634370212639,
-    "sl_price": 0.3575461585925532,
-    "tp1_price": 0.34785384140744685,
-    "tp2_price": 0.3430076828148937,
-    "tp3_price": 0.3381615242223405,
-    "ftp_price": 0.3284692070372342,
-    "risk": 0.00484615859255316,
-    "sl_source": "atr",
-    "oi_percentile": 82.6530612244898,
-    "oi_change_pct": -0.21125043618633157,
-    "price_change_pct": 1.0891372886213888,
-    "taker_buy_ratio": 0.46513458552904907,
-    "oi_value": 4137977.0,
-    "oi_value_usdt": 1459464.4879,
-    "snapshot_data": {
-      "divergence": "price_up_cvd_down",
-      "divergence_label": "top_divergence",
-      "interval": "5m",
-      "cvd_change_pct": -6.973082894190191,
-      "cvd_percentile": 100.0,
-      "cvd_window_bars": 3
-    },
-    "established_at": "2026-06-07T05:45:00+00:00",
-    "id": "62ef5127-f97a-5839-9a89-390ebc60ee34",
-    "status": "closed",
-    "reached_state": "sl",
-    "detected_at": "2026-06-07T05:46:19.605879+00:00",
-    "max_reached_state": "holding",
-    "hit_price": 0.3575461585925532,
-    "hit_at": "2026-06-07T06:25:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first",
-    "entry_price": 0.3527,
-    "signal_id": "62ef5127-f97a-5839-9a89-390ebc60ee34"
   }
 ]
