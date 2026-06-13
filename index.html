@@ -340,6 +340,36 @@
     .dot-symbol { position: absolute; transform: translate(-50%, -50%); border: 1px solid currentColor; border-radius: 999px; padding: 4px 7px; background: rgba(5,10,16,.88); font: 950 11px var(--mono); cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
     .dot-symbol.bull { color: var(--bull); }
     .dot-symbol.bear { color: var(--bear); }
+    .visual-stage { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; pointer-events: none; }
+    .visual-stage .dot-symbol { pointer-events: auto; }
+    .decision-grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 14px; margin-bottom: 22px; }
+    .decision-panel { border: 1px solid var(--line); border-radius: 9px; background: rgba(10,17,25,.94); padding: 14px; }
+    .decision-list { display: grid; gap: 8px; margin-top: 10px; }
+    .decision-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; border-top: 1px solid var(--line); padding: 9px 0; cursor: pointer; }
+    .decision-row:first-child { border-top: 0; }
+    .decision-grade { display: inline-grid; place-items: center; width: 34px; height: 28px; border: 1px solid currentColor; border-radius: 7px; font: 950 14px var(--mono); }
+    .decision-card { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: rgba(4,9,14,.75); padding: 12px; }
+    .decision-scores { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-bottom: 10px; }
+    .decision-score { padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); }
+    .decision-score span { display: block; color: var(--faint); font-size: 10px; }
+    .decision-score b { display: block; margin-top: 3px; font: 950 14px var(--mono); }
+    .decision-copy { display: grid; gap: 6px; font-size: 12px; line-height: 1.55; color: #c7d8ef; }
+    .decision-copy b { color: var(--text); }
+    .grade-a { color: var(--bull); }
+    .grade-b { color: var(--warn); }
+    .grade-c { color: var(--info); }
+    .grade-x { color: var(--faint); }
+    .mode-toggle { min-width: 72px; border-radius: 999px; padding: 0 10px; width: auto; font-size: 11px; font-weight: 900; }
+    body.novice-mode .pro-only { display: none !important; }
+    .metric-help { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 4px; border: 1px solid var(--line-2); border-radius: 50%; color: var(--faint); font: 900 9px var(--mono); cursor: help; }
+    .signal-decision { margin-top: 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(4,9,14,.72); padding: 12px; }
+    .signal-decision-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .signal-decision-title { font-weight: 950; }
+    .signal-decision-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-top: 9px; }
+    .signal-decision-score { padding: 7px; border-radius: 7px; background: rgba(255,255,255,.035); border: 1px solid var(--line); }
+    .signal-decision-score span { display: block; color: var(--faint); font-size: 9px; }
+    .signal-decision-score b { display: block; margin-top: 3px; font: 950 13px var(--mono); }
+    .decision-line { margin-top: 8px; color: #b9cce4; font-size: 11px; line-height: 1.55; }
     .backtest-panel { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.92); margin-bottom: 22px; padding: 16px; }
     .backtest-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
     .equity-chart { width: 100%; min-height: 320px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(rgba(102,167,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(102,167,255,.04) 1px, transparent 1px), #060b12; background-size: 34px 34px; overflow: hidden; }
@@ -385,6 +415,11 @@
       .analysis-row { grid-template-columns: 1fr; gap: 5px; }
       .analysis-value { text-align: left; }
       .watch-footer { align-items: flex-start; flex-direction: column; }
+      .decision-grid { grid-template-columns: 1fr; }
+      .decision-scores { grid-template-columns: repeat(2,1fr); }
+      .signal-decision-grid { grid-template-columns: repeat(2,1fr); }
+      .brand-hero { min-height: 132px; }
+      .decision-panel { padding: 11px; }
     }
   </style>
 </head>
@@ -423,6 +458,7 @@
       <div class="top-actions">
         <button class="round-btn" id="bellBtn" title="通知">🔔<span id="bellBadge" class="badge"></span></button>
         <button class="round-btn" id="focusSearch" title="搜尋">⌕</button>
+        <button class="round-btn mode-toggle" id="modeToggle" title="切換新手與專業模式">專業</button>
         <button class="round-btn" id="langBtn" title="Language">中</button>
       </div>
     </div>
@@ -464,6 +500,16 @@
           <div class="subline">整合 15M OI 訊號、穩如老狗、5M 頂底背離、板塊資金流與模擬回測。</div>
         </div>
       </section>
+      <div class="section-head">
+        <div><span class="watch-title">一眼決策</span><span class="watch-sub">市場狀態、A 級訊號、風險與績效</span></div>
+      </div>
+      <div class="watch-stats" id="decisionMarketStats"></div>
+      <div class="decision-grid">
+        <section class="decision-panel"><div class="kicker">Top 5 A 級正式訊號</div><div class="decision-list" id="decisionTopSignals"></div></section>
+        <section class="decision-panel"><div class="kicker">高風險警報</div><div class="decision-list" id="decisionRiskAlerts"></div></section>
+        <section class="decision-panel"><div class="kicker">策略績效</div><div class="watch-stats" id="decisionPerformance"></div></section>
+        <section class="decision-panel"><div class="kicker">交易檢討摘要</div><div class="decision-list" id="decisionReview"></div></section>
+      </div>
       <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>諧波交易訊號</span></div>
       <div class="section-head">
         <div><span class="watch-title">板塊資金流動</span><span class="watch-sub" id="sectorMeta">等待更新</span></div>
@@ -749,6 +795,7 @@
       visualPanX: 0,
       visualPanY: 0,
       visualDrag: null,
+      displayMode: localStorage.getItem("wei_display_mode") || (matchMedia("(max-width: 760px)").matches ? "novice" : "pro"),
       soundUnlocked: false,
       priceBaselineReady: false
     };
@@ -779,6 +826,7 @@
     $("jumpSignals").addEventListener("click", () => setView("signals"));
     $("autoScan").addEventListener("click", toggleAutoScan);
     $("focusSearch").addEventListener("click", focusCurrentSearch);
+    $("modeToggle").addEventListener("click", toggleDisplayMode);
     document.addEventListener("pointerdown", unlockSoundOnce, {once: true});
     $("bellBtn").addEventListener("click", event => { event.stopPropagation(); unlockSoundOnce(); requestNotifyPermission(); toggleNotifyPanel(); });
     $("notifyClear").addEventListener("click", markNotificationsRead);
@@ -803,14 +851,14 @@
     }));
     $("visualZoom").addEventListener("input", event => {
       state.visualZoom = Number(event.target.value) || 1;
-      renderContractRadar();
+      applyVisualTransform();
     });
     $("visualReset").addEventListener("click", () => {
       state.visualZoom = 1.8;
       state.visualPanX = 0;
       state.visualPanY = 0;
       $("visualZoom").value = state.visualZoom;
-      renderContractRadar();
+      applyVisualTransform();
     });
     $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
     $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
@@ -822,6 +870,7 @@
     });
 
     initAccessGate();
+    applyDisplayMode();
     loadNotificationMemory();
     renderAll();
     status("Auto scanner warming up.");
@@ -833,6 +882,15 @@
     function initAccessGate() {
       if (sessionStorage.getItem("wei_strategy_access") === ACCESS_PASSWORD_HASH) $("loginGate").classList.add("hidden");
       setTimeout(() => $("accessPassword")?.focus(), 80);
+    }
+    function toggleDisplayMode() {
+      state.displayMode = state.displayMode === "pro" ? "novice" : "pro";
+      localStorage.setItem("wei_display_mode", state.displayMode);
+      applyDisplayMode();
+    }
+    function applyDisplayMode() {
+      document.body.classList.toggle("novice-mode", state.displayMode === "novice");
+      if ($("modeToggle")) $("modeToggle").textContent = state.displayMode === "novice" ? "新手" : "專業";
     }
     async function unlockApp() {
       const value = $("accessPassword").value || "";
@@ -1164,6 +1222,7 @@
 
     function renderAll() {
       renderStats();
+      renderDecisionDashboard();
       renderSectorFlows();
       renderVolumeAnomalies();
       renderContractRadar();
@@ -1177,13 +1236,78 @@
     }
     function renderFastMarketViews() {
       renderStats();
-      renderWatchDashboard();
-      renderSignals();
-      renderHighQuality();
-      renderStable();
-      renderContractRadar();
+      renderDecisionDashboard();
+      renderCurrentView();
       renderNotifications();
       renderHealth();
+    }
+    function renderCurrentView() {
+      if (state.currentView === "dashboard") {
+        renderSectorFlows();
+        renderVolumeAnomalies();
+        renderWatchDashboard();
+        renderSignals();
+      } else if (state.currentView === "signals") renderSignals();
+      else if (state.currentView === "quality") renderHighQuality();
+      else if (state.currentView === "stable") renderStable();
+      else if (state.currentView === "contract") renderContractRadar();
+      else if (state.currentView === "review") renderReview();
+    }
+    function renderDecisionDashboard() {
+      if (!$("decisionMarketStats")) return;
+      const all = dataSignals();
+      const active = sortSignals(all).filter(s => isOpenSignal(s) || isPartialActiveSignal(s));
+      const formal = active.filter(s => signalDecisionModel(s).grade === "A").slice(0, 5);
+      const btc = marketFor("BTC");
+      const eth = marketFor("ETH");
+      const riskAlerts = buildRiskAlerts().slice(0, 5);
+      const decided = all.filter(s => ["tp1","tp2","tp3","ftp","sl"].includes(s.reached_state));
+      const wins = decided.filter(s => s.reached_state !== "sl").length;
+      const reviewCounts = new Map();
+      all.filter(s => s.reached_state === "sl").forEach(s => reviewTags(s).forEach(tag => reviewCounts.set(tag, (reviewCounts.get(tag) || 0) + 1)));
+      $("decisionMarketStats").innerHTML = [
+        ["BTC 24H", signed(btc?.price_change_pct), numClass(btc?.price_change_pct)],
+        ["ETH 24H", signed(eth?.price_change_pct), numClass(eth?.price_change_pct)],
+        ["A 級正式訊號", formal.length, "bull-text"],
+        ["風險警報", riskAlerts.length, "warn-text"],
+        ["持倉中", active.length, "accent-text"],
+        ["最後成功掃描", lastTimeText(state.scannerStatus?.last_success_at || state.lastTickAt || state.lastBookAt), ""]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      $("decisionTopSignals").innerHTML = formal.map(s => decisionSignalRow(s)).join("") || `<div class="empty">目前沒有符合 A 級條件的正式訊號。</div>`;
+      $("decisionRiskAlerts").innerHTML = riskAlerts.map(alert => `<div class="decision-row"><span class="decision-grade grade-${alert.grade.toLowerCase()}">${alert.grade}</span><div><strong>${alert.symbol}</strong><div class="subline">${alert.text}</div></div><span class="pill ${alert.kind}">${alert.value}</span></div>`).join("") || `<div class="empty">目前沒有高風險警報。</div>`;
+      const rate = decided.length ? wins / decided.length * 100 : 0;
+      $("decisionPerformance").innerHTML = [
+        ["樣本", decided.length, ""],
+        ["平倉勝率", decided.length < 30 ? "觀察" : `${fmt(rate,1)}%`, decided.length < 30 ? "warn-text" : "bull-text"],
+        ["近 7 天", strategyPeriodRate(all, 7), "accent-text"],
+        ["近 30 天", strategyPeriodRate(all, 30), "bull-text"]
+      ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
+      $("decisionReview").innerHTML = [...reviewCounts.entries()].sort((a,b) => b[1] - a[1]).slice(0, 5).map(([tag, count]) => `<div class="decision-row"><span class="decision-grade grade-x">${count}</span><div><strong>${tag}</strong><div class="subline">${reviewAdvice(tag)}</div></div><span class="pill warn">改善</span></div>`).join("") || `<div class="empty">目前沒有止損原因可整理。</div>`;
+      $("decisionTopSignals").querySelectorAll("[data-symbol]").forEach(row => row.addEventListener("click", () => openSymbolModal(row.dataset.symbol)));
+    }
+    function decisionSignalRow(s) {
+      const model = signalDecisionModel(s);
+      const kind = s.signal_type === "reversal_bullish" ? "bull" : "bear";
+      return `<div class="decision-row" data-symbol="${clean(s.symbol)}"><span class="decision-grade grade-a">A</span><div><strong>${clean(s.symbol)} · ${model.structure}</strong><div class="subline">${model.conclusion}</div></div><span class="pill ${kind}">${kind === "bull" ? "看多" : "看空"}</span></div>`;
+    }
+    function strategyPeriodRate(rows, days) {
+      const since = Date.now() - days * 86400000;
+      const samples = rows.filter(s => new Date(s.triggered_at || 0).getTime() >= since && ["tp1","tp2","tp3","ftp","sl"].includes(s.reached_state));
+      if (samples.length < 30) return `${samples.length} 筆`;
+      return `${fmt(samples.filter(s => s.reached_state !== "sl").length / samples.length * 100, 1)}%`;
+    }
+    function buildRiskAlerts() {
+      const alerts = [];
+      for (const row of state.contractAnomalies || []) {
+        const symbol = clean(row.symbol);
+        const oi = Number(row.oi_change_5m || row.oi_change_15m || row.oi_change_1h || 0);
+        const funding = Number(row.funding_rate || row.funding_rate_1h || 0);
+        const ratio = Number(row.long_short_ratio_1h || 0);
+        if (Math.abs(oi) >= 3) alerts.push({symbol, grade:"B", kind:"warn", text:"OI 急升，等待價格與 CVD 確認", value:signed(oi)});
+        else if (Math.abs(funding) >= .1) alerts.push({symbol, grade:"B", kind:"warn", text:"Funding 極端，小心反向收割", value:signed(funding)});
+        else if (ratio && (ratio >= 1.8 || ratio <= .55)) alerts.push({symbol, grade:"C", kind:"warn", text:"多空比極端擁擠", value:fmt(ratio,2)});
+      }
+      return alerts.sort((a,b) => Math.abs(parseFloat(b.value)) - Math.abs(parseFloat(a.value)));
     }
     function syncSearch(sourceId) {
       const value = $(sourceId).value;
@@ -1478,9 +1602,6 @@
       document.querySelectorAll("[data-visual-tf]").forEach(btn => btn.classList.toggle("active", btn.dataset.visualTf === state.visualTf));
       $("visualZoom").value = state.visualZoom;
       const axis = visualAxisFields();
-      const scale = Number(state.visualZoom) || 1;
-      const panX = Number(state.visualPanX) || 0;
-      const panY = Number(state.visualPanY) || 0;
       const points = rows
         .filter(row => contractBias(row) !== "neutral")
         .slice(0, isMobileView() ? 60 : 140)
@@ -1488,18 +1609,21 @@
           const x = clamp(firstFinite(row, axis.x), -16, 16);
           const yRaw = firstFinite(row, axis.yCvd, NaN);
           const y = clamp(Number.isFinite(yRaw) && Math.abs(yRaw) > 0.0001 ? yRaw : firstFinite(row, axis.yPrice), -16, 16);
-          const left = 50 + panX + x / 32 * 86 * scale;
-          const top = 50 + panY - y / 32 * 86 * scale;
+          const left = 50 + x / 32 * 86;
+          const top = 50 - y / 32 * 86;
           const kind = contractBias(row) === "long" ? "bull" : "bear";
           const size = clamp(Math.abs(Number(row.radar_score ?? row.score) || 0) / 14, 4, 9);
           return `<button class="dot-symbol ${kind}" data-contract-symbol="${clean(row.symbol)}" title="${clean(row.symbol)} · OI ${fmt(x,2)} · 動能 ${fmt(y,2)}" style="left:${left}%;top:${top}%;font-size:${size + 7}px">${clean(row.symbol)}</button>`;
         }).join("");
       target.innerHTML = `
-        <div class="quadrant-label bull-text" style="left:56%;top:9%">Q1 多頭建倉</div>
-        <div class="quadrant-label bull-text" style="left:8%;top:9%">Q2 空頭回補</div>
-        <div class="quadrant-label bear-text" style="left:8%;bottom:9%">Q3 多頭出場</div>
-        <div class="quadrant-label bear-text" style="right:8%;bottom:9%">Q4 空頭建倉</div>
-        ${points || `<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">等待合約異常資料</div>`}`;
+        <div class="visual-stage" id="visualStage">
+          <div class="quadrant-label bull-text" style="left:56%;top:9%">Q1 多頭建倉</div>
+          <div class="quadrant-label bull-text" style="left:8%;top:9%">Q2 空頭回補</div>
+          <div class="quadrant-label bear-text" style="left:8%;bottom:9%">Q3 多頭出場</div>
+          <div class="quadrant-label bear-text" style="right:8%;bottom:9%">Q4 空頭建倉</div>
+          ${points || `<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center">等待合約異常資料</div>`}
+        </div>`;
+      applyVisualTransform(target);
       target.querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol)));
       bindVisualPanZoom(target);
     }
@@ -1520,25 +1644,45 @@
       target.onwheel = event => {
         event.preventDefault();
         state.visualZoom = clamp(state.visualZoom + (event.deltaY < 0 ? 0.25 : -0.25), 1, 5);
-        renderContractRadar();
+        $("visualZoom").value = state.visualZoom;
+        applyVisualTransform(target);
       };
       target.onpointerdown = event => {
         if (event.target.closest(".dot-symbol")) return;
+        const rect = target.getBoundingClientRect();
         target.setPointerCapture?.(event.pointerId);
         target.classList.add("dragging");
-        state.visualDrag = {x: event.clientX, y: event.clientY, panX: state.visualPanX, panY: state.visualPanY};
+        state.visualDrag = {
+          pointerId: event.pointerId,
+          startX: event.clientX - rect.left,
+          startY: event.clientY - rect.top,
+          originX: Number(state.visualPanX) || 0,
+          originY: Number(state.visualPanY) || 0,
+          width: rect.width,
+          height: rect.height
+        };
       };
       target.onpointermove = event => {
-        if (!state.visualDrag) return;
+        if (!state.visualDrag || state.visualDrag.pointerId !== event.pointerId) return;
         const rect = target.getBoundingClientRect();
-        state.visualPanX = clamp(state.visualDrag.panX + (event.clientX - state.visualDrag.x) / rect.width * 100, -80, 80);
-        state.visualPanY = clamp(state.visualDrag.panY + (event.clientY - state.visualDrag.y) / rect.height * 100, -80, 80);
-        renderContractRadar();
+        const currentX = event.clientX - rect.left;
+        const currentY = event.clientY - rect.top;
+        state.visualPanX = clamp(state.visualDrag.originX + currentX - state.visualDrag.startX, -state.visualDrag.width, state.visualDrag.width);
+        state.visualPanY = clamp(state.visualDrag.originY + currentY - state.visualDrag.startY, -state.visualDrag.height, state.visualDrag.height);
+        applyVisualTransform(target);
       };
       target.onpointerup = target.onpointercancel = () => {
         state.visualDrag = null;
         target.classList.remove("dragging");
       };
+    }
+    function applyVisualTransform(target = $("contractVisualScreener")) {
+      const stage = target?.querySelector(".visual-stage");
+      if (!stage) return;
+      const x = Number(state.visualPanX) || 0;
+      const y = Number(state.visualPanY) || 0;
+      const scale = Number(state.visualZoom) || 1;
+      stage.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
     }
     function contractTradePlan(row) {
       const entry = Number(row.alert_price || row.entry_price || row.price || 0);
@@ -1947,6 +2091,56 @@
         <div class="stable-rule">${meta.reason}</div>
       </article>`;
     }
+    function signalDecisionModel(s) {
+      const isBull = s.signal_type === "reversal_bullish";
+      const dir = isBull ? 1 : -1;
+      const oi = Number(signalMetric(s, "oi_change_pct")) || 0;
+      const price = Number(signalMetric(s, "price_change_pct")) || 0;
+      const cvd = Number(signalMetric(s, "cvd_ratio_1h") ?? signalMetric(s, "cvd_change_pct") ?? signalMetric(s, "taker_buy_ratio"));
+      const funding = Number(signalMetric(s, "funding_rate") ?? signalMetric(s, "funding_rate_1h"));
+      const ratio = Number(signalMetric(s, "long_short_ratio_1h"));
+      const volume = Number(marketFor(s.symbol)?.quote_volume || signalMetric(s, "volume_24h") || 0);
+      const riskPctValue = riskPct(s);
+      const alignedPrice = price * dir;
+      const alignedCvd = Number.isFinite(cvd) ? (Math.abs(cvd) <= 1.5 ? (cvd - .5) * 200 : cvd) * dir : 0;
+      const quality = clamp(Math.round(signalScore(s).value / 100 * 6), 0, 6);
+      const risk = clamp(Math.round((!Number.isFinite(riskPctValue) ? 3 : riskPctValue > 8 ? 5 : riskPctValue > 5 ? 4 : riskPctValue > 3.5 ? 3 : riskPctValue < .5 ? 4 : 2) + (volume > 0 && volume < 5_000_000 ? 2 : 0)), 0, 5);
+      const crowd = clamp(Math.round((Math.abs(Number.isFinite(ratio) ? ratio - 1 : 0) * 4) + (Number.isFinite(funding) ? Math.abs(funding) * 15 : 0)), 0, 5);
+      const structure = clamp(Math.round(2 + Math.min(2, Math.abs(price)) + (alignedPrice > 0 ? 1 : 0) + (alignedCvd > 0 ? 1 : 0)), 0, 5);
+      let structureTag = isBull ? "多頭真推進" : "空頭真推進";
+      if (price > 0 && oi > 0 && alignedCvd < 0) structureTag = "誘多收割";
+      else if (price < 0 && oi > 0 && alignedCvd < 0) structureTag = "誘空拉盤";
+      else if (price > 0 && oi < 0) structureTag = "空頭回補";
+      else if (price < 0 && oi < 0) structureTag = "多頭平倉";
+      const contradictions = [];
+      if (alignedPrice < 0) contradictions.push("價格尚未共振");
+      if (Number.isFinite(cvd) && alignedCvd < 0) contradictions.push("CVD 方向相反");
+      if (Number.isFinite(ratio) && ((isBull && ratio > 1.8) || (!isBull && ratio < .55))) contradictions.push("散戶同向過度擁擠");
+      if (volume > 0 && volume < 5_000_000) contradictions.push("流動性不足");
+      let grade = quality >= 5 && risk <= 2 && !contradictions.length ? "A" : quality >= 3 && risk < 5 ? "B" : quality >= 2 ? "C" : "X";
+      if (volume > 0 && volume < 5_000_000 || risk >= 5) grade = "X";
+      const core = [`OI ${signed(oi)}`, `價格 ${signed(price)}`];
+      if (Number.isFinite(cvd)) core.push(`CVD ${fmt(cvd,2)}`);
+      const invalid = isBull ? "價格跌破 SL，或 CVD 轉弱且 OI 不再增加" : "價格站回 SL，或 CVD 翻正且 OI 不再增加";
+      const conclusion = grade === "A" ? `${structureTag}，條件完整，可依計畫管理。` : grade === "B" ? `${structureTag}，等待二次確認，不追價。` : grade === "C" ? "目前只有背景異常，不可直接進場。" : "流動性或風險不合格，禁止交易。";
+      return {grade, quality, risk, crowd, structureScore: structure, structure: structureTag, core: core.join(" · "), contradictions: contradictions.join("、") || "無重大矛盾", invalid, conclusion};
+    }
+    function signalDecisionHtml(s) {
+      const model = signalDecisionModel(s);
+      return `<div class="signal-decision">
+        <div class="signal-decision-head"><div class="signal-decision-title">${model.structure}</div><span class="decision-grade grade-${model.grade.toLowerCase()}">${model.grade}</span></div>
+        <div class="signal-decision-grid pro-only">
+          <div class="signal-decision-score" title="條件完整度"><span>品質分 <i class="metric-help">?</i></span><b>${model.quality}/6</b></div>
+          <div class="signal-decision-score" title="進場距離、流動性與追價風險，越低越好"><span>風險分 <i class="metric-help">?</i></span><b>${model.risk}/5</b></div>
+          <div class="signal-decision-score" title="Funding 與多空比擁擠程度"><span>擁擠分 <i class="metric-help">?</i></span><b>${model.crowd}/5</b></div>
+          <div class="signal-decision-score" title="突破、背離與多週期結構可信度"><span>結構分 <i class="metric-help">?</i></span><b>${model.structureScore}/5</b></div>
+        </div>
+        <div class="decision-line"><b>實戰結論：</b>${model.conclusion}</div>
+        <div class="decision-line pro-only"><b>核心原因：</b>${model.core}</div>
+        <div class="decision-line pro-only"><b>矛盾因素：</b>${model.contradictions}</div>
+        <div class="decision-line"><b>失效條件：</b>${model.invalid}</div>
+      </div>`;
+    }
     function signalCard(s) {
       const kind = s.signal_type === "reversal_bullish" ? "bull" : "bear";
       const isBull = kind === "bull";
@@ -1966,6 +2160,7 @@
           <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
+        ${signalDecisionHtml(s)}
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(entryPrice(s), 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
         ${visual}
@@ -1977,7 +2172,7 @@
           <div class="level tp ${targetHit(s, "tp3") ? "hit" : ""}"><span>TP3</span><b>${fmt(s.tp3_price, 6)}</b><i class="copy">▢</i></div>
           <div class="level tp ${targetHit(s, "ftp") ? "hit" : ""}"><span>FTP</span><b>${fmt(s.ftp_price, 6)}</b><i class="copy">▢</i></div>
         </div>
-        <div class="history-stats">
+        <div class="history-stats pro-only">
           <div class="history-stat-cell"><div class="history-stat-value">${fmt(signalMetric(s, "oi_percentile"), 1)}</div><div class="history-stat-label">OI %ile</div></div>
           <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "oi_change_pct"))}">${signed(signalMetric(s, "oi_change_pct"))}</div><div class="history-stat-label">OI Chg</div></div>
           <div class="history-stat-cell"><div class="history-stat-value ${numClass(signalMetric(s, "price_change_pct"))}">${signed(signalMetric(s, "price_change_pct"))}</div><div class="history-stat-label">Price</div></div>
@@ -2942,6 +3137,7 @@
       document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
       document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === view));
       renderStats();
+      renderCurrentView();
       renderHealth();
     }
     function renderHealth() {
@@ -3001,7 +3197,9 @@
       return `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
     }
     function lastTimeText(d) {
-      return d ? d.toLocaleTimeString() : "尚未更新";
+      if (!d) return "尚未更新";
+      const value = d instanceof Date ? d : new Date(d);
+      return Number.isNaN(value.getTime()) ? "尚未更新" : value.toLocaleTimeString();
     }
 
     if ("serviceWorker" in navigator) {
