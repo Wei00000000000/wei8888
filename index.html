@@ -337,7 +337,7 @@
     .visual-screener::before { left: 50%; top: 0; bottom: 0; width: 1px; }
     .visual-screener::after { top: 50%; left: 0; right: 0; height: 1px; }
     .quadrant-label { position: absolute; font: 950 13px var(--mono); color: var(--muted); text-shadow: 0 1px 10px #000; }
-    .dot-symbol { position: absolute; transform: translate(-50%, -50%); border: 1px solid currentColor; border-radius: 999px; padding: 4px 7px; background: rgba(5,10,16,.88); font: 950 11px var(--mono); cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .dot-symbol { position: absolute; transform: translate(-50%, -50%) scale(var(--visual-dot-scale, 1)); transform-origin: 50% 50%; border: 1px solid currentColor; border-radius: 999px; padding: 4px 7px; background: rgba(5,10,16,.88); font: 950 11px var(--mono); cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
     .dot-symbol.bull { color: var(--bull); }
     .dot-symbol.bear { color: var(--bear); }
     .visual-stage { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; pointer-events: none; }
@@ -1015,7 +1015,7 @@
         if (!manifestRes.ok) throw new Error("manifest missing");
         const manifest = await manifestRes.json();
         const chunkNames = manifest.signal_chunks || [];
-        const initialCount = isMobileView() ? 8 : 14;
+        const initialCount = isMobileView() ? 2 : 4;
         const initialNames = chunkNames.slice(0, initialCount);
         const chunks = await Promise.all(initialNames.map(async name => {
           const res = await fetch(`data/${name}?ts=${Date.now()}`);
@@ -1024,7 +1024,7 @@
         }));
         const rows = chunks.flatMap(chunk => chunk.rows || []);
         if (chunkNames.length > initialCount) {
-          setTimeout(() => loadRemainingSignalChunks(chunkNames.slice(initialCount)), 200);
+          setTimeout(() => loadRemainingSignalChunks(chunkNames.slice(initialCount)), 900);
         }
         const marketsRes = await fetch(`data/${manifest.markets || "markets.json"}?ts=${Date.now()}`);
         const marketsData = marketsRes.ok ? await marketsRes.json() : {rows: []};
@@ -1209,7 +1209,15 @@
           state.priceBaselineReady = true;
         }
         state.lastPriceAt = new Date();
-        renderFastMarketViews();
+        renderVisibleNumbers();
+        renderHealth();
+        if (state.currentView === "dashboard") {
+          renderDecisionDashboard();
+          renderWatchDashboard();
+        } else if (state.currentView === "contract") {
+          renderContractTopStats();
+          renderContractVisiblePrices();
+        }
         if ($("symbolModal").classList.contains("open")) openSymbolModal($("modalSymbol").textContent);
       } catch (err) {
         rememberError(err, "Price update error");
@@ -1607,8 +1615,8 @@
         <div class="pnl-box"><div class="metric-label">品質 / 雷達 / 分組</div><div class="pnl-value ${group.kind === "bear" ? "bear-text" : "bull-text"}">${quality}/6 · ${fmt(radar,0)} · ${group.label}</div></div>
         ${contractAnalysisGraph(row)}
         <div class="metric-grid">
-          <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value">${fmt(livePrice, 6)}</div></div>
-          <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}">${signed(liveChange)}</div></div>
+          <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value" data-contract-price="${symbol}">${fmt(livePrice, 6)}</div></div>
+          <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}" data-contract-change="${symbol}">${signed(liveChange)}</div></div>
           <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${contractMetric(row.oi_change_1h, "待 API")}</div></div>
           <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${contractMetric(row.cvd_ratio_1h, "待 API")}</div></div>
           <div class="metric-box"><div class="metric-label">散戶多空比</div><div class="metric-value">${ratioMetric(row.long_short_ratio_1h)}</div></div>
@@ -1631,18 +1639,27 @@
       document.querySelectorAll("[data-visual-tf]").forEach(btn => btn.classList.toggle("active", btn.dataset.visualTf === state.visualTf));
       $("visualZoom").value = state.visualZoom;
       const axis = visualAxisFields();
-      const points = rows
+      const plotted = rows
         .filter(row => contractBias(row) !== "neutral")
         .slice(0, isMobileView() ? 60 : 140)
         .map(row => {
-          const x = clamp(firstFinite(row, axis.x), -16, 16);
+          const xRaw = firstFinite(row, axis.x);
           const yRaw = firstFinite(row, axis.yCvd, NaN);
-          const y = clamp(Number.isFinite(yRaw) && Math.abs(yRaw) > 0.0001 ? yRaw : firstFinite(row, axis.yPrice), -16, 16);
-          const left = 50 + x / 32 * 86;
-          const top = 50 - y / 32 * 86;
+          const yValue = Number.isFinite(yRaw) && Math.abs(yRaw) > 0.0001 ? yRaw : firstFinite(row, axis.yPrice);
+          return {row, xRaw, yRaw: yValue};
+        });
+      const xScale = visualScale(plotted.map(item => item.xRaw));
+      const yScale = visualScale(plotted.map(item => item.yRaw));
+      const points = plotted.map(item => {
+          const row = item.row;
+          const x = clamp(item.xRaw / xScale, -1, 1);
+          const y = clamp(item.yRaw / yScale, -1, 1);
+          const jitter = visualJitter(clean(row.symbol));
+          const left = clamp(50 + x * 43 + jitter.x, 3, 97);
+          const top = clamp(50 - y * 43 + jitter.y, 3, 97);
           const kind = contractBias(row) === "long" ? "bull" : "bear";
           const size = clamp(Math.abs(Number(row.radar_score ?? row.score) || 0) / 14, 4, 9);
-          return `<button class="dot-symbol ${kind}" data-contract-symbol="${clean(row.symbol)}" title="${clean(row.symbol)} · OI ${fmt(x,2)} · 動能 ${fmt(y,2)}" style="left:${left}%;top:${top}%;font-size:${size + 7}px">${clean(row.symbol)}</button>`;
+          return `<button class="dot-symbol ${kind}" data-contract-symbol="${clean(row.symbol)}" title="${clean(row.symbol)} · OI ${fmt(item.xRaw,2)} · 動能 ${fmt(item.yRaw,2)}" style="left:${left}%;top:${top}%;font-size:${size + 7}px">${clean(row.symbol)}</button>`;
         }).join("");
       target.innerHTML = `
         <div class="visual-stage" id="visualStage">
@@ -1712,6 +1729,7 @@
       const y = Number(state.visualPanY) || 0;
       const scale = Number(state.visualZoom) || 1;
       stage.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+      stage.style.setProperty("--visual-dot-scale", String(clamp(1 / Math.sqrt(scale), 0.48, 1)));
     }
     function loadConditionLayout() {
       try { return JSON.parse(localStorage.getItem("wei_condition_layout_v1") || "{}") || {}; }
@@ -2264,6 +2282,7 @@
       </article>`;
     }
     function signalDecisionModel(s) {
+      const backendEngine = signalMetric(s, "entry_engine");
       const isBull = s.signal_type === "reversal_bullish";
       const dir = isBull ? 1 : -1;
       const oi = Number(signalMetric(s, "oi_change_pct")) || 0;
@@ -2294,10 +2313,39 @@
       const core = [`OI ${signed(oi)}`, `價格 ${signed(price)}`];
       if (Number.isFinite(cvd)) core.push(`CVD ${fmt(cvd,2)}`);
       const invalid = isBull ? "價格跌破 SL，或 CVD 轉弱且 OI 不再增加" : "價格站回 SL，或 CVD 翻正且 OI 不再增加";
-      const entry = entryEngineModel(s, {isBull, price, oi, alignedCvd, riskPctValue});
+      const entry = backendEntryEngineModel(s, backendEngine) || entryEngineModel(s, {isBull, price, oi, alignedCvd, riskPctValue});
       if (entry.timingScore < 35 || entry.status.includes("禁止")) grade = "X";
       const conclusion = grade === "A" ? `${structureTag}，${entry.status}，可依計畫管理。` : grade === "B" ? `${structureTag}，${entry.status}，等待二次確認。` : grade === "C" ? "目前只有背景異常，不可直接進場。" : "流動性、位置或風險不合格，禁止交易。";
       return {grade, quality, risk, crowd, structureScore: structure, structure: structureTag, core: core.join(" · "), contradictions: contradictions.join("、") || "無重大矛盾", invalid, conclusion, entry};
+    }
+    function visualScale(values) {
+      const sorted = values.map(v => Math.abs(Number(v) || 0)).filter(Number.isFinite).sort((a,b) => a - b);
+      if (!sorted.length) return 1;
+      const p90 = sorted[Math.floor(sorted.length * 0.9)] || sorted[sorted.length - 1] || 1;
+      return Math.max(0.5, p90);
+    }
+    function visualJitter(symbol) {
+      let hash = 0;
+      for (const ch of String(symbol || "")) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+      const angle = (hash % 360) / 180 * Math.PI;
+      const radius = 1.4 + (hash % 7) * 0.22;
+      return {x: Math.cos(angle) * radius, y: Math.sin(angle) * radius};
+    }
+    function backendEntryEngineModel(s, engine) {
+      if (!engine || typeof engine !== "object" || !engine.ready) return null;
+      const isBull = s.signal_type === "reversal_bullish";
+      const structure = [engine.structure_5m, engine.structure_15m].filter(Boolean).join(" / ") || "Structure ready";
+      const vwap = engine.vwap_state === "above" ? "Daily/Rolling VWAP 上方" : engine.vwap_state === "below" ? "Daily/Rolling VWAP 下方" : "VWAP 附近";
+      const liq = `${engine.sweep_bsl ? "掃 BSL" : engine.sweep_ssl ? "掃 SSL" : "未掃流動性"} · BSL ${fmt(engine.bsl, 6)} / SSL ${fmt(engine.ssl, 6)}${engine.eqh ? " · EQH" : ""}${engine.eql ? " · EQL" : ""}`;
+      const status = engine.formal ? "可進場" : "只列觀察預警";
+      return {
+        structure,
+        liquidity: liq,
+        vwap,
+        trigger: engine.trigger || (isBull ? "等待 VWAP Reclaim" : "等待 VWAP Rejection"),
+        timingScore: Number(engine.timing_score) || 0,
+        status
+      };
     }
     function entryEngineModel(s, ctx = {}) {
       const isBull = ctx.isBull ?? s.signal_type === "reversal_bullish";
@@ -2516,6 +2564,18 @@
         const pnl = pnlPct(s, isLivePricedSignal(s));
         node.textContent = signed(pnl);
         node.classList.toggle("positive", pnl >= 0);
+      });
+    }
+    function renderContractVisiblePrices() {
+      document.querySelectorAll("[data-contract-price]").forEach(node => {
+        const market = marketFor(node.dataset.contractPrice);
+        if (market && Number.isFinite(Number(market.price))) node.textContent = fmt(market.price, 6);
+      });
+      document.querySelectorAll("[data-contract-change]").forEach(node => {
+        const market = marketFor(node.dataset.contractChange);
+        if (!market || !Number.isFinite(Number(market.price_change_pct))) return;
+        node.textContent = signed(market.price_change_pct);
+        node.className = `metric-value ${numClass(market.price_change_pct)}`;
       });
     }
     function updateLiveSignalStates() {

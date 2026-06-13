@@ -524,6 +524,176 @@ def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[
     return book
 
 
+def _kline_value(kline: object, name: str, default: float = 0.0) -> float:
+    value = getattr(kline, name, default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _swing_points(klines: list[object], field: str, lookback: int = 2) -> list[tuple[int, float]]:
+    points: list[tuple[int, float]] = []
+    if len(klines) < lookback * 2 + 3:
+        return points
+    for index in range(lookback, len(klines) - lookback):
+        value = _kline_value(klines[index], field)
+        left = [_kline_value(klines[i], field) for i in range(index - lookback, index)]
+        right = [_kline_value(klines[i], field) for i in range(index + 1, index + lookback + 1)]
+        if field == "high" and all(value > item for item in left + right):
+            points.append((index, value))
+        if field == "low" and all(value < item for item in left + right):
+            points.append((index, value))
+    return points
+
+
+def _rolling_vwap(klines: list[object], window: int) -> float | None:
+    sample = klines[-window:]
+    numerator = 0.0
+    denominator = 0.0
+    for item in sample:
+        high = _kline_value(item, "high")
+        low = _kline_value(item, "low")
+        close = _kline_value(item, "close")
+        volume = _kline_value(item, "volume")
+        typical = (high + low + close) / 3.0
+        numerator += typical * volume
+        denominator += volume
+    return numerator / denominator if denominator > 0 else None
+
+
+def _structure_snapshot(klines: list[object], side: str) -> dict[str, object]:
+    if len(klines) < 24:
+        return {"ready": False, "reason": "kline_insufficient"}
+    last = klines[-1]
+    close = _kline_value(last, "close")
+    high = _kline_value(last, "high")
+    low = _kline_value(last, "low")
+    highs = _swing_points(klines[:-1], "high")
+    lows = _swing_points(klines[:-1], "low")
+    prev_high = highs[-1][1] if highs else max(_kline_value(k, "high") for k in klines[-21:-1])
+    prev_low = lows[-1][1] if lows else min(_kline_value(k, "low") for k in klines[-21:-1])
+    recent = klines[-21:-1]
+    bsl = max(_kline_value(k, "high") for k in recent)
+    ssl = min(_kline_value(k, "low") for k in recent)
+    atr_proxy = sum(_kline_value(k, "high") - _kline_value(k, "low") for k in klines[-14:]) / 14.0
+    rolling_vwap = _rolling_vwap(klines, min(48, len(klines)))
+    daily_vwap = _rolling_vwap(klines, min(288, len(klines)))
+    bullish_bos = close > prev_high
+    bearish_bos = close < prev_low
+    sweep_bsl = high > bsl and close < bsl
+    sweep_ssl = low < ssl and close > ssl
+    range_mode = not bullish_bos and not bearish_bos
+    eqh = len(highs) >= 2 and abs(highs[-1][1] - highs[-2][1]) <= atr_proxy * 0.1
+    eql = len(lows) >= 2 and abs(lows[-1][1] - lows[-2][1]) <= atr_proxy * 0.1
+    vwap = rolling_vwap or daily_vwap
+    vwap_state = "unknown"
+    if vwap:
+        if close > vwap:
+            vwap_state = "above"
+        elif close < vwap:
+            vwap_state = "below"
+        else:
+            vwap_state = "at"
+    if side == "long":
+        structure_ok = bullish_bos or (range_mode and close > prev_low)
+        liquidity_ok = sweep_ssl or close > ssl
+        vwap_ok = vwap_state == "above"
+    else:
+        structure_ok = bearish_bos or (range_mode and close < prev_high)
+        liquidity_ok = sweep_bsl or close < bsl
+        vwap_ok = vwap_state == "below"
+    timing = 0
+    timing += 30 if structure_ok else 0
+    timing += 25 if vwap_ok else 0
+    timing += 20 if liquidity_ok else 0
+    timing += 15 if (side == "long" and sweep_ssl) or (side == "short" and sweep_bsl) else 0
+    timing += 10 if (side == "long" and close >= prev_low) or (side == "short" and close <= prev_high) else 0
+    return {
+        "ready": True,
+        "close": close,
+        "structure": "Bullish BOS" if bullish_bos else "Bearish BOS" if bearish_bos else "Range",
+        "structure_ok": structure_ok,
+        "bullish_bos": bullish_bos,
+        "bearish_bos": bearish_bos,
+        "bsl": bsl,
+        "ssl": ssl,
+        "eqh": eqh,
+        "eql": eql,
+        "sweep_bsl": sweep_bsl,
+        "sweep_ssl": sweep_ssl,
+        "rolling_vwap": rolling_vwap,
+        "daily_vwap": daily_vwap,
+        "vwap_state": vwap_state,
+        "vwap_ok": vwap_ok,
+        "liquidity_ok": liquidity_ok,
+        "timing_score": min(100, timing),
+    }
+
+
+def load_entry_engine_book(symbols: list[str], workers: int = 8, limit: int = 80) -> dict[str, dict[str, list[object]]]:
+    def load(symbol: str) -> tuple[str, dict[str, list[object]]]:
+        with market_client(timeout=14) as client:
+            return symbol, {
+                "5m": client.klines(symbol, interval="5m", limit=limit),
+                "15m": client.klines(symbol, interval="15m", limit=max(40, limit // 2)),
+            }
+
+    book: dict[str, dict[str, list[object]]] = {}
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(load, symbol): symbol for symbol in symbols}
+        for future in as_completed(futures):
+            try:
+                symbol, data = future.result()
+            except Exception:
+                continue
+            book[symbol] = data
+    return book
+
+
+def contract_entry_engine(row: dict[str, object], kline_book: dict[str, dict[str, list[object]]]) -> dict[str, object]:
+    symbol = clean_symbol(row.get("symbol"))
+    side = str(row.get("bias") or "")
+    data = kline_book.get(symbol) or {}
+    snap_5m = _structure_snapshot(data.get("5m") or [], side)
+    snap_15m = _structure_snapshot(data.get("15m") or [], side)
+    ready = bool(snap_5m.get("ready")) and bool(snap_15m.get("ready"))
+    if not ready:
+        return {"ready": False, "grade": "watch", "reason": "entry_engine_kline_insufficient"}
+    timing = int(round(float(snap_5m.get("timing_score") or 0) * 0.65 + float(snap_15m.get("timing_score") or 0) * 0.35))
+    side_ok = (side == "long" and snap_5m.get("vwap_state") == "above") or (side == "short" and snap_5m.get("vwap_state") == "below")
+    formal = timing >= int(os.getenv("ENTRY_ENGINE_MIN_TIMING", "65")) and side_ok
+    entry = as_float(snap_5m.get("rolling_vwap")) or as_float(row.get("trigger_price")) or as_float(row.get("price"))
+    close = as_float(snap_5m.get("close")) or entry
+    if entry and close:
+        # If price already pulled away, keep the locked entry near current executable price.
+        if abs(close - entry) / max(entry, 1e-12) > float(os.getenv("ENTRY_ENGINE_MAX_VWAP_DISTANCE", "0.018")):
+            entry = close
+    return {
+        "ready": True,
+        "formal": formal,
+        "grade": "formal" if formal else "watch",
+        "timing_score": timing,
+        "entry_price": entry,
+        "structure_5m": snap_5m.get("structure"),
+        "structure_15m": snap_15m.get("structure"),
+        "vwap_state": snap_5m.get("vwap_state"),
+        "rolling_vwap": snap_5m.get("rolling_vwap"),
+        "daily_vwap": snap_5m.get("daily_vwap"),
+        "bsl": snap_5m.get("bsl"),
+        "ssl": snap_5m.get("ssl"),
+        "eqh": snap_5m.get("eqh"),
+        "eql": snap_5m.get("eql"),
+        "sweep_bsl": snap_5m.get("sweep_bsl"),
+        "sweep_ssl": snap_5m.get("sweep_ssl"),
+        "trigger": (
+            "VWAP reclaim + bullish structure" if side == "long" and formal else
+            "VWAP rejection + bearish structure" if side == "short" and formal else
+            "waiting for BOS/VWAP confirmation"
+        ),
+    }
+
+
 def prefetch_scan_data(symbols: list[str], lookback: int, divergence_lookback: int) -> None:
     if provider_name() != "binance":
         return
@@ -733,6 +903,13 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
     max_same_side = int(os.getenv("MAX_ACTIVE_PER_SYMBOL_SIDE", "2"))
     rows: list[dict[str, object]] = []
     max_new = int(os.getenv("CONTRACT_SIGNAL_MAX_NEW", "30"))
+    entry_candidates = [
+        clean_symbol(row.get("symbol"))
+        for row in radar_rows
+        if str(row.get("bias") or "neutral") in {"long", "short"} and str(row.get("trigger") or "watch") != "watch"
+    ]
+    entry_limit = int(os.getenv("ENTRY_ENGINE_CANDIDATES", "60"))
+    entry_book = load_entry_engine_book(entry_candidates[:entry_limit], workers=int(os.getenv("ENTRY_ENGINE_WORKERS", "6"))) if entry_candidates else {}
     for row in radar_rows:
         bias = str(row.get("bias") or "neutral")
         trigger = str(row.get("trigger") or "watch")
@@ -743,7 +920,10 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
         key = (symbol, signal_type)
         if active_counts.get(key, 0) >= max_same_side:
             continue
-        price = as_float(row.get("trigger_price")) or as_float(row.get("price"))
+        engine = contract_entry_engine(row, entry_book)
+        if not engine.get("formal"):
+            continue
+        price = as_float(engine.get("entry_price")) or as_float(row.get("trigger_price")) or as_float(row.get("price"))
         if price is None or price <= 0:
             continue
         triggered_at_ms = int(row.get("triggered_at_ms") or datetime.now(timezone.utc).timestamp() * 1000)
@@ -793,6 +973,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "source": "coinglass_contract_scan",
                     "snapshot_data": {
                         "contract_radar": True,
+                        "entry_engine": engine,
                         "radar_score": row.get("radar_score", row.get("score")),
                         "bias": bias,
                         "trigger": trigger,
