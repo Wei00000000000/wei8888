@@ -342,6 +342,17 @@
     .dot-symbol.bear { color: var(--bear); }
     .visual-stage { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; pointer-events: none; }
     .visual-stage .dot-symbol { pointer-events: auto; }
+    .condition-board { position: relative; min-height: 360px; border: 1px solid var(--line); border-radius: 10px; background: rgba(4,9,14,.74); overflow: hidden; touch-action: none; }
+    .condition-zone { position: absolute; top: 12px; bottom: 12px; width: calc((100% - 48px) / 3); border: 1px dashed rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.018); padding: 10px; pointer-events: none; }
+    .condition-zone.entry { left: 12px; border-color: rgba(0,224,164,.36); }
+    .condition-zone.watch { left: calc(24px + (100% - 48px) / 3); border-color: rgba(255,177,59,.36); }
+    .condition-zone.block { right: 12px; border-color: rgba(255,85,119,.36); }
+    .condition-zone-title { font: 950 13px var(--mono); }
+    .condition-zone-sub { margin-top: 4px; color: var(--faint); font-size: 11px; line-height: 1.35; }
+    .condition-card { position: absolute; width: 170px; min-height: 58px; border: 1px solid var(--line-2); border-radius: 9px; background: #101927; padding: 10px; color: var(--text); cursor: grab; user-select: none; touch-action: none; transform: translate3d(var(--x), var(--y), 0); will-change: transform; box-shadow: 0 10px 24px rgba(0,0,0,.28); }
+    .condition-card.dragging { z-index: 20; cursor: grabbing; border-color: var(--accent); box-shadow: 0 18px 42px rgba(0,0,0,.52); }
+    .condition-card strong { display: block; font-size: 12px; }
+    .condition-card span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.35; }
     .decision-grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 14px; margin-bottom: 22px; }
     .decision-panel { border: 1px solid var(--line); border-radius: 9px; background: rgba(10,17,25,.94); padding: 14px; }
     .decision-list { display: grid; gap: 8px; margin-top: 10px; }
@@ -405,7 +416,7 @@
     }
     @media (max-width: 620px) {
       .main { padding-left: 10px; padding-right: 10px; padding-bottom: 94px; }
-      .nav { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 900; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8,13,19,.95); backdrop-filter: blur(14px); box-shadow: 0 14px 36px rgba(0,0,0,.45); }
+      .nav { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 900; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8,13,19,.95); backdrop-filter: blur(14px); box-shadow: 0 14px 36px rgba(0,0,0,.45); }
       .nav button { min-width: 0; padding: 0 4px; height: 38px; font-size: 12px; }
       .signal-main { grid-template-columns: auto 1fr; }
       .signal-actions { grid-column: 1 / -1; justify-content: flex-start; }
@@ -420,6 +431,12 @@
       .signal-decision-grid { grid-template-columns: repeat(2,1fr); }
       .brand-hero { min-height: 132px; }
       .decision-panel { padding: 11px; }
+      .condition-board { min-height: 520px; }
+      .condition-zone { width: calc(100% - 24px); height: calc((100% - 48px) / 3); }
+      .condition-zone.entry { left: 12px; right: 12px; top: 12px; bottom: auto; }
+      .condition-zone.watch { left: 12px; right: 12px; top: calc(24px + (100% - 48px) / 3); bottom: auto; }
+      .condition-zone.block { left: 12px; right: 12px; top: auto; bottom: 12px; }
+      .condition-card { width: 148px; }
     }
   </style>
 </head>
@@ -453,7 +470,6 @@
         <button data-view="quality">高品質訊號</button>
         <button data-view="stable">穩如老狗</button>
         <button data-view="review">交易檢討</button>
-        <button data-view="harmonic">諧波交易訊號</button>
       </nav>
       <div class="top-actions">
         <button class="round-btn" id="bellBtn" title="通知">🔔<span id="bellBadge" class="badge"></span></button>
@@ -510,7 +526,7 @@
         <section class="decision-panel"><div class="kicker">策略績效</div><div class="watch-stats" id="decisionPerformance"></div></section>
         <section class="decision-panel"><div class="kicker">交易檢討摘要</div><div class="decision-list" id="decisionReview"></div></section>
       </div>
-      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>諧波交易訊號</span></div>
+      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>合約異常雷達</span></div>
       <div class="section-head">
         <div><span class="watch-title">板塊資金流動</span><span class="watch-sub" id="sectorMeta">等待更新</span></div>
       </div>
@@ -613,6 +629,15 @@
           </div>
         </div>
         <div id="contractVisualScreener" class="visual-screener"></div>
+        <div class="backtest-head">
+          <div>
+            <div class="kicker">Condition Flow</div>
+            <h2>三區交易條件篩選器</h2>
+            <div class="subline">把條件拖到正式進場、觀察預警、禁止交易；位置會儲存在本機，重新整理後保留。</div>
+          </div>
+          <button class="btn" id="conditionReset">重置條件配置</button>
+        </div>
+        <div id="conditionBoard" class="condition-board"></div>
       </section>
       <section class="backtest-panel">
         <div class="backtest-head">
@@ -723,23 +748,6 @@
       <div class="review-grid" id="reviewCards"></div>
     </section>
 
-    <section id="harmonic" class="view">
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="kicker">Harmonic Signals</div>
-            <h2>諧波交易訊號</h2>
-            <div class="subline">目前保留位置，之後可接 harmonic_signals 或 TradingView webhook。</div>
-          </div>
-          <span class="pill accent">PRZ</span>
-        </div>
-      </section>
-      <div class="ghost-grid">
-        <article class="ghost-card"><span class="pill accent">Butterfly</span><h2>Active PRZ</h2><p class="muted">等待諧波資料源接入。</p></article>
-        <article class="ghost-card"><span class="pill bull">Bullish</span><h2>Confluence</h2><p class="muted">可接 RSI divergence / reversal candle。</p></article>
-        <article class="ghost-card"><span class="pill bear">Bearish</span><h2>Risk Ladder</h2><p class="muted">PRZ、SL、TP1、TP2 風險階梯。</p></article>
-      </div>
-    </section>
   </main>
 
   <div class="notify-panel" id="notifyPanel">
@@ -795,6 +803,8 @@
       visualPanX: 0,
       visualPanY: 0,
       visualDrag: null,
+      conditionDrag: null,
+      conditionLayout: loadConditionLayout(),
       displayMode: localStorage.getItem("wei_display_mode") || (matchMedia("(max-width: 760px)").matches ? "novice" : "pro"),
       soundUnlocked: false,
       priceBaselineReady: false
@@ -802,6 +812,17 @@
     const MAIN_WATCH_SYMBOLS = [
       "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
       "TRX","BCH","LTC","DOT","NEAR","UNI","APT","SUI","OP","ARB"
+    ];
+    const CONDITION_CARDS = [
+      ["oi_spike", "OI 急升", "槓桿快速進場"],
+      ["cvd_divergence", "CVD 背離", "主動成交不跟價"],
+      ["funding_extreme", "Funding 極端", "擁擠反向風險"],
+      ["long_short_crowd", "多空比擁擠", "散戶單邊過熱"],
+      ["vwap_position", "VWAP 上下方", "日內成本線判斷"],
+      ["bos_choch", "BOS / CHoCH", "結構確認"],
+      ["sweep_liquidity", "掃 BSL / SSL", "流動性收割"],
+      ["low_volume", "成交量不足", "禁止正式進場"],
+      ["far_from_vwap", "遠離 VWAP 過多", "追價風險"]
     ];
     const STATIC_MODE = location.hostname.endsWith("github.io") || location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.protocol === "file:";
     const STABLE_THRESHOLD = 88;
@@ -859,6 +880,11 @@
       state.visualPanY = 0;
       $("visualZoom").value = state.visualZoom;
       applyVisualTransform();
+    });
+    $("conditionReset").addEventListener("click", () => {
+      localStorage.removeItem("wei_condition_layout_v1");
+      state.conditionLayout = {};
+      renderConditionBoard();
     });
     $("signalFilter").addEventListener("change", () => syncFilter("signalFilter"));
     $("signalStatusFilter").addEventListener("change", () => syncFilter("signalStatusFilter"));
@@ -1468,6 +1494,7 @@
         ["更新", lastTimeText(state.lastContractAt), ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
       renderContractVisualScreener(rows);
+      renderConditionBoard();
       renderContractBacktest(rows);
       renderOiRankGroups(rows);
       const warnings = rows
@@ -1514,6 +1541,7 @@
       const wins = samples.filter(row => row.aligned).length;
       const rate = samples.length ? wins / samples.length * 100 : 0;
       const formalTargets = targetHitStats(contractFormalSignals());
+      const confidence = sampleConfidence(samples.length);
       const equity = [];
       let value = 0;
       for (const row of samples.slice().reverse()) {
@@ -1523,7 +1551,8 @@
       $("contractBacktestMeta").textContent = `${samples.length} samples`;
       $("contractBacktestStats").innerHTML = [
         ["樣本數", samples.length, ""],
-        ["方向命中率", `${fmt(rate, 1)}%`, rate >= 50 ? "bull-text" : "bear-text"],
+        ["樣本可信度", confidence.label, confidence.cls],
+        ["方向命中率", confidence.showRate ? `${fmt(rate, 1)}%` : "觀察中", confidence.showRate && rate >= 50 ? "bull-text" : "warn-text"],
         ["正式TP1率", `${fmt(formalTargets.tp1, 1)}%`, "bull-text"],
         ["正式TP2率", `${fmt(formalTargets.tp2, 1)}%`, "bull-text"],
         ["正式TP3率", `${fmt(formalTargets.tp3, 1)}%`, "accent-text"],
@@ -1683,6 +1712,76 @@
       const y = Number(state.visualPanY) || 0;
       const scale = Number(state.visualZoom) || 1;
       stage.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+    }
+    function loadConditionLayout() {
+      try { return JSON.parse(localStorage.getItem("wei_condition_layout_v1") || "{}") || {}; }
+      catch { return {}; }
+    }
+    function saveConditionLayout() {
+      localStorage.setItem("wei_condition_layout_v1", JSON.stringify(state.conditionLayout || {}));
+    }
+    function defaultConditionPosition(index, board) {
+      const zoneW = isMobileView() ? board.clientWidth - 24 : (board.clientWidth - 48) / 3;
+      const zoneH = isMobileView() ? (board.clientHeight - 48) / 3 : board.clientHeight - 24;
+      const zoneIndex = index >= 7 ? 2 : index >= 4 ? 1 : 0;
+      const col = isMobileView() ? index % 2 : index % 2;
+      const row = Math.floor((index - (zoneIndex === 2 ? 7 : zoneIndex === 1 ? 4 : 0)) / 2);
+      const zoneX = isMobileView() ? 12 : 12 + zoneIndex * zoneW + zoneIndex * 12;
+      const zoneY = isMobileView() ? 12 + zoneIndex * zoneH + zoneIndex * 12 : 12;
+      return {x: zoneX + 12 + col * 180, y: zoneY + 54 + row * 74};
+    }
+    function renderConditionBoard() {
+      const board = $("conditionBoard");
+      if (!board) return;
+      board.innerHTML = `
+        <div class="condition-zone entry"><div class="condition-zone-title bull-text">正式進場條件</div><div class="condition-zone-sub">同時滿足才升 A 級。</div></div>
+        <div class="condition-zone watch"><div class="condition-zone-title warn-text">觀察預警條件</div><div class="condition-zone-sub">只提示，不給交易點位。</div></div>
+        <div class="condition-zone block"><div class="condition-zone-title bear-text">禁止交易條件</div><div class="condition-zone-sub">一旦觸發降為 X 級。</div></div>
+        ${CONDITION_CARDS.map(([id, title, desc], index) => {
+          const pos = state.conditionLayout[id] || defaultConditionPosition(index, board);
+          state.conditionLayout[id] = pos;
+          return `<button class="condition-card" data-condition-id="${id}" style="--x:${pos.x}px;--y:${pos.y}px"><strong>${title}</strong><span>${desc}</span></button>`;
+        }).join("")}`;
+      board.querySelectorAll(".condition-card").forEach(card => bindConditionDrag(board, card));
+      saveConditionLayout();
+    }
+    function bindConditionDrag(board, card) {
+      card.onpointerdown = event => {
+        const rect = board.getBoundingClientRect();
+        const id = card.dataset.conditionId;
+        const pos = state.conditionLayout[id] || {x: 0, y: 0};
+        card.setPointerCapture?.(event.pointerId);
+        card.classList.add("dragging");
+        state.conditionDrag = {id, pointerId: event.pointerId, startX: event.clientX - rect.left, startY: event.clientY - rect.top, originX: pos.x, originY: pos.y};
+      };
+      card.onpointermove = event => {
+        const drag = state.conditionDrag;
+        if (!drag || drag.pointerId !== event.pointerId || drag.id !== card.dataset.conditionId) return;
+        const rect = board.getBoundingClientRect();
+        const currentX = event.clientX - rect.left;
+        const currentY = event.clientY - rect.top;
+        const maxX = Math.max(0, board.clientWidth - card.offsetWidth - 8);
+        const maxY = Math.max(0, board.clientHeight - card.offsetHeight - 8);
+        const x = clamp(drag.originX + currentX - drag.startX, 8, maxX);
+        const y = clamp(drag.originY + currentY - drag.startY, 8, maxY);
+        state.conditionLayout[drag.id] = {x, y};
+        card.style.setProperty("--x", `${x}px`);
+        card.style.setProperty("--y", `${y}px`);
+      };
+      const finish = () => {
+        const drag = state.conditionDrag;
+        if (!drag || drag.id !== card.dataset.conditionId) return;
+        const pos = state.conditionLayout[drag.id] || {x: 0, y: 0};
+        const snap = {x: Math.round(pos.x / 12) * 12, y: Math.round(pos.y / 12) * 12};
+        state.conditionLayout[drag.id] = snap;
+        card.style.setProperty("--x", `${snap.x}px`);
+        card.style.setProperty("--y", `${snap.y}px`);
+        card.classList.remove("dragging");
+        state.conditionDrag = null;
+        saveConditionLayout();
+      };
+      card.onpointerup = finish;
+      card.onpointercancel = finish;
     }
     function contractTradePlan(row) {
       const entry = Number(row.alert_price || row.entry_price || row.price || 0);
@@ -1932,20 +2031,42 @@
       const avgWin = wins ? all.filter(s => ["tp1","tp2","tp3","ftp"].includes(s.reached_state)).reduce((sum, s) => sum + pnlPct(s, false), 0) / wins : 0;
       const avgR = all.length ? equity / all.length : 0;
       const targetStats = targetHitStats(all);
+      const confidence = sampleConfidence(all.length);
+      const playbook = playbookStats(all)[0] || {name: "等待樣本", rate: 0, count: 0};
       $(metaId).textContent = `${all.length} trades`;
       $(statsId).innerHTML = [
         ["交易數", all.length, ""],
-        ["勝率", `${fmt(rate, 1)}%`, "bull-text"],
+        ["樣本可信度", confidence.label, confidence.cls],
+        ["勝率", confidence.showRate ? `${fmt(rate, 1)}%` : "觀察中", confidence.showRate ? "bull-text" : "warn-text"],
         ["TP1率", `${fmt(targetStats.tp1, 1)}%`, "bull-text"],
         ["TP2率", `${fmt(targetStats.tp2, 1)}%`, "bull-text"],
         ["TP3率", `${fmt(targetStats.tp3, 1)}%`, "accent-text"],
         ["FTP率", `${fmt(targetStats.ftp, 1)}%`, "accent-text"],
+        ["最佳劇本", `${playbook.name} ${playbook.count}`, "accent-text"],
+        ["劇本勝率", playbook.count >= 30 ? `${fmt(playbook.rate, 1)}%` : "樣本不足", playbook.count >= 30 ? "bull-text" : "warn-text"],
         ["平均獲利", signed(avgWin), "bull-text"],
         ["平均R", signed(avgR), avgR >= 0 ? "bull-text" : "bear-text"],
         ["最大回撤", signed(maxDrawdown), "bear-text"],
         ["累積盈虧", signed(equity), equity >= 0 ? "bull-text" : "bear-text"]
       ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
       $(chartId).innerHTML = equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses});
+    }
+    function sampleConfidence(count) {
+      if (count < 30) return {label: `${count} 筆｜觀察`, cls: "warn-text", showRate: false};
+      if (count < 100) return {label: `${count} 筆｜低信心`, cls: "warn-text", showRate: true};
+      if (count < 300) return {label: `${count} 筆｜中信心`, cls: "accent-text", showRate: true};
+      return {label: `${count} 筆｜高信心`, cls: "bull-text", showRate: true};
+    }
+    function playbookStats(rows) {
+      const book = new Map();
+      for (const s of rows) {
+        const key = signalDecisionModel(s).structure;
+        if (!book.has(key)) book.set(key, {name: key, count: 0, wins: 0});
+        const item = book.get(key);
+        item.count += 1;
+        if (["tp1","tp2","tp3","ftp"].includes(s.reached_state)) item.wins += 1;
+      }
+      return [...book.values()].map(item => ({...item, rate: item.count ? item.wins / item.count * 100 : 0})).sort((a,b) => b.count - a.count || b.rate - a.rate);
     }
     function targetHitStats(rows) {
       const decided = rows.filter(s => ["sl","tp1","tp2","tp3","ftp"].includes(s.reached_state));
@@ -2002,20 +2123,71 @@
         }
       }
       const reasonRows = [...reasonMap.entries()].sort((a,b) => b[1].length - a[1].length);
+      const recentLoss = days => stopped.filter(s => Date.now() - new Date(s.hit_at || s.triggered_at || 0).getTime() <= days * 86400000);
+      const chaseTrades = rows.filter(s => Math.abs(Number(signalMetric(s, "price_change_pct")) || 0) > 1.5);
+      const symbolErrors = symbolErrorRows(rows).slice(0, 5);
+      const strategyErrors = strategyErrorRows(stopped).slice(0, 5);
+      const weeklyAdvice = improvementAdvice(reasonRows, chaseTrades.length / Math.max(1, rows.length) * 100);
       $("reviewStats").innerHTML = [
         ["止損交易", stopped.length, "bear-text"],
+        ["7/30/90天止損", `${recentLoss(7).length}/${recentLoss(30).length}/${recentLoss(90).length}`, "bear-text"],
         ["低分交易", lowScore.length, "warn-text"],
+        ["追價比例", `${fmt(chaseTrades.length / Math.max(1, rows.length) * 100, 1)}%`, "warn-text"],
         ["重複風險類型", reasonRows.length, "accent-text"],
         ["近期樣本", rows.slice(0, 120).length, ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
-      $("reviewCards").innerHTML = reasonRows.slice(0, 12).map(([tag, items]) => {
+      const diagnosticCards = [
+        reviewSummaryCard("最近 30 天止損原因排行", reasonRows.slice(0, 6).map(([tag, items]) => `${tag}：${items.filter(s => recentLoss(30).includes(s)).length || items.length} 筆`), "bear"),
+        reviewSummaryCard("策略失敗原因拆解", strategyErrors.map(row => `${row.name}：${row.count} 筆 · ${row.top}`), "warn"),
+        reviewSummaryCard("幣種錯誤率排行", symbolErrors.map(row => `${row.symbol}：${fmt(row.rate,1)}% · ${row.losses}/${row.total}`), "bear"),
+        reviewSummaryCard("每週改善建議", weeklyAdvice, "bull")
+      ].join("");
+      $("reviewCards").innerHTML = diagnosticCards + (reasonRows.slice(0, 12).map(([tag, items]) => {
         const recent = items.slice(0, 4);
         return `<article class="review-card">
           <div class="review-title"><span>${tag}</span><span class="pill ${tag.includes("止損") ? "bear" : "warn"}">${items.length} 筆</span></div>
           <div class="subline">${reviewAdvice(tag)}</div>
           <div class="review-list">${recent.map(s => `<div class="review-item"><strong>${clean(s.symbol)}</strong> · ${strategyNameForSignal(s)} · ${shortTime(s.triggered_at)} · ${stateLabel(s.reached_state)}<br>${plainTradeReason(s)}</div>`).join("")}</div>
         </article>`;
-      }).join("") || `<section class="panel"><div class="empty">目前沒有足夠的檢討樣本。</div></section>`;
+      }).join("") || `<section class="panel"><div class="empty">目前沒有足夠的檢討樣本。</div></section>`);
+    }
+    function reviewSummaryCard(title, lines, kind = "warn") {
+      return `<article class="review-card"><div class="review-title"><span>${title}</span><span class="pill ${kind}">診斷</span></div><div class="review-list">${(lines.length ? lines : ["等待更多樣本"]).map(line => `<div class="review-item">${line}</div>`).join("")}</div></article>`;
+    }
+    function symbolErrorRows(rows) {
+      const map = new Map();
+      for (const s of rows) {
+        const sym = clean(s.symbol);
+        if (!map.has(sym)) map.set(sym, {symbol: sym, total: 0, losses: 0});
+        const item = map.get(sym);
+        item.total += 1;
+        if (s.reached_state === "sl") item.losses += 1;
+      }
+      return [...map.values()].filter(x => x.total >= 3).map(x => ({...x, rate: x.losses / x.total * 100})).sort((a,b) => b.rate - a.rate || b.losses - a.losses);
+    }
+    function strategyErrorRows(rows) {
+      const map = new Map();
+      for (const s of rows) {
+        const name = strategyNameForSignal(s);
+        if (!map.has(name)) map.set(name, []);
+        map.get(name).push(s);
+      }
+      return [...map.entries()].map(([name, list]) => {
+        const tags = new Map();
+        list.forEach(s => reviewTags(s).forEach(tag => tags.set(tag, (tags.get(tag) || 0) + 1)));
+        const top = [...tags.entries()].sort((a,b) => b[1] - a[1])[0]?.[0] || "等待分類";
+        return {name, count: list.length, top};
+      }).sort((a,b) => b.count - a.count);
+    }
+    function improvementAdvice(reasonRows, chaseRate) {
+      const top = reasonRows[0]?.[0] || "";
+      const advice = [];
+      if (chaseRate > 20) advice.push("追價比例偏高：A 級訊號仍需等 VWAP 回抽或 BOS 確認。");
+      if (top.includes("Taker")) advice.push("Taker 不共振：降低主動成交不明確訊號的權重。");
+      if (top.includes("OI")) advice.push("OI 過熱：極端槓桿要等待流動性掃完後再進。");
+      if (top.includes("R")) advice.push("R 值過大：價格離 SL 太遠時只列預警。");
+      if (!advice.length) advice.push("本週優先維持：A/B/C/X 分層、Entry Engine 與止損原因紀錄。");
+      return advice;
     }
     function reviewTags(s) {
       const tags = [];
@@ -2122,20 +2294,50 @@
       const core = [`OI ${signed(oi)}`, `價格 ${signed(price)}`];
       if (Number.isFinite(cvd)) core.push(`CVD ${fmt(cvd,2)}`);
       const invalid = isBull ? "價格跌破 SL，或 CVD 轉弱且 OI 不再增加" : "價格站回 SL，或 CVD 翻正且 OI 不再增加";
-      const conclusion = grade === "A" ? `${structureTag}，條件完整，可依計畫管理。` : grade === "B" ? `${structureTag}，等待二次確認，不追價。` : grade === "C" ? "目前只有背景異常，不可直接進場。" : "流動性或風險不合格，禁止交易。";
-      return {grade, quality, risk, crowd, structureScore: structure, structure: structureTag, core: core.join(" · "), contradictions: contradictions.join("、") || "無重大矛盾", invalid, conclusion};
+      const entry = entryEngineModel(s, {isBull, price, oi, alignedCvd, riskPctValue});
+      if (entry.timingScore < 35 || entry.status.includes("禁止")) grade = "X";
+      const conclusion = grade === "A" ? `${structureTag}，${entry.status}，可依計畫管理。` : grade === "B" ? `${structureTag}，${entry.status}，等待二次確認。` : grade === "C" ? "目前只有背景異常，不可直接進場。" : "流動性、位置或風險不合格，禁止交易。";
+      return {grade, quality, risk, crowd, structureScore: structure, structure: structureTag, core: core.join(" · "), contradictions: contradictions.join("、") || "無重大矛盾", invalid, conclusion, entry};
+    }
+    function entryEngineModel(s, ctx = {}) {
+      const isBull = ctx.isBull ?? s.signal_type === "reversal_bullish";
+      const dir = isBull ? 1 : -1;
+      const entry = entryPrice(s);
+      const current = currentPrice(s);
+      const risk = Number(ctx.riskPctValue ?? riskPct(s));
+      const priceMove = Number(ctx.price ?? signalMetric(s, "price_change_pct")) || 0;
+      const oi = Number(ctx.oi ?? signalMetric(s, "oi_change_pct")) || 0;
+      const cvd = Number(ctx.alignedCvd ?? 0);
+      const vwapProxy = entry && Number.isFinite(current) ? (current - entry) / entry * 100 : priceMove;
+      const bos = priceMove * dir > 0.35 ? (isBull ? "5M Bullish BOS" : "5M Bearish BOS") : Math.abs(priceMove) < 0.18 ? "15M Range" : "15M CHoCH 觀察";
+      const bslSslDistance = Number.isFinite(risk) ? clamp(risk * 0.45, 0.2, 6) : clamp(Math.abs(priceMove) * 0.8, 0.2, 6);
+      const swept = oi > 0.35 && cvd < 0 ? (isBull ? "掃 SSL 後站回" : "掃 BSL 後收回") : "未確認掃流動性";
+      const vwap = vwapProxy * dir >= 0 ? (isBull ? "Daily VWAP 上方" : "Daily VWAP 下方") : (isBull ? "等待 VWAP Reclaim" : "等待 VWAP Rejection");
+      const trigger = isBull
+        ? (vwapProxy >= 0 ? "回踩 VWAP 守住可進場" : "等站回 VWAP，禁止追多")
+        : (vwapProxy <= 0 ? "反彈 VWAP 失敗可進場" : "等跌回 VWAP，禁止追空");
+      let timingScore = 0;
+      if (bos.includes("BOS")) timingScore += 25;
+      if (vwapProxy * dir >= 0) timingScore += 25;
+      if (swept.includes("掃")) timingScore += 20;
+      if (cvd >= 0) timingScore += 15;
+      if (Number.isFinite(risk) && risk >= .5 && risk <= 6) timingScore += 15;
+      const status = timingScore >= 75 ? "可進場" : timingScore >= 55 ? (isBull ? "等回踩確認" : "等反彈確認") : timingScore >= 35 ? "只列觀察預警" : "禁止直接追價";
+      return {structure: bos, liquidity: `${swept} · 距離 ${isBull ? "SSL" : "BSL"} ${fmt(bslSslDistance, 1)}%`, vwap, trigger, timingScore: Math.round(clamp(timingScore, 0, 100)), status};
     }
     function signalDecisionHtml(s) {
       const model = signalDecisionModel(s);
       return `<div class="signal-decision">
-        <div class="signal-decision-head"><div class="signal-decision-title">${model.structure}</div><span class="decision-grade grade-${model.grade.toLowerCase()}">${model.grade}</span></div>
+        <div class="signal-decision-head"><div class="signal-decision-title">${model.structure} · ${model.entry.status}</div><span class="decision-grade grade-${model.grade.toLowerCase()}">${model.grade}</span></div>
         <div class="signal-decision-grid pro-only">
           <div class="signal-decision-score" title="條件完整度"><span>品質分 <i class="metric-help">?</i></span><b>${model.quality}/6</b></div>
           <div class="signal-decision-score" title="進場距離、流動性與追價風險，越低越好"><span>風險分 <i class="metric-help">?</i></span><b>${model.risk}/5</b></div>
           <div class="signal-decision-score" title="Funding 與多空比擁擠程度"><span>擁擠分 <i class="metric-help">?</i></span><b>${model.crowd}/5</b></div>
-          <div class="signal-decision-score" title="突破、背離與多週期結構可信度"><span>結構分 <i class="metric-help">?</i></span><b>${model.structureScore}/5</b></div>
+          <div class="signal-decision-score" title="突破、背離與多週期結構可信度"><span>Timing <i class="metric-help">?</i></span><b>${model.entry.timingScore}</b></div>
         </div>
         <div class="decision-line"><b>實戰結論：</b>${model.conclusion}</div>
+        <div class="decision-line"><b>Entry Engine：</b>${model.entry.structure}｜${model.entry.vwap}｜${model.entry.trigger}</div>
+        <div class="decision-line pro-only"><b>流動性：</b>${model.entry.liquidity}</div>
         <div class="decision-line pro-only"><b>核心原因：</b>${model.core}</div>
         <div class="decision-line pro-only"><b>矛盾因素：</b>${model.contradictions}</div>
         <div class="decision-line"><b>失效條件：</b>${model.invalid}</div>
@@ -2152,12 +2354,13 @@
       const market = marketFor(s.symbol);
       const sector = sectorForSymbol(s.symbol);
       const visual = signalVisuals(s, score.value);
+      const decision = signalDecisionModel(s);
       return `<article class="signal-card ${kind} ${score.value >= 88 ? "high-score" : ""}" data-symbol="${clean(s.symbol)}">
         <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
           <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
-          <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
+          <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="decision-grade grade-${decision.grade.toLowerCase()}">${decision.grade}</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
         ${signalDecisionHtml(s)}
@@ -2344,13 +2547,13 @@
         .filter(s => isOpenSignal(s) || isPartialActiveSignal(s))
         .slice(0, 12);
       const liveNotes = state.notifications.slice(0, 12);
+      const buckets = notificationBuckets(recentSignals);
       $("notifyList").innerHTML = `
         <div class="notify-section"><span>即時提示</span><span>${liveNotes.length}</span></div>
         ${liveNotes.map(note => `<div class="notify-item" data-symbol="${note.symbol}"><div class="notify-row"><span class="notify-symbol">${note.symbol}</span><span class="pill ${note.kind}">${note.title}</span></div><div class="notify-meta">${note.body}</div></div>`).join("") || `<div class="empty">暫無新的即時提示。</div>`}
-        <div class="notify-section"><span>數據交易訊號</span><span>${recentSignals.length}</span></div>
-        ${recentSignals.map(s => `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${s.signal_type === "reversal_bullish" ? "bull" : "bear"}">${strategyNameForSignal(s)}</span></div><div class="notify-meta">${stateLabel(s.reached_state)} · ${shortTime(s.triggered_at)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}</div></div>`).join("")}
-        <div class="notify-section"><span>諧波交易訊號</span><span>0</span></div>
-        <div class="empty" style="padding:16px">尚未接入諧波訊號來源。</div>`;
+        ${renderNotifyBucket("A 級進場", buckets.entry)}
+        ${renderNotifyBucket("觀察預警", buckets.watch)}
+        ${renderNotifyBucket("失效 / TP / SL", buckets.manage)}`;
       $("notifyList").querySelectorAll(".notify-item").forEach(item => item.addEventListener("click", () => {
         $("symbolSearch").value = item.dataset.symbol;
         setView("signals");
@@ -2359,6 +2562,23 @@
         $("notifyPanel").classList.remove("open");
       }));
       updateBell();
+    }
+    function notificationBuckets(rows) {
+      return rows.reduce((acc, s) => {
+        const model = signalDecisionModel(s);
+        if (["tp1","tp2","tp3","ftp","sl"].includes(displayState(s))) acc.manage.push(s);
+        else if (model.grade === "A") acc.entry.push(s);
+        else acc.watch.push(s);
+        return acc;
+      }, {entry: [], watch: [], manage: []});
+    }
+    function renderNotifyBucket(title, rows) {
+      return `<div class="notify-section"><span>${title}</span><span>${rows.length}</span></div>
+        ${rows.map(s => {
+          const model = signalDecisionModel(s);
+          const kind = s.signal_type === "reversal_bullish" ? "bull" : "bear";
+          return `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${kind}">${model.grade} · ${strategyNameForSignal(s)}</span></div><div class="notify-meta">${model.entry.status} · ${stateLabel(displayState(s))} · ${shortTime(s.triggered_at)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}</div></div>`;
+        }).join("") || `<div class="empty">暫無${title}。</div>`}`;
     }
     function toggleNotifyPanel() {
       renderNotifications();
