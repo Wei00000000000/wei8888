@@ -1,5 +1,43 @@
 [
   {
+    "symbol": "IPUSDT",
+    "timeframe": "5M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "cvd_5m_bullish_divergence",
+    "triggered_at_ms": 1781464200000,
+    "triggered_at": "2026-06-14T19:10:00+00:00",
+    "trigger_price": 0.2932,
+    "entry_price": 0.2932,
+    "atr_at_trigger": 0.0016335960903036645,
+    "sl_price": 0.28911600977424085,
+    "tp1_price": 0.2972839902257592,
+    "tp2_price": 0.30136798045151836,
+    "tp3_price": 0.3054519706772775,
+    "ftp_price": 0.3136199511287958,
+    "risk": 0.004083990225759161,
+    "sl_source": "atr",
+    "oi_percentile": 53.06122448979592,
+    "oi_change_pct": -0.22967958227025972,
+    "price_change_pct": -0.5764665988470599,
+    "taker_buy_ratio": 0.3515364112619099,
+    "oi_value": 14512073.0,
+    "oi_value_usdt": 4270903.0839,
+    "snapshot_data": {
+      "divergence": "price_down_cvd_up",
+      "divergence_label": "bottom_divergence",
+      "interval": "5m",
+      "cvd_change_pct": 2.798109973770678,
+      "cvd_percentile": 100.0,
+      "cvd_window_bars": 3
+    },
+    "established_at": "2026-06-14T19:10:00+00:00",
+    "id": "32e12b63-fea0-58ad-b014-c9f2db129209",
+    "signal_id": "32e12b63-fea0-58ad-b014-c9f2db129209",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-14T19:11:54.198434+00:00"
+  },
+  {
     "symbol": "UBUSDT",
     "timeframe": "5M",
     "signal_type": "reversal_bearish",
@@ -1179,9 +1217,13 @@
     "established_at": "2026-06-14T18:35:00+00:00",
     "id": "733257fe-e8cf-5783-b724-fcc196999385",
     "signal_id": "733257fe-e8cf-5783-b724-fcc196999385",
-    "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T18:37:23.639103+00:00"
+    "status": "closed",
+    "reached_state": "sl",
+    "detected_at": "2026-06-14T18:37:23.639103+00:00",
+    "max_reached_state": "holding",
+    "hit_price": 0.19908731573856764,
+    "hit_at": "2026-06-14T19:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "DOTUSDT",
@@ -1882,8 +1924,12 @@
     "id": "522ce0e7-e681-5a81-be84-821e8860b9ea",
     "signal_id": "522ce0e7-e681-5a81-be84-821e8860b9ea",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T18:11:27.576452+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-14T18:11:27.576452+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 60.44680036715522,
+    "hit_at": "2026-06-14T19:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "SAHARAUSDT",
@@ -2273,9 +2319,13 @@
     "established_at": "2026-06-14T17:55:00+00:00",
     "id": "cbd77869-5c6d-560b-9c6e-db4c8eb5a854",
     "signal_id": "cbd77869-5c6d-560b-9c6e-db4c8eb5a854",
-    "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T17:57:14.659445+00:00"
+    "status": "closed",
+    "reached_state": "sl",
+    "detected_at": "2026-06-14T17:57:14.659445+00:00",
+    "max_reached_state": "holding",
+    "hit_price": 0.31881346132099614,
+    "hit_at": "2026-06-14T19:05:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "TRUMPUSDT",
@@ -3389,8 +3439,12 @@
     "id": "48e28fed-64f5-5d71-977a-df1bfa2306ff",
     "signal_id": "48e28fed-64f5-5d71-977a-df1bfa2306ff",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T16:56:58.039200+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-14T16:56:58.039200+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.006523413146653915,
+    "hit_at": "2026-06-14T19:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "OPGUSDT",
@@ -5142,12 +5196,13 @@
     "id": "3b99356e-3f09-5767-bf0e-22e0a0ada541",
     "signal_id": "3b99356e-3f09-5767-bf0e-22e0a0ada541",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-06-14T16:01:43.046348+00:00",
-    "max_reached_state": "tp1",
-    "hit_price": 2.087592949827441,
-    "hit_at": "2026-06-14T16:10:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 2.107185899654882,
+    "hit_at": "2026-06-14T19:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 2.068
   },
   {
     "symbol": "CHIPUSDT",
@@ -440651,47 +440706,5 @@
     "hit_at": "2026-06-07T17:15:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
     "active_sl_price": 0.01612
-  },
-  {
-    "symbol": "MRVLUSDT",
-    "timeframe": "5M",
-    "signal_type": "reversal_bearish",
-    "setup_id": "cvd_5m_bearish_divergence",
-    "triggered_at_ms": 1780818300000,
-    "triggered_at": "2026-06-07T07:45:00+00:00",
-    "trigger_price": 284.4,
-    "atr_at_trigger": 1.23705211377017,
-    "sl_price": 287.4926302844254,
-    "tp1_price": 281.30736971557457,
-    "tp2_price": 278.21473943114916,
-    "tp3_price": 275.1221091467237,
-    "ftp_price": 268.93684857787287,
-    "risk": 3.092630284425425,
-    "sl_source": "atr",
-    "oi_percentile": 33.6734693877551,
-    "oi_change_pct": -0.1126339276982274,
-    "price_change_pct": 0.10559662090811493,
-    "taker_buy_ratio": 0.4013211108115396,
-    "oi_value": 33194.12,
-    "oi_value_usdt": 9447046.552000001,
-    "snapshot_data": {
-      "divergence": "price_up_cvd_down",
-      "divergence_label": "top_divergence",
-      "interval": "5m",
-      "cvd_change_pct": -14.135869769540193,
-      "cvd_percentile": 100.0,
-      "cvd_window_bars": 3
-    },
-    "established_at": "2026-06-07T07:45:00+00:00",
-    "id": "9aa7f775-02f1-5dec-a58f-cdc383c9d2b9",
-    "status": "closed",
-    "reached_state": "sl",
-    "detected_at": "2026-06-07T07:45:56.458865+00:00",
-    "entry_price": 284.4,
-    "signal_id": "9aa7f775-02f1-5dec-a58f-cdc383c9d2b9",
-    "max_reached_state": "holding",
-    "hit_price": 287.4926302844254,
-    "hit_at": "2026-06-07T13:05:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
   }
 ]
