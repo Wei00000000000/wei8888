@@ -1,5 +1,43 @@
 [
   {
+    "symbol": "HOMEUSDT",
+    "timeframe": "5M",
+    "signal_type": "reversal_bearish",
+    "setup_id": "cvd_5m_bearish_divergence",
+    "triggered_at_ms": 1781465400000,
+    "triggered_at": "2026-06-14T19:30:00+00:00",
+    "trigger_price": 0.02703,
+    "entry_price": 0.02703,
+    "atr_at_trigger": 0.0003219431485140687,
+    "sl_price": 0.02783485787128517,
+    "tp1_price": 0.026225142128714827,
+    "tp2_price": 0.025420284257429655,
+    "tp3_price": 0.024615426386144484,
+    "ftp_price": 0.02300571064357414,
+    "risk": 0.0008048578712851718,
+    "sl_source": "atr",
+    "oi_percentile": 78.57142857142857,
+    "oi_change_pct": -0.26550335498059296,
+    "price_change_pct": 0.7829977628635286,
+    "taker_buy_ratio": 0.37495523457084873,
+    "oi_value": 1109274.0,
+    "oi_value_usdt": 2981728.512,
+    "snapshot_data": {
+      "divergence": "price_up_cvd_down",
+      "divergence_label": "top_divergence",
+      "interval": "5m",
+      "cvd_change_pct": -25.00895308583025,
+      "cvd_percentile": 100.0,
+      "cvd_window_bars": 3
+    },
+    "established_at": "2026-06-14T19:30:00+00:00",
+    "id": "dbd82a6a-90aa-51f9-bb01-0200e3e2a8cb",
+    "signal_id": "dbd82a6a-90aa-51f9-bb01-0200e3e2a8cb",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-14T19:32:04.929702+00:00"
+  },
+  {
     "symbol": "HUSDT",
     "timeframe": "15M",
     "signal_type": "reversal_bullish",
@@ -58,8 +96,12 @@
     "id": "2b3b96aa-a1a5-5859-abf2-5b56367fa59e",
     "signal_id": "2b3b96aa-a1a5-5859-abf2-5b56367fa59e",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T19:27:21.628151+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-14T19:27:21.628151+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.41740912,
+    "hit_at": "2026-06-14T19:30:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "HUSDT",
@@ -119,9 +161,13 @@
     "established_at": "2026-06-14T19:20:00+00:00",
     "id": "4551da3b-878a-554f-817d-51fb562fea1c",
     "signal_id": "4551da3b-878a-554f-817d-51fb562fea1c",
-    "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T19:22:35.563292+00:00"
+    "status": "closed",
+    "reached_state": "sl",
+    "detected_at": "2026-06-14T19:22:35.563292+00:00",
+    "max_reached_state": "holding",
+    "hit_price": 0.395361,
+    "hit_at": "2026-06-14T19:30:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "BSBUSDT",
@@ -1124,8 +1170,12 @@
     "id": "f72c73fd-d628-5568-9bfc-72fb3fbef8e9",
     "signal_id": "f72c73fd-d628-5568-9bfc-72fb3fbef8e9",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T18:41:57.158772+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-14T18:41:57.158772+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 6.43903063432208,
+    "hit_at": "2026-06-14T19:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "BABYUSDT",
@@ -1794,8 +1844,12 @@
     "id": "c16712d4-a84b-5d4d-a048-4efa092650ae",
     "signal_id": "c16712d4-a84b-5d4d-a048-4efa092650ae",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-14T18:26:57.503801+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-14T18:26:57.503801+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.07252327665986666,
+    "hit_at": "2026-06-14T19:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "CRVUSDT",
@@ -8522,12 +8576,13 @@
     "id": "bf0afb2d-3ccc-5033-9101-8beb1ec6fbad",
     "signal_id": "bf0afb2d-3ccc-5033-9101-8beb1ec6fbad",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-06-14T14:52:18.250676+00:00",
-    "max_reached_state": "tp1",
-    "hit_price": 1.7317197891890184,
-    "hit_at": "2026-06-14T15:00:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 1.749439578378037,
+    "hit_at": "2026-06-14T19:25:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 1.714
   },
   {
     "symbol": "RIVERUSDT",
@@ -440747,48 +440802,6 @@
     "signal_id": "211e74b2-c29d-5aa4-9e05-9236bc74673b",
     "max_reached_state": "holding",
     "hit_price": 0.7437418757184289,
-    "hit_at": "2026-06-07T13:05:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
-  },
-  {
-    "symbol": "OPNUSDT",
-    "timeframe": "5M",
-    "signal_type": "reversal_bullish",
-    "setup_id": "cvd_5m_bullish_divergence",
-    "triggered_at_ms": 1780818300000,
-    "triggered_at": "2026-06-07T07:45:00+00:00",
-    "trigger_price": 0.1344,
-    "atr_at_trigger": 0.0016192444464522293,
-    "sl_price": 0.13035188888386942,
-    "tp1_price": 0.13844811111613056,
-    "tp2_price": 0.14249622223226113,
-    "tp3_price": 0.1465443333483917,
-    "ftp_price": 0.15464055558065287,
-    "risk": 0.004048111116130573,
-    "sl_source": "atr",
-    "oi_percentile": 31.63265306122449,
-    "oi_change_pct": 0.19137965617736244,
-    "price_change_pct": -0.07434944237919461,
-    "taker_buy_ratio": 0.9022556390977443,
-    "oi_value": 2547456.0,
-    "oi_value_usdt": 3403401.216,
-    "snapshot_data": {
-      "divergence": "price_down_cvd_up",
-      "divergence_label": "bottom_divergence",
-      "interval": "5m",
-      "cvd_change_pct": 80.45112781954887,
-      "cvd_percentile": 100.0,
-      "cvd_window_bars": 3
-    },
-    "established_at": "2026-06-07T07:45:00+00:00",
-    "id": "9d9eb596-1c0e-5dd2-bc93-a70a7122134e",
-    "status": "closed",
-    "reached_state": "sl",
-    "detected_at": "2026-06-07T07:45:48.200102+00:00",
-    "entry_price": 0.1344,
-    "signal_id": "9d9eb596-1c0e-5dd2-bc93-a70a7122134e",
-    "max_reached_state": "holding",
-    "hit_price": 0.13035188888386942,
     "hit_at": "2026-06-07T13:05:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first"
   }
