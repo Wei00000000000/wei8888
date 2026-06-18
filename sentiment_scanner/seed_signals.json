@@ -1,5 +1,43 @@
 [
   {
+    "symbol": "FLOKIUSDT",
+    "timeframe": "5M",
+    "signal_type": "reversal_bearish",
+    "setup_id": "cvd_5m_bearish_divergence",
+    "triggered_at_ms": 1781820900000,
+    "triggered_at": "2026-06-18T22:15:00+00:00",
+    "trigger_price": 2.741e-05,
+    "entry_price": 2.741e-05,
+    "atr_at_trigger": 2.1093253316173573e-07,
+    "sl_price": 2.793733133290434e-05,
+    "tp1_price": 2.688266866709566e-05,
+    "tp2_price": 2.6355337334191323e-05,
+    "tp3_price": 2.5828006001286982e-05,
+    "ftp_price": 2.47733433354783e-05,
+    "risk": 5.273313329043393e-07,
+    "sl_source": "atr",
+    "oi_percentile": 63.26530612244898,
+    "oi_change_pct": 0.3693536169316027,
+    "price_change_pct": 0.47653958944281694,
+    "taker_buy_ratio": 0.25051884581910694,
+    "oi_value": 352451.0,
+    "oi_value_usdt": 974527.015,
+    "snapshot_data": {
+      "divergence": "price_up_cvd_down",
+      "divergence_label": "top_divergence",
+      "interval": "5m",
+      "cvd_change_pct": -49.89623083617862,
+      "cvd_percentile": 100.0,
+      "cvd_window_bars": 3
+    },
+    "established_at": "2026-06-18T22:15:00+00:00",
+    "id": "8eabca1f-ca39-5525-a654-d9a3689a1933",
+    "signal_id": "8eabca1f-ca39-5525-a654-d9a3689a1933",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-06-18T22:17:07.545564+00:00"
+  },
+  {
     "symbol": "EDENUSDT",
     "timeframe": "15M",
     "signal_type": "reversal_bullish",
@@ -234,8 +272,12 @@
     "id": "91f262be-537d-5ce9-bb5b-318d09a6a742",
     "signal_id": "91f262be-537d-5ce9-bb5b-318d09a6a742",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-18T22:11:20.582451+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-18T22:11:20.582451+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 1856.4923220910296,
+    "hit_at": "2026-06-18T22:15:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "TIAUSDT",
@@ -9690,9 +9732,13 @@
     "established_at": "2026-06-18T17:25:00+00:00",
     "id": "d6762b14-fd1a-5d36-baf3-0e24299cb2cb",
     "signal_id": "d6762b14-fd1a-5d36-baf3-0e24299cb2cb",
-    "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-18T17:26:17.740664+00:00"
+    "status": "closed",
+    "reached_state": "sl",
+    "detected_at": "2026-06-18T17:26:17.740664+00:00",
+    "max_reached_state": "holding",
+    "hit_price": 0.02638686771522762,
+    "hit_at": "2026-06-18T22:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "AVAXUSDT",
@@ -10003,8 +10049,12 @@
     "id": "11311217-a540-5291-a5b6-1dd984b4c508",
     "signal_id": "11311217-a540-5291-a5b6-1dd984b4c508",
     "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-18T17:22:10.459839+00:00"
+    "reached_state": "tp1",
+    "detected_at": "2026-06-18T17:22:10.459839+00:00",
+    "max_reached_state": "tp1",
+    "hit_price": 0.14738241667521118,
+    "hit_at": "2026-06-18T22:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "WIFUSDT",
@@ -22718,9 +22768,13 @@
     "established_at": "2026-06-18T15:15:00+00:00",
     "id": "a50c929c-b670-55dc-8bc2-42ab30890f6b",
     "signal_id": "a50c929c-b670-55dc-8bc2-42ab30890f6b",
-    "status": "active",
-    "reached_state": "holding",
-    "detected_at": "2026-06-18T15:16:13.336595+00:00"
+    "status": "closed",
+    "reached_state": "sl",
+    "detected_at": "2026-06-18T15:16:13.336595+00:00",
+    "max_reached_state": "holding",
+    "hit_price": 0.026327266211909086,
+    "hit_at": "2026-06-18T22:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "PUMPUSDT",
@@ -32003,12 +32057,13 @@
     "id": "4ba7ff81-4eb2-5726-8987-48dfec8d9900",
     "signal_id": "4ba7ff81-4eb2-5726-8987-48dfec8d9900",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-06-18T12:56:13.430358+00:00",
-    "max_reached_state": "tp1",
-    "hit_price": 0.028076842908816766,
-    "hit_at": "2026-06-18T14:40:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 0.026313685817633537,
+    "hit_at": "2026-06-18T22:10:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 0.02984
   },
   {
     "symbol": "ONDOUSDT",
@@ -461213,48 +461268,6 @@
     "max_reached_state": "holding",
     "hit_price": 0.012329635030467922,
     "hit_at": "2026-06-10T21:10:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
-  },
-  {
-    "symbol": "PENGUUSDT",
-    "timeframe": "5M",
-    "signal_type": "reversal_bullish",
-    "setup_id": "cvd_5m_bullish_divergence",
-    "triggered_at_ms": 1781124000000,
-    "triggered_at": "2026-06-10T20:40:00+00:00",
-    "trigger_price": 0.006481,
-    "entry_price": 0.006481,
-    "atr_at_trigger": 2.8609828844878067e-05,
-    "sl_price": 0.006409475427887805,
-    "tp1_price": 0.006552524572112195,
-    "tp2_price": 0.00662404914422439,
-    "tp3_price": 0.006695573716336585,
-    "ftp_price": 0.006838622860560976,
-    "risk": 7.152457211219517e-05,
-    "sl_source": "atr",
-    "oi_percentile": 64.94845360824742,
-    "oi_change_pct": 0.2070556779241279,
-    "price_change_pct": -0.32297754537065804,
-    "taker_buy_ratio": 0.8732011512631915,
-    "oi_value": 4977064.0,
-    "oi_value_usdt": 3232105.3616,
-    "snapshot_data": {
-      "divergence": "price_down_cvd_up",
-      "divergence_label": "bottom_divergence",
-      "interval": "5m",
-      "cvd_change_pct": 74.6402302526383,
-      "cvd_percentile": 100.0,
-      "cvd_window_bars": 3
-    },
-    "established_at": "2026-06-10T20:40:00+00:00",
-    "id": "ca037612-f2d8-5f60-b819-daf77c533294",
-    "signal_id": "ca037612-f2d8-5f60-b819-daf77c533294",
-    "status": "closed",
-    "reached_state": "sl",
-    "detected_at": "2026-06-10T20:41:56.470714+00:00",
-    "max_reached_state": "holding",
-    "hit_price": 0.006409475427887805,
-    "hit_at": "2026-06-10T21:05:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first"
   }
 ]
