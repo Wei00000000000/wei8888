@@ -1449,11 +1449,12 @@ def main() -> None:
         key=lambda row: str(row.get("triggered_at") or row.get("detected_at") or ""),
         reverse=True,
     )
-    max_rows = int(os.getenv("MAX_SEED_ROWS", "10000"))
+    max_rows = int(os.getenv("MAX_SEED_ROWS", "0"))
     allowed_errors = int(os.getenv("MAX_SCAN_ERRORS", str(max(5, int(len(symbols) * 0.05)))))
     scan_ok = bool(found) and len(errors) <= allowed_errors
     if scan_ok:
-        SEED.write_text(json.dumps(rows[:max_rows], ensure_ascii=False, indent=2), encoding="utf-8")
+        rows_to_save = rows[:max_rows] if max_rows > 0 else rows
+        SEED.write_text(json.dumps(rows_to_save, ensure_ascii=False, indent=2), encoding="utf-8")
     else:
         print("WARN scan failed; keeping previous signal data")
     status_time = datetime.now(timezone.utc).isoformat()
@@ -1481,7 +1482,8 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
-    print(f"symbols={len(symbols)} found={len(found)} new={new_count} saved={min(len(rows), max_rows)} errors={len(errors)}")
+    saved_count = min(len(rows), max_rows) if max_rows > 0 else len(rows)
+    print(f"symbols={len(symbols)} found={len(found)} new={new_count} saved={saved_count} errors={len(errors)}")
     for error in errors[:20]:
         print(f"ERROR {error}")
 

@@ -35,7 +35,7 @@ jobs:
           MAX_SCAN_ERRORS: "12"
           STATE_REPLAY_WORKERS: "3"
           DIVERGENCE_CVD_PERCENTILE: "95"
-          MAX_SEED_ROWS: "10000"
+          MAX_SEED_ROWS: "0"
           MAX_ACTIVE_PER_SYMBOL_SIDE: "2"
           SCAN_FALLBACK_LIMIT: "120"
           MIN_QUOTE_VOLUME_USDT: "5000000"
@@ -59,6 +59,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -rf data index.html
           cp -r site/* .
           git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json data index.html
           if git diff --cached --quiet; then

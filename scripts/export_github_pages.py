@@ -72,6 +72,34 @@ def load_seed_rows() -> list[dict[str, object]]:
     return [row for row in rows if isinstance(row, dict)]
 
 
+def signal_identity(row: dict[str, object]) -> str:
+    return str(row.get("id") or row.get("signal_id") or "|".join(
+        [
+            str(row.get("symbol") or ""),
+            str(row.get("setup_id") or ""),
+            str(row.get("triggered_at") or row.get("triggered_at_ms") or ""),
+        ]
+    ))
+
+
+def is_visible_live_signal(row: dict[str, object]) -> bool:
+    state = str(row.get("reached_state") or "holding")
+    status = str(row.get("status") or "active")
+    return status == "active" and state in {"holding", "tp1", "tp2", "tp3"}
+
+
+def build_quick_rows(seed_rows: list[dict[str, object]], recent_limit: int = 800) -> list[dict[str, object]]:
+    seen: set[str] = set()
+    rows: list[dict[str, object]] = []
+    for row in [*seed_rows[:recent_limit], *[item for item in seed_rows if is_visible_live_signal(item)]]:
+        key = signal_identity(row)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(row)
+    return rows
+
+
 def load_contract_radar() -> dict[str, object]:
     if not CONTRACT_RADAR.exists():
         return {"rows": [], "updated_at": None}
@@ -254,7 +282,9 @@ def build_volume_anomalies(seed_rows: list[dict[str, object]]) -> list[dict[str,
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "data").mkdir(parents=True, exist_ok=True)
+    (OUT / "data" / "history").mkdir(parents=True, exist_ok=True)
     seed_rows = load_seed_rows()
+    quick_rows = build_quick_rows(seed_rows)
     contract_radar = load_contract_radar()
     markets = build_markets(seed_rows)
     sector_flows = build_sector_flows()
@@ -263,19 +293,23 @@ def main() -> None:
     if BRAND_IMAGE.exists():
         copyfile(BRAND_IMAGE, OUT / "brand-hero.png")
     (OUT / "data" / "book.json").write_text(
-        json.dumps({"rows": seed_rows, "markets": markets}, ensure_ascii=False, separators=(",", ":")),
+        json.dumps({"rows": quick_rows, "markets": markets}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
-    chunk_size = 100
-    chunks = []
+    (OUT / "data" / "active_signals.json").write_text(
+        json.dumps({"rows": quick_rows, "total": len(seed_rows), "quick": len(quick_rows)}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    chunk_size = 500
+    history_chunks = []
     for index in range(0, len(seed_rows), chunk_size):
-        name = f"signals-{index // chunk_size:03d}.json"
+        name = f"history/signals-{index // chunk_size:04d}.json"
         chunk_rows = seed_rows[index : index + chunk_size]
         (OUT / "data" / name).write_text(
             json.dumps({"rows": chunk_rows}, ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8",
         )
-        chunks.append(name)
+        history_chunks.append(name)
     (OUT / "data" / "markets.json").write_text(
         json.dumps({"rows": markets}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
@@ -298,11 +332,26 @@ def main() -> None:
         encoding="utf-8",
     )
     (OUT / "data" / "manifest.json").write_text(
-        json.dumps({"signal_chunks": chunks, "markets": "markets.json", "sector_flows": "sector_flows.json", "volume_anomalies": "volume_anomalies.json", "contract_anomalies": "contract_anomalies.json", "scanner_status": "scanner_status.json"}, ensure_ascii=False, separators=(",", ":")),
+        json.dumps(
+            {
+                "active_signals": "active_signals.json",
+                "history_chunks": history_chunks,
+                "signal_chunks": history_chunks,
+                "total_signals": len(seed_rows),
+                "quick_signals": len(quick_rows),
+                "markets": "markets.json",
+                "sector_flows": "sector_flows.json",
+                "volume_anomalies": "volume_anomalies.json",
+                "contract_anomalies": "contract_anomalies.json",
+                "scanner_status": "scanner_status.json",
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         encoding="utf-8",
     )
     print(f"Exported GitHub Pages site to {OUT}")
-    print(f"Signals: {len(seed_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)} Volume anomalies: {len(volume_anomalies)} Contract radar: {len(contract_radar.get('rows') or [])}")
+    print(f"Signals: {len(seed_rows)} Quick: {len(quick_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)} Volume anomalies: {len(volume_anomalies)} Contract radar: {len(contract_radar.get('rows') or [])}")
 
 
 if __name__ == "__main__":

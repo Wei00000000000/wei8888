@@ -795,6 +795,11 @@
       lastVolumeAt: null,
       lastContractAt: null,
       scannerStatus: null,
+      manifest: null,
+      historyLoaded: false,
+      historyLoading: null,
+      historyTotal: 0,
+      quickTotal: 0,
       lastError: "",
       busy: false,
       currentView: "dashboard",
@@ -1014,18 +1019,12 @@
         const manifestRes = await fetch(`data/manifest.json?ts=${Date.now()}`);
         if (!manifestRes.ok) throw new Error("manifest missing");
         const manifest = await manifestRes.json();
-        const chunkNames = manifest.signal_chunks || [];
-        const initialCount = isMobileView() ? 2 : 4;
-        const initialNames = chunkNames.slice(0, initialCount);
-        const chunks = await Promise.all(initialNames.map(async name => {
-          const res = await fetch(`data/${name}?ts=${Date.now()}`);
-          if (!res.ok) return {rows: []};
-          return res.json();
-        }));
-        const rows = chunks.flatMap(chunk => chunk.rows || []);
-        if (chunkNames.length > initialCount) {
-          setTimeout(() => loadRemainingSignalChunks(chunkNames.slice(initialCount)), 900);
-        }
+        state.manifest = manifest;
+        state.historyTotal = Number(manifest.total_signals || 0);
+        state.quickTotal = Number(manifest.quick_signals || 0);
+        const activeRes = await fetch(`data/${manifest.active_signals || "active_signals.json"}?ts=${Date.now()}`);
+        const activeData = activeRes.ok ? await activeRes.json() : {rows: []};
+        const rows = activeData.rows || [];
         const marketsRes = await fetch(`data/${manifest.markets || "markets.json"}?ts=${Date.now()}`);
         const marketsData = marketsRes.ok ? await marketsRes.json() : {rows: []};
         const statusRes = await fetch(`data/${manifest.scanner_status || "scanner_status.json"}?ts=${Date.now()}`);
@@ -1134,7 +1133,8 @@
         const data = await apiJson("book");
         const firstLoad = !state.lastBookAt;
         const oldStates = new Map(seenStates);
-        state.signals = sortSignals(data.rows || []);
+        if (state.historyLoaded) mergeSignals(data.rows || []);
+        else state.signals = sortSignals(data.rows || []);
         state.markets = mergeMarkets(state.markets, data.markets || []);
         state.lastBookAt = new Date();
         if (firstLoad) {
@@ -1259,12 +1259,7 @@
       renderDecisionDashboard();
       renderSectorFlows();
       renderVolumeAnomalies();
-      renderContractRadar();
-      renderWatchDashboard();
-      renderSignals();
-      renderHighQuality();
-      renderStable();
-      renderReview();
+      renderCurrentView();
       renderNotifications();
       renderHealth();
     }
@@ -1348,6 +1343,9 @@
       ["symbolSearch", "signalSearch", "stableSearch", "contractSearch", "qualitySearch"].forEach(id => {
         if ($(id) && id !== sourceId) $(id).value = value;
       });
+      if (value.trim() && ["symbolSearch", "signalSearch", "stableSearch", "qualitySearch"].includes(sourceId)) {
+        requestHistoryRender("搜尋歷史", renderCurrentView);
+      }
       renderAll();
     }
     function focusCurrentSearch() {
@@ -1359,6 +1357,7 @@
     function syncDate(sourceId) {
       const targetId = sourceId === "symbolDate" ? "signalDate" : "symbolDate";
       $(targetId).value = $(sourceId).value;
+      if ($(sourceId).value) requestHistoryRender("日期查詢", renderCurrentView);
       renderAll();
     }
     function syncFilter(sourceId) {
@@ -1519,22 +1518,49 @@
       $("contractWarningCards").querySelectorAll("[data-contract-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.contractSymbol)));
       target.querySelectorAll("[data-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
     }
-    async function loadRemainingSignalChunks(chunkNames) {
-      try {
-        const chunks = [];
-        for (const name of chunkNames) {
-          const res = await fetch(`data/${name}?ts=${Date.now()}`);
-          if (res.ok) chunks.push(await res.json());
-          await new Promise(resolve => setTimeout(resolve, 0));
+    async function ensureHistorySignals(reason = "backtest") {
+      if (state.historyLoaded) return state.signals;
+      if (state.historyLoading) return state.historyLoading;
+      state.historyLoading = (async () => {
+        try {
+          if (!state.manifest) {
+            const manifestRes = await fetch(`data/manifest.json?ts=${Date.now()}`);
+            state.manifest = manifestRes.ok ? await manifestRes.json() : {};
+          }
+          const chunks = state.manifest.history_chunks || state.manifest.signal_chunks || [];
+          if (!chunks.length) {
+            state.historyLoaded = true;
+            return state.signals;
+          }
+          status(`載入完整歷史給${reason} · 0/${chunks.length}`);
+          for (let index = 0; index < chunks.length; index += 4) {
+            const batch = chunks.slice(index, index + 4);
+            const payloads = await Promise.all(batch.map(async name => {
+              const res = await fetch(`data/${name}?ts=${Date.now()}`);
+              return res.ok ? res.json() : {rows: []};
+            }));
+            mergeSignals(payloads.flatMap(chunk => chunk.rows || []));
+            if (index % 16 === 0) status(`載入完整歷史給${reason} · ${Math.min(index + 4, chunks.length)}/${chunks.length}`);
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+          state.historyLoaded = true;
+          status(`完整歷史已載入 · ${state.signals.length} trades`);
+          return state.signals;
+        } catch (err) {
+          rememberError(err, "History load error");
+          throw err;
+        } finally {
+          state.historyLoading = null;
         }
-        const rows = chunks.flatMap(chunk => chunk.rows || []);
-        if (!rows.length) return;
-        mergeSignals(rows);
-        renderAll();
-        status(`背景補齊歷史 · ${state.signals.length} signals`);
-      } catch (err) {
-        rememberError(err, "History load error");
-      }
+      })();
+      return state.historyLoading;
+    }
+    function requestHistoryRender(reason, renderFn) {
+      if (state.historyLoaded || state.historyLoading) return;
+      ensureHistorySignals(reason).then(() => {
+        renderStats();
+        renderCurrentView();
+      }).catch(() => {});
     }
     function renderContractBacktest(rows) {
       const samples = rows
@@ -1925,6 +1951,7 @@
       </div>`;
     }
     function renderSignals() {
+      if (state.currentView === "signals") requestHistoryRender("數據回測", renderSignals);
       const rows = filteredSignals();
       const backtestRows = dateRangeRows(dataSignals(), $("signalBtFrom").value, $("signalBtTo").value);
       $("signalCount").textContent = `(${rows.length})`;
@@ -1933,7 +1960,8 @@
       renderBacktestChart(backtestRows, {
         chartId: "signalBacktestChart",
         statsId: "signalBacktestStats",
-        metaId: "signalBacktestMeta"
+        metaId: "signalBacktestMeta",
+        loading: !state.historyLoaded
       });
       const hasFocusedQuery = Boolean($("signalSearch").value.trim() || $("signalDate").value || $("signalStatusFilter").value !== "all");
       const displayRows = hasFocusedQuery ? rows.slice(0, displayLimit(240, 100)) : rows.slice(0, displayLimit(120, 40));
@@ -1944,6 +1972,7 @@
       document.querySelectorAll(".signal-card").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
     }
     function renderHighQuality() {
+      if (state.currentView === "quality") requestHistoryRender("高品質回測", renderHighQuality);
       const target = $("qualityCards");
       if (!target) return;
       const q = $("qualitySearch").value.trim().toUpperCase();
@@ -1969,7 +1998,8 @@
       renderBacktestChart(todayRows, {
         chartId: "qualityBacktestChart",
         statsId: "qualityBacktestStats",
-        metaId: "qualityBacktestMeta"
+        metaId: "qualityBacktestMeta",
+        loading: !state.historyLoaded
       });
       target.innerHTML = rows.slice(0, displayLimit(120, 40)).map(s => signalCard({...s, snapshot_data: {...(s.snapshot_data || {}), quality_desk: true}})).join("") || `<section class="panel"><div class="empty">目前沒有高品質正式訊號。</div></section>`;
       target.querySelectorAll("[data-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
@@ -2001,6 +2031,7 @@
       return new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
     function renderStable() {
+      if (state.currentView === "stable") requestHistoryRender("穩如老狗回測", renderStable);
       const q = $("stableSearch").value.trim().toUpperCase();
       const sideFilter = $("stableSideFilter").value;
       const day = $("stableDate").value;
@@ -2024,7 +2055,7 @@
         ["觀望", wait, "warn-text"],
         ["高分", tradable, ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
-      renderBacktestChart(dateRangeRows(stableOfficialRows(), $("stableBtFrom").value, $("stableBtTo").value));
+      renderBacktestChart(dateRangeRows(stableOfficialRows(), $("stableBtFrom").value, $("stableBtTo").value), {loading: !state.historyLoaded});
       $("stableCards").innerHTML = rows.slice(0, displayLimit(120, 40)).map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
       $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
     }
@@ -2051,7 +2082,10 @@
       const targetStats = targetHitStats(all);
       const confidence = sampleConfidence(all.length);
       const playbook = playbookStats(all)[0] || {name: "等待樣本", rate: 0, count: 0};
-      $(metaId).textContent = `${all.length} trades`;
+      const loadingHistory = options.loading && !state.historyLoaded;
+      $(metaId).textContent = loadingHistory
+        ? `${all.length} / ${state.historyTotal || "?"} trades · 載入完整歷史中`
+        : `${all.length} trades · 完整紀錄`;
       $(statsId).innerHTML = [
         ["交易數", all.length, ""],
         ["樣本可信度", confidence.label, confidence.cls],
@@ -2067,7 +2101,9 @@
         ["最大回撤", signed(maxDrawdown), "bear-text"],
         ["累積盈虧", signed(equity), equity >= 0 ? "bull-text" : "bear-text"]
       ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
-      $(chartId).innerHTML = equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses});
+      $(chartId).innerHTML = loadingHistory
+        ? `<div class="empty">正在載入完整歷史回測，先顯示快速資料。</div>${equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses})}`
+        : equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses});
     }
     function sampleConfidence(count) {
       if (count < 30) return {label: `${count} 筆｜觀察`, cls: "warn-text", showRate: false};
@@ -2788,6 +2824,9 @@
 
     function openSymbolModal(symbol) {
       symbol = clean(symbol);
+      if (!state.historyLoaded && !state.historyLoading) {
+        ensureHistorySignals(`${symbol} 歷史`).then(() => openSymbolModal(symbol)).catch(() => {});
+      }
       const modalDay = $("modalDate").value;
       const rows = state.signals
         .filter(s => clean(s.symbol) === symbol)
