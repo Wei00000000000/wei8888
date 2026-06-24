@@ -585,6 +585,8 @@
           <div class="section-actions">
             <input id="signalBtFrom" type="date" title="開始日期">
             <input id="signalBtTo" type="date" title="結束日期">
+            <button class="btn" id="signalExportCsv">CSV</button>
+            <button class="btn" id="signalExportJson">JSON</button>
             <span class="pill accent" id="signalBacktestMeta">0 trades</span>
           </div>
         </div>
@@ -730,6 +732,8 @@
           <div class="section-actions">
             <input id="stableBtFrom" type="date" title="開始日期">
             <input id="stableBtTo" type="date" title="結束日期">
+            <button class="btn" id="stableExportCsv">CSV</button>
+            <button class="btn" id="stableExportJson">JSON</button>
           </div>
         </div>
         <div id="backtestChart" class="equity-chart"></div>
@@ -863,8 +867,12 @@
     $("stableDate").addEventListener("change", renderStable);
     $("signalBtFrom").addEventListener("change", renderSignals);
     $("signalBtTo").addEventListener("change", renderSignals);
+    $("signalExportCsv").addEventListener("click", () => exportBacktest("signals", "csv"));
+    $("signalExportJson").addEventListener("click", () => exportBacktest("signals", "json"));
     $("stableBtFrom").addEventListener("change", renderStable);
     $("stableBtTo").addEventListener("change", renderStable);
+    $("stableExportCsv").addEventListener("click", () => exportBacktest("stable", "csv"));
+    $("stableExportJson").addEventListener("click", () => exportBacktest("stable", "json"));
     $("stableSearch").addEventListener("input", () => syncSearch("stableSearch"));
     $("stableSideFilter").addEventListener("change", renderStable);
     $("contractSearch").addEventListener("input", () => syncSearch("contractSearch"));
@@ -1953,7 +1961,10 @@
     function renderSignals() {
       if (state.currentView === "signals") requestHistoryRender("數據回測", renderSignals);
       const rows = filteredSignals();
-      const backtestRows = dateRangeRows(dataSignals(), $("signalBtFrom").value, $("signalBtTo").value);
+      const signalFrom = $("signalBtFrom").value;
+      const signalTo = $("signalBtTo").value;
+      const sourceRows = dataSignals();
+      const backtestRows = dateRangeRows(sourceRows, signalFrom, signalTo);
       $("signalCount").textContent = `(${rows.length})`;
       const dashRows = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).slice(0, 8);
       $("dashboardSignalCount").textContent = `(${dashRows.length})`;
@@ -1961,6 +1972,9 @@
         chartId: "signalBacktestChart",
         statsId: "signalBacktestStats",
         metaId: "signalBacktestMeta",
+        from: signalFrom,
+        to: signalTo,
+        sourceTotal: sourceRows.length,
         loading: !state.historyLoaded
       });
       const hasFocusedQuery = Boolean($("signalSearch").value.trim() || $("signalDate").value || $("signalStatusFilter").value !== "all");
@@ -2055,7 +2069,15 @@
         ["觀望", wait, "warn-text"],
         ["高分", tradable, ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
-      renderBacktestChart(dateRangeRows(stableOfficialRows(), $("stableBtFrom").value, $("stableBtTo").value), {loading: !state.historyLoaded});
+      const stableFrom = $("stableBtFrom").value;
+      const stableTo = $("stableBtTo").value;
+      const stableSourceRows = stableOfficialRows();
+      renderBacktestChart(dateRangeRows(stableSourceRows, stableFrom, stableTo), {
+        from: stableFrom,
+        to: stableTo,
+        sourceTotal: stableSourceRows.length,
+        loading: !state.historyLoaded
+      });
       $("stableCards").innerHTML = rows.slice(0, displayLimit(120, 40)).map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
       $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
     }
@@ -2083,9 +2105,11 @@
       const confidence = sampleConfidence(all.length);
       const playbook = playbookStats(all)[0] || {name: "等待樣本", rate: 0, count: 0};
       const loadingHistory = options.loading && !state.historyLoaded;
+      const scopeText = rangeLabel(options.from, options.to);
+      const sourceTotal = Number(options.sourceTotal || all.length);
       $(metaId).textContent = loadingHistory
-        ? `${all.length} / ${state.historyTotal || "?"} trades · 載入完整歷史中`
-        : `${all.length} trades · 完整紀錄`;
+        ? `${scopeText} · ${all.length} / ${state.historyTotal || "?"} trades · 載入完整歷史中`
+        : `${scopeText} · ${all.length}/${sourceTotal} trades · 全量統計`;
       $(statsId).innerHTML = [
         ["交易數", all.length, ""],
         ["樣本可信度", confidence.label, confidence.cls],
@@ -3390,21 +3414,113 @@
     }
     function sameDay(value, yyyyMmDd) {
       if (!value || !yyyyMmDd) return false;
+      return taipeiDateKey(value) === yyyyMmDd;
+    }
+    function tradeDate(row) {
+      return new Date(row?.triggered_at || row?.detected_at || row?.created_at || row?.recorded_at || 0);
+    }
+    function taipeiDateKey(value) {
       const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return false;
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}` === yyyyMmDd;
+      if (Number.isNaN(d.getTime())) return "";
+      const parts = new Intl.DateTimeFormat("en", {
+        timeZone: "Asia/Taipei",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(d).reduce((acc, part) => {
+        acc[part.type] = part.value;
+        return acc;
+      }, {});
+      return `${parts.year}-${parts.month}-${parts.day}`;
+    }
+    function taipeiBoundary(value, end = false) {
+      if (!value) return null;
+      const time = end ? "23:59:59.999" : "00:00:00.000";
+      const date = new Date(`${value}T${time}+08:00`);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+    function rangeLabel(from, to) {
+      if (from && to) return `${from} → ${to}`;
+      if (from) return `${from} 之後`;
+      if (to) return `${to} 之前`;
+      return "全部期間";
     }
     function dateRangeRows(rows, from, to) {
+      const start = taipeiBoundary(from, false);
+      const end = taipeiBoundary(to, true);
       return rows.filter(row => {
-        const d = new Date(row.triggered_at || row.detected_at || 0);
+        const d = tradeDate(row);
         if (Number.isNaN(d.getTime())) return false;
-        if (from && d < new Date(`${from}T00:00:00`)) return false;
-        if (to && d > new Date(`${to}T23:59:59`)) return false;
+        if (start && d < start) return false;
+        if (end && d > end) return false;
         return true;
       });
+    }
+    function currentBacktestRows(kind) {
+      if (kind === "stable") {
+        return dateRangeRows(stableOfficialRows(), $("stableBtFrom").value, $("stableBtTo").value);
+      }
+      return dateRangeRows(dataSignals(), $("signalBtFrom").value, $("signalBtTo").value);
+    }
+    async function exportBacktest(kind, format) {
+      await ensureHistorySignals("匯出完整回測");
+      const rows = currentBacktestRows(kind).slice().sort((a,b) => tradeDate(a) - tradeDate(b));
+      const label = kind === "stable" ? "stable" : "signals";
+      const from = kind === "stable" ? $("stableBtFrom").value : $("signalBtFrom").value;
+      const to = kind === "stable" ? $("stableBtTo").value : $("signalBtTo").value;
+      const stamp = `${label}_${from || "all"}_${to || "all"}`;
+      const simple = rows.map(simplifiedTrade);
+      if (format === "json") {
+        downloadText(`${stamp}.json`, JSON.stringify({range: rangeLabel(from, to), total: simple.length, rows: simple}, null, 2), "application/json");
+      } else {
+        downloadText(`${stamp}.csv`, tradesToCsv(simple), "text/csv;charset=utf-8");
+      }
+      status(`已匯出 ${simple.length} 筆完整回測紀錄`);
+    }
+    function simplifiedTrade(s) {
+      return {
+        symbol: clean(s.symbol),
+        strategy: strategyNameForSignal(s),
+        timeframe: s.timeframe || "15M",
+        side: s.signal_type === "reversal_bullish" ? "多" : "空",
+        state: displayState(s),
+        entry_price: entryPrice(s),
+        exit_price: exitPriceFor(s),
+        current_price: currentPrice(s),
+        pnl_pct: Number(pnlPct(s, false).toFixed(4)),
+        risk_pct: Number((riskPct(s) || 0).toFixed(4)),
+        triggered_at: s.triggered_at || "",
+        hit_at: s.hit_at || "",
+        reason: plainTradeReason(s)
+      };
+    }
+    function exitPriceFor(s) {
+      const stateValue = s.reached_state;
+      if (stateValue === "sl") return Number(s.sl_price);
+      if (stateValue === "tp1") return Number(s.tp1_price);
+      if (stateValue === "tp2") return Number(s.tp2_price);
+      if (stateValue === "tp3") return Number(s.tp3_price);
+      if (stateValue === "ftp") return Number(s.ftp_price);
+      return currentPrice(s);
+    }
+    function tradesToCsv(rows) {
+      const headers = ["symbol","strategy","timeframe","side","state","entry_price","exit_price","current_price","pnl_pct","risk_pct","triggered_at","hit_at","reason"];
+      return [headers.join(","), ...rows.map(row => headers.map(key => csvCell(row[key])).join(","))].join("\n");
+    }
+    function csvCell(value) {
+      const text = String(value ?? "");
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+    function downloadText(filename, text, type) {
+      const blob = new Blob([text], {type});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
     }
     function isDivergenceSignal(s) {
       const setup = String(s && s.setup_id || "");
