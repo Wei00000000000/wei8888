@@ -96,6 +96,7 @@
     .btn { height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); padding: 0 12px; font-size: 12px; font-weight: 900; white-space: nowrap; }
     .btn.primary { border-color: rgba(179,107,255,.7); background: var(--accent-soft); color: #e8d4ff; }
     .btn:disabled { opacity: .55; cursor: progress; }
+    .btn.load-more { display: block; width: min(360px, 100%); margin: 18px auto 0; }
     .status-line { padding: 10px 14px; color: var(--muted); font: 700 11px var(--mono); border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .health-pack { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
     .health-dot { min-height: 22px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: rgba(255,255,255,.025); color: var(--muted); }
@@ -585,6 +586,7 @@
           <div class="section-actions">
             <input id="signalBtFrom" type="date" title="開始日期">
             <input id="signalBtTo" type="date" title="結束日期">
+            <button class="btn" id="signalLoadFull">載入完整回測</button>
             <button class="btn" id="signalExportCsv">CSV</button>
             <button class="btn" id="signalExportJson">JSON</button>
             <span class="pill accent" id="signalBacktestMeta">0 trades</span>
@@ -594,6 +596,7 @@
         <div class="chart-stats" id="signalBacktestStats"></div>
       </section>
       <div class="signals-grid" id="signalCards"></div>
+      <button class="btn load-more" id="signalLoadMore">載入更多訊號</button>
     </section>
 
     <section id="contract" class="view">
@@ -699,6 +702,7 @@
         <div class="chart-stats" id="qualityBacktestStats"></div>
       </section>
       <div class="terminal-grid" id="qualityCards"></div>
+      <button class="btn load-more" id="qualityLoadMore">載入更多高品質訊號</button>
     </section>
 
     <section id="stable" class="view">
@@ -732,6 +736,7 @@
           <div class="section-actions">
             <input id="stableBtFrom" type="date" title="開始日期">
             <input id="stableBtTo" type="date" title="結束日期">
+            <button class="btn" id="stableLoadFull">載入完整回測</button>
             <button class="btn" id="stableExportCsv">CSV</button>
             <button class="btn" id="stableExportJson">JSON</button>
           </div>
@@ -740,6 +745,7 @@
         <div class="chart-stats" id="backtestStats"></div>
       </section>
       <div class="terminal-grid" id="stableCards"></div>
+      <button class="btn load-more" id="stableLoadMore">載入更多穩狗訊號</button>
     </section>
 
     <section id="review" class="view">
@@ -804,6 +810,9 @@
       historyLoading: null,
       historyTotal: 0,
       quickTotal: 0,
+      signalIndex: new Map(),
+      debounceTimers: {},
+      visibleLimitBoost: {signals: 0, stable: 0, quality: 0, contract: 0},
       lastError: "",
       busy: false,
       currentView: "dashboard",
@@ -860,25 +869,30 @@
     document.addEventListener("pointerdown", unlockSoundOnce, {once: true});
     $("bellBtn").addEventListener("click", event => { event.stopPropagation(); unlockSoundOnce(); requestNotifyPermission(); toggleNotifyPanel(); });
     $("notifyClear").addEventListener("click", markNotificationsRead);
-    $("symbolSearch").addEventListener("input", () => syncSearch("symbolSearch"));
-    $("signalSearch").addEventListener("input", () => syncSearch("signalSearch"));
+    $("symbolSearch").addEventListener("input", () => debounceAction("search", () => syncSearch("symbolSearch"), 300));
+    $("signalSearch").addEventListener("input", () => debounceAction("search", () => syncSearch("signalSearch"), 300));
     $("symbolDate").addEventListener("change", () => syncDate("symbolDate"));
     $("signalDate").addEventListener("change", () => syncDate("signalDate"));
     $("stableDate").addEventListener("change", renderStable);
-    $("signalBtFrom").addEventListener("change", renderSignals);
-    $("signalBtTo").addEventListener("change", renderSignals);
+    $("signalBtFrom").addEventListener("change", () => debounceAction("signalBacktest", renderSignals, 250));
+    $("signalBtTo").addEventListener("change", () => debounceAction("signalBacktest", renderSignals, 250));
+    $("signalLoadFull").addEventListener("click", () => loadFullHistoryFor("數據完整回測", renderSignals));
     $("signalExportCsv").addEventListener("click", () => exportBacktest("signals", "csv"));
     $("signalExportJson").addEventListener("click", () => exportBacktest("signals", "json"));
-    $("stableBtFrom").addEventListener("change", renderStable);
-    $("stableBtTo").addEventListener("change", renderStable);
+    $("stableBtFrom").addEventListener("change", () => debounceAction("stableBacktest", renderStable, 250));
+    $("stableBtTo").addEventListener("change", () => debounceAction("stableBacktest", renderStable, 250));
+    $("stableLoadFull").addEventListener("click", () => loadFullHistoryFor("穩狗完整回測", renderStable));
     $("stableExportCsv").addEventListener("click", () => exportBacktest("stable", "csv"));
     $("stableExportJson").addEventListener("click", () => exportBacktest("stable", "json"));
-    $("stableSearch").addEventListener("input", () => syncSearch("stableSearch"));
+    $("stableSearch").addEventListener("input", () => debounceAction("search", () => syncSearch("stableSearch"), 300));
     $("stableSideFilter").addEventListener("change", renderStable);
-    $("contractSearch").addEventListener("input", () => syncSearch("contractSearch"));
+    $("contractSearch").addEventListener("input", () => debounceAction("search", () => syncSearch("contractSearch"), 300));
     $("contractBiasFilter").addEventListener("change", renderContractRadar);
-    $("qualitySearch").addEventListener("input", () => syncSearch("qualitySearch"));
+    $("qualitySearch").addEventListener("input", () => debounceAction("search", () => syncSearch("qualitySearch"), 300));
     $("qualitySideFilter").addEventListener("change", renderHighQuality);
+    $("signalLoadMore").addEventListener("click", () => showMore("signals", renderSignals));
+    $("stableLoadMore").addEventListener("click", () => showMore("stable", renderStable));
+    $("qualityLoadMore").addEventListener("click", () => showMore("quality", renderHighQuality));
     document.querySelectorAll("[data-visual-tf]").forEach(btn => btn.addEventListener("click", () => {
       state.visualTf = btn.dataset.visualTf;
       renderContractRadar();
@@ -1016,10 +1030,11 @@
         const data = await apiJson("contract_anomalies");
         state.contractAnomalies = data.rows || [];
         state.lastContractAt = data.updated_at ? new Date(data.updated_at) : new Date();
-        renderContractRadar();
+        if (state.currentView === "contract") renderContractRadar();
+        else renderHealth();
       } catch (err) {
         state.contractAnomalies = [];
-        renderContractRadar();
+        if (state.currentView === "contract") renderContractRadar();
       }
     }
     async function staticBook() {
@@ -1142,7 +1157,10 @@
         const firstLoad = !state.lastBookAt;
         const oldStates = new Map(seenStates);
         if (state.historyLoaded) mergeSignals(data.rows || []);
-        else state.signals = sortSignals(data.rows || []);
+        else {
+          state.signals = sortSignals(data.rows || []);
+          rebuildSignalIndex();
+        }
         state.markets = mergeMarkets(state.markets, data.markets || []);
         state.lastBookAt = new Date();
         if (firstLoad) {
@@ -1183,6 +1201,7 @@
         const data = await apiJson("tick", tickParams());
         const oldStates = new Map(seenStates);
         state.signals = sortSignals(data.rows || state.signals);
+        rebuildSignalIndex();
         state.markets = mergeMarkets(state.markets, data.markets || []);
         notifySignalChanges(data.new_signals || []);
         state.lastTickAt = new Date();
@@ -1242,9 +1261,14 @@
       }
       const seconds = 120;
       $("autoScan").textContent = "停止自動";
-      tickScan();
-      autoTimer = setInterval(tickScan, seconds * 1000);
-      status(`Auto scan every ${seconds}s.`);
+      if (STATIC_MODE) {
+        autoTimer = setInterval(loadBook, seconds * 1000);
+        status(`雲端掃描同步每 ${seconds}s 更新。`);
+      } else {
+        tickScan();
+        autoTimer = setInterval(tickScan, seconds * 1000);
+        status(`Auto scan every ${seconds}s.`);
+      }
       renderHealth();
     }
     function busy(value) {
@@ -1260,6 +1284,32 @@
     function rememberError(err, prefix = "Error") {
       state.lastError = `${prefix}: ${err.message}`;
       status(state.lastError, "warn");
+    }
+    function debounceAction(key, fn, delay = 300) {
+      clearTimeout(state.debounceTimers[key]);
+      state.debounceTimers[key] = setTimeout(fn, delay);
+    }
+    function rebuildSignalIndex() {
+      state.signalIndex = new Map(state.signals.map(row => [signalKey(row), row]));
+    }
+    async function loadFullHistoryFor(reason, renderFn = renderCurrentView) {
+      await ensureHistorySignals(reason);
+      renderStats();
+      renderFn();
+    }
+    function listLimit(key, focused = false) {
+      const base = focused ? displayLimit(100, 50) : displayLimit(60, 20);
+      return base + (state.visibleLimitBoost[key] || 0);
+    }
+    function showMore(key, renderFn) {
+      state.visibleLimitBoost[key] = (state.visibleLimitBoost[key] || 0) + displayLimit(60, 20);
+      renderFn();
+    }
+    function updateLoadMore(id, shown, total) {
+      const btn = $(id);
+      if (!btn) return;
+      btn.style.display = total > shown ? "" : "none";
+      btn.textContent = `載入更多 (${shown}/${total})`;
     }
 
     function renderAll() {
@@ -1351,9 +1401,6 @@
       ["symbolSearch", "signalSearch", "stableSearch", "contractSearch", "qualitySearch"].forEach(id => {
         if ($(id) && id !== sourceId) $(id).value = value;
       });
-      if (value.trim() && ["symbolSearch", "signalSearch", "stableSearch", "qualitySearch"].includes(sourceId)) {
-        requestHistoryRender("搜尋歷史", renderCurrentView);
-      }
       renderAll();
     }
     function focusCurrentSearch() {
@@ -1365,7 +1412,6 @@
     function syncDate(sourceId) {
       const targetId = sourceId === "symbolDate" ? "signalDate" : "symbolDate";
       $(targetId).value = $(sourceId).value;
-      if ($(sourceId).value) requestHistoryRender("日期查詢", renderCurrentView);
       renderAll();
     }
     function syncFilter(sourceId) {
@@ -1541,17 +1587,20 @@
             return state.signals;
           }
           status(`載入完整歷史給${reason} · 0/${chunks.length}`);
-          for (let index = 0; index < chunks.length; index += 4) {
-            const batch = chunks.slice(index, index + 4);
+          const batchSize = isMobileView() ? 1 : 2;
+          for (let index = 0; index < chunks.length; index += batchSize) {
+            const batch = chunks.slice(index, index + batchSize);
             const payloads = await Promise.all(batch.map(async name => {
               const res = await fetch(`data/${name}?ts=${Date.now()}`);
               return res.ok ? res.json() : {rows: []};
             }));
-            mergeSignals(payloads.flatMap(chunk => chunk.rows || []));
-            if (index % 16 === 0) status(`載入完整歷史給${reason} · ${Math.min(index + 4, chunks.length)}/${chunks.length}`);
-            await new Promise(resolve => setTimeout(resolve, 0));
+            mergeSignals(payloads.flatMap(chunk => chunk.rows || []), {deferSort: true});
+            if (index % Math.max(4, batchSize * 4) === 0) status(`載入完整歷史給${reason} · ${Math.min(index + batchSize, chunks.length)}/${chunks.length}`);
+            await new Promise(resolve => setTimeout(resolve, isMobileView() ? 24 : 8));
           }
           state.historyLoaded = true;
+          state.signals = sortSignals(state.signals);
+          rebuildSignalIndex();
           status(`完整歷史已載入 · ${state.signals.length} trades`);
           return state.signals;
         } catch (err) {
@@ -1959,15 +2008,18 @@
       </div>`;
     }
     function renderSignals() {
-      if (state.currentView === "signals") requestHistoryRender("數據回測", renderSignals);
       const rows = filteredSignals();
       const signalFrom = $("signalBtFrom").value;
       const signalTo = $("signalBtTo").value;
       const sourceRows = dataSignals();
-      const backtestRows = dateRangeRows(sourceRows, signalFrom, signalTo);
       $("signalCount").textContent = `(${rows.length})`;
       const dashRows = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).slice(0, 8);
       $("dashboardSignalCount").textContent = `(${dashRows.length})`;
+      const dashHtml = dashRows.map(signalCard).join("") || `<section class="panel"><div class="empty">目前沒有持倉中訊號。</div></section>`;
+      $("dashboardSignalCards").innerHTML = dashHtml;
+      $("dashboardSignalCards").querySelectorAll(".signal-card").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
+      if (state.currentView !== "signals") return;
+      const backtestRows = dateRangeRows(sourceRows, signalFrom, signalTo);
       renderBacktestChart(backtestRows, {
         chartId: "signalBacktestChart",
         statsId: "signalBacktestStats",
@@ -1975,18 +2027,17 @@
         from: signalFrom,
         to: signalTo,
         sourceTotal: sourceRows.length,
-        loading: !state.historyLoaded
+        loading: Boolean(state.historyLoading)
       });
       const hasFocusedQuery = Boolean($("signalSearch").value.trim() || $("signalDate").value || $("signalStatusFilter").value !== "all");
-      const displayRows = hasFocusedQuery ? rows.slice(0, displayLimit(240, 100)) : rows.slice(0, displayLimit(120, 40));
+      const signalLimit = listLimit("signals", hasFocusedQuery);
+      const displayRows = rows.slice(0, signalLimit);
       const allHtml = displayRows.map(signalCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的訊號。</div></section>`;
-      const dashHtml = dashRows.map(signalCard).join("") || `<section class="panel"><div class="empty">目前沒有持倉中訊號。</div></section>`;
       $("signalCards").innerHTML = allHtml;
-      $("dashboardSignalCards").innerHTML = dashHtml;
-      document.querySelectorAll(".signal-card").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
+      updateLoadMore("signalLoadMore", displayRows.length, rows.length);
+      $("signalCards").querySelectorAll(".signal-card").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
     }
     function renderHighQuality() {
-      if (state.currentView === "quality") requestHistoryRender("高品質回測", renderHighQuality);
       const target = $("qualityCards");
       if (!target) return;
       const q = $("qualitySearch").value.trim().toUpperCase();
@@ -2013,9 +2064,12 @@
         chartId: "qualityBacktestChart",
         statsId: "qualityBacktestStats",
         metaId: "qualityBacktestMeta",
-        loading: !state.historyLoaded
+        loading: Boolean(state.historyLoading)
       });
-      target.innerHTML = rows.slice(0, displayLimit(120, 40)).map(s => signalCard({...s, snapshot_data: {...(s.snapshot_data || {}), quality_desk: true}})).join("") || `<section class="panel"><div class="empty">目前沒有高品質正式訊號。</div></section>`;
+      const qualityLimit = listLimit("quality", Boolean(q || side !== "all"));
+      const qualityRows = rows.slice(0, qualityLimit);
+      target.innerHTML = qualityRows.map(s => signalCard({...s, snapshot_data: {...(s.snapshot_data || {}), quality_desk: true}})).join("") || `<section class="panel"><div class="empty">目前沒有高品質正式訊號。</div></section>`;
+      updateLoadMore("qualityLoadMore", qualityRows.length, rows.length);
       target.querySelectorAll("[data-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.symbol)));
     }
     function highQualitySignals(activeOnly = true) {
@@ -2045,7 +2099,6 @@
       return new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
     function renderStable() {
-      if (state.currentView === "stable") requestHistoryRender("穩如老狗回測", renderStable);
       const q = $("stableSearch").value.trim().toUpperCase();
       const sideFilter = $("stableSideFilter").value;
       const day = $("stableDate").value;
@@ -2076,9 +2129,12 @@
         from: stableFrom,
         to: stableTo,
         sourceTotal: stableSourceRows.length,
-        loading: !state.historyLoaded
+        loading: Boolean(state.historyLoading)
       });
-      $("stableCards").innerHTML = rows.slice(0, displayLimit(120, 40)).map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
+      const stableLimit = listLimit("stable", historyMode);
+      const stableRows = rows.slice(0, stableLimit);
+      $("stableCards").innerHTML = stableRows.map(stableTradeCard).join("") || `<section class="panel"><div class="empty">尚無符合條件的穩如老狗訊號。</div></section>`;
+      updateLoadMore("stableLoadMore", stableRows.length, rows.length);
       $("stableCards").querySelectorAll("[data-stable-symbol]").forEach(card => card.addEventListener("click", () => openSymbolModal(card.dataset.stableSymbol)));
     }
     function renderBacktestChart(rows, options = {}) {
@@ -2105,11 +2161,14 @@
       const confidence = sampleConfidence(all.length);
       const playbook = playbookStats(all)[0] || {name: "等待樣本", rate: 0, count: 0};
       const loadingHistory = options.loading && !state.historyLoaded;
+      const quickOnly = !state.historyLoaded && !loadingHistory;
       const scopeText = rangeLabel(options.from, options.to);
       const sourceTotal = Number(options.sourceTotal || all.length);
       $(metaId).textContent = loadingHistory
         ? `${scopeText} · ${all.length} / ${state.historyTotal || "?"} trades · 載入完整歷史中`
-        : `${scopeText} · ${all.length}/${sourceTotal} trades · 全量統計`;
+        : quickOnly
+          ? `${scopeText} · ${all.length}/${sourceTotal} trades · 快速資料`
+          : `${scopeText} · ${all.length}/${sourceTotal} trades · 全量統計`;
       $(statsId).innerHTML = [
         ["交易數", all.length, ""],
         ["樣本可信度", confidence.label, confidence.cls],
@@ -2127,7 +2186,7 @@
       ].map(([label, value, cls]) => `<div class="chart-stat"><div class="stat-label">${label}</div><div class="matrix-value ${cls}">${value}</div></div>`).join("");
       $(chartId).innerHTML = loadingHistory
         ? `<div class="empty">正在載入完整歷史回測，先顯示快速資料。</div>${equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses})}`
-        : equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses});
+        : `${quickOnly ? `<div class="empty">目前為快速資料；需要完整勝率請按「載入完整回測」。</div>` : ""}${equitySvg(points, all, {equity, rate, avgR, maxDrawdown, wins, losses})}`;
     }
     function sampleConfidence(count) {
       if (count < 30) return {label: `${count} 筆｜觀察`, cls: "warn-text", showRate: false};
@@ -2154,6 +2213,9 @@
     }
     function equitySvg(values, rows = [], summary = {}) {
       if (!values.length) return `<div class="empty">尚無可回測樣本。</div>`;
+      const sampled = sampleEquity(values, rows, isMobileView() ? 260 : 500);
+      values = sampled.values;
+      rows = sampled.rows;
       const w = 1200, h = 320, pad = 44;
       const min = Math.min(0, ...values);
       const max = Math.max(0, ...values);
@@ -2187,6 +2249,18 @@
         <text x="${pad}" y="${pad + 40}" fill="#7791ad" font-size="12">勝率 ${fmt(summary.rate || 0,1)}% · 平均 ${signed(summary.avgR || 0)} · 回撤 ${signed(summary.maxDrawdown || 0)}</text>
         <text x="${w - pad - 8}" y="${lastY - 8}" text-anchor="end" fill="#dceaff" font-size="13" font-weight="900">${signed(values[values.length - 1])}</text>
       </svg>`;
+    }
+    function sampleEquity(values, rows = [], maxPoints = 500) {
+      if (values.length <= maxPoints) return {values, rows};
+      const sampledValues = [];
+      const sampledRows = [];
+      const step = (values.length - 1) / (maxPoints - 1);
+      for (let i = 0; i < maxPoints; i++) {
+        const index = Math.min(values.length - 1, Math.round(i * step));
+        sampledValues.push(values[index]);
+        sampledRows.push(rows[index]);
+      }
+      return {values: sampledValues, rows: sampledRows};
     }
     function renderReview() {
       const rows = state.signals.filter(s => s && !s.error);
@@ -2615,11 +2689,13 @@
     }
     function renderVisibleNumbers() {
       document.querySelectorAll("[data-current]").forEach(node => {
+        if (!isElementNearViewport(node)) return;
         const market = marketFor(node.dataset.current);
         if (market && Number.isFinite(Number(market.price))) node.textContent = fmt(market.price, 6);
       });
       document.querySelectorAll("[data-pnl]").forEach(node => {
-        const s = state.signals.find(row => signalKey(row) === node.dataset.pnl);
+        if (!isElementNearViewport(node)) return;
+        const s = state.signalIndex.get(node.dataset.pnl);
         if (!s) return;
         const pnl = pnlPct(s, isLivePricedSignal(s));
         node.textContent = signed(pnl);
@@ -2628,15 +2704,21 @@
     }
     function renderContractVisiblePrices() {
       document.querySelectorAll("[data-contract-price]").forEach(node => {
+        if (!isElementNearViewport(node)) return;
         const market = marketFor(node.dataset.contractPrice);
         if (market && Number.isFinite(Number(market.price))) node.textContent = fmt(market.price, 6);
       });
       document.querySelectorAll("[data-contract-change]").forEach(node => {
+        if (!isElementNearViewport(node)) return;
         const market = marketFor(node.dataset.contractChange);
         if (!market || !Number.isFinite(Number(market.price_change_pct))) return;
         node.textContent = signed(market.price_change_pct);
         node.className = `metric-value ${numClass(market.price_change_pct)}`;
       });
+    }
+    function isElementNearViewport(node, margin = 420) {
+      const rect = node.getBoundingClientRect();
+      return rect.bottom >= -margin && rect.top <= window.innerHeight + margin;
     }
     function updateLiveSignalStates() {
       for (const s of state.signals) {
@@ -3225,10 +3307,11 @@
       if (analysisRank !== 0) return analysisRank;
       return MAIN_WATCH_SYMBOLS.indexOf(clean(a.symbol)) - MAIN_WATCH_SYMBOLS.indexOf(clean(b.symbol));
     }
-    function mergeSignals(rows) {
+    function mergeSignals(rows, options = {}) {
       const book = new Map(state.signals.map(s => [signalKey(s), s]));
       for (const row of rows) book.set(signalKey(row), {...book.get(signalKey(row)), ...row});
-      state.signals = sortSignals([...book.values()]);
+      state.signals = options.deferSort ? [...book.values()] : sortSignals([...book.values()]);
+      rebuildSignalIndex();
     }
     function mergeMarkets(existing, rows) {
       const book = new Map(existing.map(m => [clean(m.symbol), m]));
