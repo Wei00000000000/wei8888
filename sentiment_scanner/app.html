@@ -854,6 +854,7 @@
     ];
     const STATIC_MODE = location.hostname.endsWith("github.io") || location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.protocol === "file:";
     const STABLE_THRESHOLD = 88;
+    const BACKTEST_START_AT = Date.parse("2026-06-01T00:00:00+08:00");
     const ACCESS_PASSWORD_HASH = "aee231a88857a8bf1737e8663740894c615a7a4fcb721629134abd8c39e122c7";
     const NOTIFY_MEMORY_KEY = "wei_strategy_notify_memory_v2";
     const seenSignals = new Set();
@@ -2400,13 +2401,18 @@
       return {tp1: hit("tp1"), tp2: hit("tp2"), tp3: hit("tp3"), ftp: hit("ftp")};
     }
     function isFinalWin(s) {
-      return s.reached_state === "ftp" || (s.status && String(s.status).toLowerCase() === "closed" && ["tp1","tp2","tp3"].includes(s.reached_state));
+      return targetOrder(displayState(s)) >= targetOrder("tp1");
     }
     function isFinalLoss(s) {
-      return s.reached_state === "sl";
+      return displayState(s) === "sl";
     }
     function finalWinStats(rows) {
-      const entered = rows.filter(isOfficialTrade);
+      const entered = rows
+        .filter(isOfficialTrade)
+        .filter(s => {
+          const time = Date.parse(s.triggered_at || s.detected_at || 0);
+          return !Number.isFinite(BACKTEST_START_AT) || !Number.isFinite(time) || time >= BACKTEST_START_AT;
+        });
       const wins = entered.filter(isFinalWin).length;
       const losses = entered.filter(isFinalLoss).length;
       const open = Math.max(0, entered.length - wins - losses);
@@ -3531,7 +3537,7 @@
         .filter(s => {
           const meta = stableTradeMeta(s);
           const candidate = isDivergenceSignal(s) || meta.score >= STABLE_THRESHOLD;
-          return candidate && (!applyThreshold || meta.score >= STABLE_THRESHOLD);
+          return candidate && (!applyThreshold || isDivergenceSignal(s) || meta.score >= STABLE_THRESHOLD);
         });
     }
     function stableTradeMeta(s) {
