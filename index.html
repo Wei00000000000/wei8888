@@ -402,6 +402,7 @@
     .gate-error { min-height: 18px; margin-top: 10px; color: var(--bear); font-size: 12px; }
     .review-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px; }
     .review-card { border: 1px solid var(--line); border-radius: 10px; background: rgba(10,17,25,.94); padding: 16px; }
+    .review-title.compact { font-size: 12px; margin-bottom: 8px; color: var(--muted); }
     .review-title { display: flex; justify-content: space-between; gap: 10px; align-items: start; font-weight: 950; }
     .review-list { margin-top: 12px; display: grid; gap: 8px; }
     .review-item { border-top: 1px solid var(--line); padding-top: 8px; color: #c7d8ef; font-size: 13px; line-height: 1.5; }
@@ -754,6 +755,11 @@
         <h2>交易檢討中心</h2>
         <div class="subline">獨立統計止損與低品質交易原因，避免同樣錯誤反覆出現。</div>
       </section>
+      <div class="section-head">
+        <h2 class="section-title">SL 診斷面板 <span id="slDiagMeta" class="section-count">(快速資料)</span></h2>
+        <button class="btn primary" id="loadFullReview">載入完整診斷</button>
+      </div>
+      <div class="review-grid" id="slDiagnosticGrid"></div>
       <div class="watch-stats" id="reviewStats"></div>
       <div class="review-grid" id="reviewCards"></div>
     </section>
@@ -893,6 +899,7 @@
     $("signalLoadMore").addEventListener("click", () => showMore("signals", renderSignals));
     $("stableLoadMore").addEventListener("click", () => showMore("stable", renderStable));
     $("qualityLoadMore").addEventListener("click", () => showMore("quality", renderHighQuality));
+    $("loadFullReview").addEventListener("click", () => loadFullHistoryFor("SL 完整診斷", renderReview));
     document.querySelectorAll("[data-visual-tf]").forEach(btn => btn.addEventListener("click", () => {
       state.visualTf = btn.dataset.visualTf;
       renderContractRadar();
@@ -2280,6 +2287,7 @@
       const symbolErrors = symbolErrorRows(rows).slice(0, 5);
       const strategyErrors = strategyErrorRows(stopped).slice(0, 5);
       const weeklyAdvice = improvementAdvice(reasonRows, chaseTrades.length / Math.max(1, rows.length) * 100);
+      renderSlDiagnostics(rows);
       $("reviewStats").innerHTML = [
         ["止損交易", stopped.length, "bear-text"],
         ["7/30/90天止損", `${recentLoss(7).length}/${recentLoss(30).length}/${recentLoss(90).length}`, "bear-text"],
@@ -2302,6 +2310,90 @@
           <div class="review-list">${recent.map(s => `<div class="review-item"><strong>${clean(s.symbol)}</strong> · ${strategyNameForSignal(s)} · ${shortTime(s.triggered_at)} · ${stateLabel(s.reached_state)}<br>${plainTradeReason(s)}</div>`).join("")}</div>
         </article>`;
       }).join("") || `<section class="panel"><div class="empty">目前沒有足夠的檢討樣本。</div></section>`);
+    }
+    function renderSlDiagnostics(rows) {
+      const stopped = rows.filter(s => s.reached_state === "sl");
+      const closed = rows.filter(s => ["sl","tp1","tp2","tp3","ftp"].includes(s.reached_state));
+      const totalSlRate = closed.length ? stopped.length / closed.length * 100 : 0;
+      $("slDiagMeta").textContent = state.historyLoaded
+        ? `(${rows.length} 筆完整資料 · SL ${fmt(totalSlRate, 1)}%)`
+        : `(${rows.length}/${state.historyTotal || "?"} 快速資料 · SL ${fmt(totalSlRate, 1)}%)`;
+      $("slDiagnosticGrid").innerHTML = [
+        slDiagnosticCard("策略 SL 來源", groupedSlRows(rows, s => strategyBucket(s)).slice(0, 6), "bear"),
+        slDiagnosticCard("板塊 SL 來源", groupedSlRows(rows, s => sectorForSymbol(s.symbol)).slice(0, 6), "warn"),
+        slDiagnosticCard("分數區間", groupedSlRows(rows, s => scoreBucket(signalScore(s).value)).slice(0, 6), "accent"),
+        slDiagnosticCard("時間框架", groupedSlRows(rows, s => s.timeframe || "15M").slice(0, 6), "warn"),
+        slDiagnosticCard("止損原因組合", groupedReasonCombos(stopped).slice(0, 6), "bear"),
+        reviewSummaryCard("優先改善建議", slImprovementRules(rows), "bull")
+      ].join("");
+    }
+    function groupedSlRows(rows, keyFn) {
+      const map = new Map();
+      for (const s of rows) {
+        const key = keyFn(s) || "未分類";
+        if (!map.has(key)) map.set(key, {name: key, total: 0, sl: 0, wins: 0});
+        const item = map.get(key);
+        item.total += 1;
+        if (s.reached_state === "sl") item.sl += 1;
+        if (["tp1","tp2","tp3","ftp"].includes(s.reached_state)) item.wins += 1;
+      }
+      return [...map.values()]
+        .filter(item => item.total >= 3)
+        .map(item => ({...item, rate: item.sl / Math.max(1, item.sl + item.wins) * 100}))
+        .sort((a,b) => b.sl - a.sl || b.rate - a.rate);
+    }
+    function slDiagnosticCard(title, rows, kind = "warn") {
+      const max = Math.max(1, ...rows.map(row => row.sl || row.count || 0));
+      const lines = rows.map(row => {
+        const value = row.sl ?? row.count ?? 0;
+        const rate = row.rate !== undefined ? ` · SL率 ${fmt(row.rate, 1)}%` : "";
+        const detail = row.total ? `${value}/${row.total}${rate}` : `${value} 筆`;
+        return `<div class="review-item">
+          <div class="review-title compact"><span>${row.name}</span><span>${detail}</span></div>
+          <div class="flow-bar"><span style="width:${clamp(value / max * 100, 8, 100)}%"></span></div>
+        </div>`;
+      }).join("") || `<div class="review-item">等待更多樣本</div>`;
+      return `<article class="review-card"><div class="review-title"><span>${title}</span><span class="pill ${kind}">SL</span></div><div class="review-list">${lines}</div></article>`;
+    }
+    function groupedReasonCombos(rows) {
+      const map = new Map();
+      for (const s of rows) {
+        const tags = reviewTags(s).filter(tag => tag !== "觸發止損").slice(0, 3);
+        const key = tags.length ? tags.join(" + ") : "未標記原因";
+        map.set(key, (map.get(key) || 0) + 1);
+      }
+      return [...map.entries()].map(([name, count]) => ({name, count})).sort((a,b) => b.count - a.count);
+    }
+    function scoreBucket(score) {
+      if (score >= 90) return "90+ 高分";
+      if (score >= 80) return "80-89";
+      if (score >= 70) return "70-79";
+      if (score >= 60) return "60-69";
+      if (score >= 50) return "50-59";
+      return "<50 低分";
+    }
+    function strategyBucket(s) {
+      const setup = String(s.setup_id || "");
+      if (setup.includes("contract")) return "合約異常雷達";
+      if (setup.includes("cvd") || setup.includes("divergence")) return "CVD 背離";
+      if (stableTradeMeta(s).score >= STABLE_THRESHOLD || isDivergenceSignal(s)) return "穩如老狗";
+      return strategyNameForSignal(s);
+    }
+    function slImprovementRules(rows) {
+      const advice = [];
+      const byStrategy = groupedSlRows(rows, strategyBucket);
+      const byScore = groupedSlRows(rows, s => scoreBucket(signalScore(s).value));
+      const bySector = groupedSlRows(rows, s => sectorForSymbol(s.symbol));
+      const topStrategy = byStrategy[0];
+      const lowScore = byScore.find(row => row.name.includes("<50") || row.name.includes("50-59"));
+      const topSector = bySector[0];
+      if (topStrategy) advice.push(`${topStrategy.name} 是最大 SL 來源：先把正式進場門檻提高，低分只列預警。`);
+      if (lowScore && lowScore.sl >= 20) advice.push(`低分區間造成 ${lowScore.sl} 筆 SL：建議 60 分以下禁止正式進場。`);
+      if (topSector && topSector.rate >= 70) advice.push(`${topSector.name} SL率 ${fmt(topSector.rate,1)}%：該板塊只保留 80 分以上訊號。`);
+      const combos = groupedReasonCombos(rows.filter(s => s.reached_state === "sl"));
+      if (combos[0]) advice.push(`最常見組合是「${combos[0].name}」：下次同組合先降級為預警。`);
+      if (!advice.length) advice.push("樣本不足，先累積更多 SL 與 TP 資料。");
+      return advice;
     }
     function reviewSummaryCard(title, lines, kind = "warn") {
       return `<article class="review-card"><div class="review-title"><span>${title}</span><span class="pill ${kind}">診斷</span></div><div class="review-list">${(lines.length ? lines : ["等待更多樣本"]).map(line => `<div class="review-item">${line}</div>`).join("")}</div></article>`;
