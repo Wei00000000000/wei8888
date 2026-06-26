@@ -72,6 +72,73 @@ def signal_id(row: dict[str, object]) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, raw))
 
 
+def raw_number(value: object, default: float = 0.0) -> float:
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def metric_value(row: dict[str, object], name: str, default: object = None) -> object:
+    if row.get(name) is not None:
+        return row.get(name)
+    snapshot = row.get("snapshot_data")
+    if isinstance(snapshot, dict) and snapshot.get(name) is not None:
+        return snapshot.get(name)
+    return default
+
+
+def classify_trade_layer(row: dict[str, object]) -> tuple[str, list[str]]:
+    reasons: list[str] = []
+    blocks: list[str] = []
+    snapshot = row.get("snapshot_data")
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    score = raw_number(row.get("score"), raw_number(snapshot.get("score"), raw_number(snapshot.get("oi_percentile"), 0)))
+    entry = raw_number(row.get("entry_price") or row.get("trigger_price"), 0)
+    sl = raw_number(row.get("sl_price"), 0)
+    risk = abs(entry - sl) / entry * 100 if entry > 0 and sl > 0 else 0
+    volume = raw_number(metric_value(row, "volume_24h", metric_value(row, "quote_volume", 0)), 0)
+    price_move = abs(raw_number(metric_value(row, "price_change_pct", 0), 0))
+    setup = str(row.get("setup_id") or "")
+    if score < 60:
+        reasons.append("score_below_60_warning_only")
+    if 60 <= score < 70 and not any(metric_value(row, key) in (True, "true", 1, "1") for key in ("mtf_5m_confluence", "mtf_15m_confluence", "mtf_5m_oi_confluence", "mtf_15m_oi_confluence")):
+        reasons.append("score_60_69_requires_5m_15m_alignment")
+    if score < 70:
+        reasons.append("score_below_official_threshold")
+    if entry <= 0 or sl <= 0:
+        blocks.append("missing_entry_or_sl")
+    elif risk < 0.5 or risk > 5:
+        reasons.append("risk_distance_outside_0_5_to_5_pct")
+    if volume > 0 and volume < 5_000_000:
+        reasons.append("volume_below_5m_warning_only")
+    if price_move > 5:
+        reasons.append("chasing_price_move_too_large")
+    if "cvd_5m" in setup or "divergence" in setup:
+        engine = metric_value(row, "entry_engine", {})
+        confirmed = isinstance(engine, dict) and (engine.get("formal") or raw_number(engine.get("timing_score"), 0) >= 65)
+        if not confirmed:
+            reasons.append("cvd_divergence_needs_price_vwap_confirmation")
+    if blocks:
+        return "filtered_out", blocks + reasons
+    if reasons:
+        return "warning", reasons
+    return "official_trade", []
+
+
+def apply_trade_layer(row: dict[str, object]) -> None:
+    layer, reasons = classify_trade_layer(row)
+    row["raw_signal"] = True
+    row["trade_layer"] = layer
+    row["official_trade"] = layer == "official_trade"
+    row["warning"] = layer == "warning"
+    row["filtered_out"] = layer == "filtered_out"
+    row["trade_filter_reason"] = "; ".join(reasons)
+
+
 def normalize_row(row: dict[str, object]) -> dict[str, object]:
     row = dict(row)
     triggered_at_ms = row.get("triggered_at_ms")
@@ -106,6 +173,7 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
         if snapshot.get("divergence_label") not in {"top_divergence", "bottom_divergence"}:
             snapshot["divergence_label"] = "top_divergence" if "bearish" in setup else "bottom_divergence"
         row["snapshot_data"] = snapshot
+    apply_trade_layer(row)
     return row
 
 
