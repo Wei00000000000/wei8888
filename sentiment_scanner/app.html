@@ -687,6 +687,7 @@
             <option value="bull">嘎空</option>
             <option value="bear">嘎多</option>
           </select>
+          <button class="btn primary" id="refreshQuality">⟳ 更新訊號</button>
         </div>
       </div>
       <div class="watch-stats" id="qualityStats"></div>
@@ -723,6 +724,7 @@
             <option value="bear">嘎多</option>
             <option value="neutral">觀望</option>
           </select>
+          <button class="btn primary" id="refreshStable">⟳ 更新訊號</button>
         </div>
       </div>
       <div class="watch-stats" id="stableStats"></div>
@@ -869,6 +871,8 @@
     $("loadMarkets").addEventListener("click", loadMarkets);
     $("refreshWatch").addEventListener("click", loadMarkets);
     $("refreshSignals").addEventListener("click", () => runSignals("backtest"));
+    $("refreshQuality").addEventListener("click", () => runSignals("backtest", {keepView: true}));
+    $("refreshStable").addEventListener("click", () => runSignals("backtest", {keepView: true}));
     $("manageWatch").addEventListener("click", () => controls.symbols.focus());
     $("jumpSignals").addEventListener("click", () => setView("signals"));
     $("autoScan").addEventListener("click", toggleAutoScan);
@@ -937,9 +941,9 @@
     renderAll();
     status("Auto scanner warming up.");
     initialize();
-    setInterval(refreshPrices, isMobileView() ? 12000 : 5000);
-    setInterval(loadBook, 120000);
-    setInterval(renderHealth, 1000);
+    setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 30000 : 15000);
+    setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, 120000);
+    setInterval(renderHealth, 5000);
 
     function initAccessGate() {
       if (sessionStorage.getItem("wei_strategy_access") === ACCESS_PASSWORD_HASH) $("loginGate").classList.add("hidden");
@@ -1144,7 +1148,8 @@
       p.set("batch", $("batchSize").value || "10");
       return p;
     }
-    async function runSignals(mode) {
+    async function runSignals(mode, options = {}) {
+      const viewBefore = state.currentView;
       busy(true);
       status(mode === "scan" ? "Scanning latest bars..." : "Backtesting recent events...");
       try {
@@ -1152,7 +1157,8 @@
         mergeSignals(data.rows || []);
         state.lastTickAt = new Date();
         renderAll();
-        setView("signals");
+        if (!options.keepView) setView("signals");
+        else setView(viewBefore);
         status(`${mode} complete · ${state.signals.length} signals · ${new Date().toLocaleTimeString()}`);
       } catch (err) {
         rememberError(err);
@@ -1282,7 +1288,7 @@
     }
     function busy(value) {
       state.busy = value;
-      ["scan","backtest","loadMarkets","refreshWatch","refreshSignals"].forEach(id => $(id).disabled = value);
+      ["scan","backtest","loadMarkets","refreshWatch","refreshSignals","refreshQuality","refreshStable"].forEach(id => $(id).disabled = value);
     }
     function status(text, kind = "accent") {
       $("statusText").textContent = text;
@@ -1307,11 +1313,11 @@
       renderFn();
     }
     function listLimit(key, focused = false) {
-      const base = focused ? displayLimit(100, 50) : displayLimit(60, 20);
+      const base = focused ? displayLimit(80, 30) : displayLimit(36, 10);
       return base + (state.visibleLimitBoost[key] || 0);
     }
     function showMore(key, renderFn) {
-      state.visibleLimitBoost[key] = (state.visibleLimitBoost[key] || 0) + displayLimit(60, 20);
+      state.visibleLimitBoost[key] = (state.visibleLimitBoost[key] || 0) + displayLimit(36, 10);
       renderFn();
     }
     function updateLoadMore(id, shown, total) {
@@ -1372,8 +1378,8 @@
       $("decisionTopSignals").innerHTML = formal.map(s => decisionSignalRow(s)).join("") || `<div class="empty">目前沒有符合 A 級條件的正式訊號。</div>`;
       $("decisionRiskAlerts").innerHTML = riskAlerts.map(alert => `<div class="decision-row"><span class="decision-grade grade-${alert.grade.toLowerCase()}">${alert.grade}</span><div><strong>${alert.symbol}</strong><div class="subline">${alert.text}</div></div><span class="pill ${alert.kind}">${alert.value}</span></div>`).join("") || `<div class="empty">目前沒有高風險警報。</div>`;
       $("decisionPerformance").innerHTML = [
-        ["結案樣本", closedStats.total, ""],
-        ["結案勝率", closedStats.total < 30 ? "觀察" : `${fmt(closedStats.rate,1)}%`, closedStats.total < 30 ? "warn-text" : "bull-text"],
+        ["正式進場", closedStats.total, `${closedStats.open} 持倉`],
+        ["進場勝率", closedStats.total < 30 ? "觀察" : `${fmt(closedStats.rate,1)}%`, closedStats.total < 30 ? "warn-text" : "bull-text"],
         ["近 7 天", strategyPeriodRate(all, 7), "accent-text"],
         ["近 30 天", strategyPeriodRate(all, 30), "bull-text"]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
@@ -1452,14 +1458,14 @@
       const avgHold = avgHoldHours(sourceRows);
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        ["穩狗結案勝率", closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未結案", `${closedStats.wins}W / ${closedStats.losses}L · TP觸發 ${fmt(tpStats.tp1, 1)}%`],
+        ["穩狗進場勝率", closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP觸發 ${fmt(tpStats.tp1, 1)}%`],
         ["穩狗累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        ["結案勝率", closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未結案", `${closedStats.wins}W / ${closedStats.losses}L · TP觸發 ${fmt(tpStats.tp1, 1)}%`],
+        ["進場勝率", closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP觸發 ${fmt(tpStats.tp1, 1)}%`],
         ["總累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
@@ -2065,7 +2071,7 @@
       $("qualityStats").innerHTML = [
         ["正式持倉", open.length, "bull-text"],
         ["今日樣本", todayRows.length, ""],
-        ["今日結案勝率", todayClosed.total ? `${fmt(todayClosed.rate, 1)}%` : "未結案", "accent-text"],
+        ["今日進場勝率", todayClosed.total ? `${fmt(todayClosed.rate, 1)}%` : "未進場", "accent-text"],
         ["今日TP觸發", `${fmt(todayTp.tp1, 1)}%`, "bull-text"],
         ["平均品質", fmt(avg, 0), "bull-text"],
         ["嘎空 / 嘎多", `${rows.filter(s => qualitySide(s) === "bull").length} / ${rows.filter(s => qualitySide(s) === "bear").length}`, ""],
@@ -2317,7 +2323,7 @@
         ["原始訊號", rawRows.length, ""],
         ["預警/過濾", gatedOut, gatedOut ? "warn-text" : ""],
         ["樣本可信度", confidence.label, confidence.cls],
-        ["結案勝率", closedStats.total ? `${fmt(rate, 1)}%` : "未結案", closedStats.total ? "bull-text" : "warn-text"],
+        ["進場勝率", closedStats.total ? `${fmt(rate, 1)}%` : "未進場", closedStats.total ? "bull-text" : "warn-text"],
         ["TP1率", `${fmt(targetStats.tp1, 1)}%`, "bull-text"],
         ["TP2率", `${fmt(targetStats.tp2, 1)}%`, "bull-text"],
         ["TP3率", `${fmt(targetStats.tp3, 1)}%`, "accent-text"],
@@ -2364,10 +2370,12 @@
       return s.reached_state === "sl";
     }
     function finalWinStats(rows) {
-      const wins = rows.filter(isFinalWin).length;
-      const losses = rows.filter(isFinalLoss).length;
-      const total = wins + losses;
-      return {wins, losses, total, rate: total ? wins / total * 100 : 0};
+      const entered = rows.filter(isOfficialTrade);
+      const wins = entered.filter(isFinalWin).length;
+      const losses = entered.filter(isFinalLoss).length;
+      const open = Math.max(0, entered.length - wins - losses);
+      const total = entered.length;
+      return {wins, losses, open, total, rate: total ? wins / total * 100 : 0};
     }
     function equitySvg(values, rows = [], summary = {}) {
       if (!values.length) return `<div class="empty">尚無可回測樣本。</div>`;
@@ -2404,7 +2412,7 @@
         <line x1="${w-pad}" y1="${pad}" x2="${w-pad}" y2="${h-pad}" stroke="rgba(179,107,255,.35)" stroke-dasharray="6 7"/>
         <text x="${pad}" y="${pad - 16}" fill="#b36bff" font-size="13" font-weight="900">累計R</text>
         <text x="${pad}" y="${pad + 14}" fill="#00e0a4" font-size="24" font-weight="950">${signed(summary.equity || values[values.length - 1])}</text>
-        <text x="${pad}" y="${pad + 40}" fill="#7791ad" font-size="12">結案勝率 ${fmt(summary.rate || 0,1)}% · 平均 ${signed(summary.avgR || 0)} · 回撤 ${signed(summary.maxDrawdown || 0)}</text>
+        <text x="${pad}" y="${pad + 40}" fill="#7791ad" font-size="12">進場勝率 ${fmt(summary.rate || 0,1)}% · 平均 ${signed(summary.avgR || 0)} · 回撤 ${signed(summary.maxDrawdown || 0)}</text>
         <text x="${w - pad - 8}" y="${lastY - 8}" text-anchor="end" fill="#dceaff" font-size="13" font-weight="900">${signed(values[values.length - 1])}</text>
       </svg>`;
     }
@@ -2635,15 +2643,17 @@
       const reversal = reversalWarning(s);
       const market = marketFor(s.symbol);
       const sector = sectorForSymbol(s.symbol);
-      const visual = signalVisuals(s, meta.score);
       const gate = tradeGate(s);
       const isOfficial = gate.layer === "official_trade";
+      const visual = isOfficial ? signalVisuals(s, meta.score) : supportRadarHtml(signalSupportMetrics(s, meta.score));
+      const stateText = isOfficial ? stateLabel(displayState(s)) : gate.label;
+      const stateClass = isOfficial ? stateKind(s) : gate.kind;
       return `<article class="signal-card ${meta.kind} ${meta.score >= 88 ? "high-score" : ""}" data-stable-symbol="${clean(s.symbol)}">
         <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
           <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span>${isOfficial ? `<span class="mini-tag">${protectiveStopText(s)}</span>` : ""}${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
-          <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
+          <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateClass}">${stateText}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
         ${isOfficial ? `<div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
@@ -2968,6 +2978,7 @@
     }
     function updateLiveSignalStates() {
       for (const s of state.signals) {
+        if (!isOfficialTrade(s)) continue;
         if (!isLivePricedSignal(s)) continue;
         const next = displayState(s);
         const prev = s.reached_state || "holding";
@@ -3194,7 +3205,7 @@
       $("modalTier").textContent = rate >= 70 ? "高等" : rate >= 50 ? "中等" : "低等";
       $("modalStats").innerHTML = [
         ["訊號總數", rows.length, `${rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length} 進行中`],
-        ["結案勝率", closedStats.total ? `${fmt(rate,1)}%` : "未結案", `${closedStats.wins}W / ${closedStats.losses}L · TP觸發 ${fmt(tpStats.tp1,1)}%`],
+        ["進場勝率", closedStats.total ? `${fmt(rate,1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP觸發 ${fmt(tpStats.tp1,1)}%`],
         ["累計盈虧", signed(pnl), `${rows.length} 筆`],
         ["平均評分", fmt(avgScore, 0), rows.length ? scoreGrade(avgScore).label : "尚無樣本"]
       ].map(metricCard).join("");
@@ -3226,7 +3237,7 @@
     function modalStrategy(name, rows, kind) {
       const closedStats = finalWinStats(rows);
       const pnl = rows.reduce((sum, s) => sum + pnlPct(s, isLivePricedSignal(s)), 0);
-      return `<div class="modal-card"><strong class="${kind}-text">${name}</strong><span class="subline"> ${rows.length} 筆</span><div class="mini-grid"><div class="mini">結案勝率 <b class="accent-text">${closedStats.total ? `${fmt(closedStats.rate,1)}%` : "未結案"}</b><span>${closedStats.wins}W / ${closedStats.losses}L</span></div><div class="mini">累計盈虧 <b class="${pnl >= 0 ? "bull-text" : "bear-text"}">${signed(pnl)}</b></div></div></div>`;
+      return `<div class="modal-card"><strong class="${kind}-text">${name}</strong><span class="subline"> ${rows.length} 筆</span><div class="mini-grid"><div class="mini">進場勝率 <b class="accent-text">${closedStats.total ? `${fmt(closedStats.rate,1)}%` : "未進場"}</b><span>${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉</span></div><div class="mini">累計盈虧 <b class="${pnl >= 0 ? "bull-text" : "bear-text"}">${signed(pnl)}</b></div></div></div>`;
     }
     function metricCard([a,b,c]) {
       return `<div class="modal-card"><div class="subline">${a}</div><div class="stat-value ${String(b).startsWith("-") ? "bear-text" : "bull-text"}">${b}</div><div class="subline">${c || ""}</div></div>`;
@@ -3871,7 +3882,7 @@
       return "bottom";
     }
     function winsOf(rows) { return finalWinStats(rows).wins; }
-    function lossesOf(rows) { return rows.filter(s => s.reached_state === "sl").length; }
+    function lossesOf(rows) { return finalWinStats(rows).losses; }
     function maxDrawdownOf(rows) {
       let equity = 0;
       let peak = 0;
