@@ -1456,16 +1456,17 @@
       const maxDd = maxDrawdownOf(sourceRows);
       const streak = streakSummary(sourceRows);
       const avgHold = avgHoldHours(sourceRows);
+      const totalLabel = stableMode ? "穩狗總進場勝率" : "總進場勝率";
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        ["穩狗進場勝率", closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP觸發 ${fmt(tpStats.tp1, 1)}%`],
+        [totalLabel, closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP1 ${fmt(tpStats.tp1, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`],
         ["穩狗累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        ["進場勝率", closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP觸發 ${fmt(tpStats.tp1, 1)}%`],
+        [totalLabel, closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP1 ${fmt(tpStats.tp1, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`],
         ["總累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
@@ -2062,15 +2063,18 @@
         .filter(s => !q || clean(s.symbol).includes(q))
         .filter(s => side === "all" || qualitySide(s) === side)
         .sort((a,b) => highQualityScore(b).score - highQualityScore(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
-      const todayRows = rows.filter(s => new Date(s.triggered_at || 0) >= todayStartTaipei());
+      const allRows = highQualitySignals(false);
+      const todayRows = allRows.filter(s => new Date(s.triggered_at || 0) >= todayStartTaipei());
       const open = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s));
+      const totalStats = finalWinStats(allRows);
       const todayClosed = finalWinStats(todayRows);
       const todayTp = targetHitStats(todayRows);
       const avg = rows.length ? rows.reduce((sum, s) => sum + highQualityScore(s).score, 0) / rows.length : 0;
       $("qualityCount").textContent = `(${rows.length})`;
       $("qualityStats").innerHTML = [
         ["正式持倉", open.length, "bull-text"],
-        ["今日樣本", todayRows.length, ""],
+        ["總進場勝率", totalStats.total ? `${fmt(totalStats.rate, 1)}%` : "未進場", "bull-text"],
+        ["總樣本", `${totalStats.total} 倉`, ""],
         ["今日進場勝率", todayClosed.total ? `${fmt(todayClosed.rate, 1)}%` : "未進場", "accent-text"],
         ["今日TP觸發", `${fmt(todayTp.tp1, 1)}%`, "bull-text"],
         ["平均品質", fmt(avg, 0), "bull-text"],
@@ -2127,6 +2131,33 @@
       const volume = Number(marketFor(s.symbol)?.quote_volume || signalMetric(s, "volume_24h") || signalMetric(s, "quote_volume") || 0);
       const priceMove = Math.abs(Number(signalMetric(s, "price_change_pct")) || 0);
       const dirKey = `${clean(s.symbol)}|${s.signal_type}`;
+
+      if (isDivergenceSignal(s)) {
+        const confirmed = cvdDivergenceConfirmed(s);
+        const mtf = hasMtfDirectionConfluence(s);
+        const tier = score >= 75 && confirmed && mtf ? "A級正式" : score >= 70 && confirmed ? "B級正式" : "預警";
+        if (score < 70) reasons.push("穩如老狗分數低於 70，只列預警");
+        if (!confirmed) reasons.push("CVD 背離尚未通過價格 / VWAP 結構確認");
+        if (score >= 70 && score < 75 && !mtf) reasons.push("B級進場：尚未 5M / 15M 完全共振，保守標記");
+        if (volume > 0 && volume < 5_000_000) reasons.push("24H 成交量低於 500 萬，只列預警");
+        if (profile.symbolPause.has(clean(s.symbol))) blocks.push("近 10 筆 SL 率過高，暫停 24 小時");
+        if (profile.directionPause.has(dirKey)) blocks.push("同幣同方向連續 3 次 SL，暫停");
+        if (!Number.isFinite(risk) || risk <= 0) blocks.push("缺少有效 SL / 進場距離");
+        else if (risk < 0.5 || risk > 5) reasons.push(`風險距離 ${fmt(risk, 2)}%，不在 0.5%-5%`);
+        const layer = blocks.length ? "filtered_out" : (score >= 70 && confirmed && !(volume > 0 && volume < 5_000_000) && Number.isFinite(risk) && risk >= 0.5 && risk <= 5) ? "official_trade" : "warning";
+        const result = {
+          raw_signal: true,
+          layer,
+          label: layer === "official_trade" ? tier : layer === "warning" ? "預警" : "過濾",
+          kind: layer === "official_trade" ? "bull" : layer === "warning" ? "warn" : "bear",
+          score,
+          requiredScore: 70,
+          reasons: [...blocks, ...reasons],
+          tier
+        };
+        state.tradeGateCache.set(key, result);
+        return result;
+      }
 
       if (score < 60) reasons.push("分數低於 60，只列預警");
       if (score >= 60 && score < 70 && !hasMtfDirectionConfluence(s)) reasons.push("60-69 分需要 5M / 15M 同方向");
@@ -2254,12 +2285,17 @@
       const metas = rows.map(stableTradeMeta);
       const officialRows = rows.filter(isOfficialTrade);
       const warningRows = rows.filter(s => tradeGate(s).layer === "warning");
+      const totalStableRows = stableOfficialRows();
+      const totalStats = finalWinStats(totalStableRows);
+      const totalTp = targetHitStats(totalStableRows);
       const tradable = metas.filter(s => s.score >= 92).length;
       const wait = metas.filter(s => s.side === "neutral").length;
       const avg = metas.length ? metas.reduce((sum, s) => sum + s.score, 0) / metas.length : 0;
       $("stableStats").innerHTML = [
         ["穩狗訊號", rows.length, "bull-text"],
         ["正式 / 預警", `${officialRows.length} / ${warningRows.length}`, "accent-text"],
+        ["總進場勝率", totalStats.total ? `${fmt(totalStats.rate, 1)}%` : "未進場", "bull-text"],
+        ["總TP1/FTP", `${fmt(totalTp.tp1, 1)}% / ${fmt(totalTp.ftp, 1)}%`, "accent-text"],
         ["平均分數", fmt(avg, 0), "accent-text"],
         ["嘎空方向", metas.filter(s => s.side === "bull").length, "bull-text"],
         ["嘎多方向", metas.filter(s => s.side === "bear").length, "bear-text"],
@@ -2376,6 +2412,21 @@
       const open = Math.max(0, entered.length - wins - losses);
       const total = entered.length;
       return {wins, losses, open, total, rate: total ? wins / total * 100 : 0};
+    }
+    function strategyHealthSummary(rows) {
+      const stats = finalWinStats(rows);
+      const tp = targetHitStats(rows);
+      const slRate = stats.total ? stats.losses / stats.total * 100 : 0;
+      const notes = [];
+      if (!stats.total) notes.push("尚無正式進場樣本");
+      else {
+        notes.push(`總勝率 ${fmt(stats.rate, 1)}%`);
+        notes.push(`SL率 ${fmt(slRate, 1)}%`);
+        notes.push(`TP1 ${fmt(tp.tp1, 1)}% / FTP ${fmt(tp.ftp, 1)}%`);
+      }
+      if (slRate > 70) notes.push("健康度偏弱，建議只收 80 分以上");
+      else if (stats.rate >= 55 && stats.total >= 20) notes.push("健康度正常，可維持正式門檻");
+      return notes.join(" · ");
     }
     function equitySvg(values, rows = [], summary = {}) {
       if (!values.length) return `<div class="empty">尚無可回測樣本。</div>`;
@@ -2648,6 +2699,7 @@
       const visual = isOfficial ? signalVisuals(s, meta.score) : supportRadarHtml(signalSupportMetrics(s, meta.score));
       const stateText = isOfficial ? stateLabel(displayState(s)) : gate.label;
       const stateClass = isOfficial ? stateKind(s) : gate.kind;
+      const health = strategyHealthSummary(stableOfficialRows());
       return `<article class="signal-card ${meta.kind} ${meta.score >= 88 ? "high-score" : ""}" data-stable-symbol="${clean(s.symbol)}">
         <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
@@ -2667,7 +2719,7 @@
           <div class="level tp ${targetHit(s, "tp3") ? "hit" : ""}"><span>TP3</span><b>${fmt(s.tp3_price, 6)}</b><i class="copy">▢</i></div>
           <div class="level tp ${targetHit(s, "ftp") ? "hit" : ""}"><span>FTP</span><b>${fmt(s.ftp_price, 6)}</b><i class="copy">▢</i></div>
         </div>` : ""}
-        <div class="stable-rule">${meta.reason}</div>
+        <div class="stable-rule">${meta.reason}<br>${health}</div>
       </article>`;
     }
     function signalDecisionModel(s) {
@@ -3485,7 +3537,11 @@
     function stableTradeMeta(s) {
       if (isDivergenceSignal(s)) {
         const top = divergenceKind(s) === "top";
-        const score = Math.round(clamp(Number(signalMetric(s, "oi_percentile")) || 0, 0, 100));
+        const support = signalSupportMetrics(s, 0).items.map(item => Number(item[1]) || 0);
+        const supportAvg = support.length ? support.reduce((a,b) => a + b, 0) / support.length : 50;
+        const base = Number(signalScore(s).value) || 0;
+        const oiPct = Number(signalMetric(s, "oi_percentile")) || 0;
+        const score = Math.round(clamp(Math.max(base, supportAvg * 0.72 + oiPct * 0.18 + (cvdDivergenceConfirmed(s) ? 10 : 0) + (hasMtfDirectionConfluence(s) ? 8 : 0)), 0, 100));
         return {
           score,
           kind: top ? "bear" : "bull",
