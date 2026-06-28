@@ -797,6 +797,7 @@
     </section>
   </div>
 
+  <script src="api-config.js"></script>
   <script>
     const $ = id => document.getElementById(id);
     const state = {
@@ -835,7 +836,8 @@
       conditionLayout: loadConditionLayout(),
       displayMode: localStorage.getItem("wei_display_mode") || (matchMedia("(max-width: 760px)").matches ? "novice" : "pro"),
       soundUnlocked: false,
-      priceBaselineReady: false
+      priceBaselineReady: false,
+      csrfToken: ""
     };
     const MAIN_WATCH_SYMBOLS = [
       "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
@@ -852,7 +854,9 @@
       ["low_volume", "成交量不足", "禁止正式進場"],
       ["far_from_vwap", "遠離 VWAP 過多", "追價風險"]
     ];
-    const STATIC_MODE = location.hostname.endsWith("github.io") || location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.protocol === "file:";
+    const CLOUD_API_BASE = String(window.WEI_API_BASE || "").replace(/\/+$/, "");
+    const CLOUD_MODE = Boolean(CLOUD_API_BASE);
+    const STATIC_MODE = !CLOUD_MODE && (location.hostname.endsWith("github.io") || location.hostname === "127.0.0.1" || location.hostname === "localhost" || location.protocol === "file:");
     const STABLE_THRESHOLD = 88;
     const BACKTEST_START_AT = Date.parse("2026-06-01T00:00:00+08:00");
     const ACCESS_PASSWORD_HASH = "aee231a88857a8bf1737e8663740894c615a7a4fcb721629134abd8c39e122c7";
@@ -946,8 +950,15 @@
     setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, 120000);
     setInterval(renderHealth, 5000);
 
-    function initAccessGate() {
-      if (sessionStorage.getItem("wei_strategy_access") === ACCESS_PASSWORD_HASH) $("loginGate").classList.add("hidden");
+    async function initAccessGate() {
+      if (CLOUD_MODE) {
+        try {
+          const response = await cloudFetch("/auth/me");
+          if (response.ok) $("loginGate").classList.add("hidden");
+        } catch {}
+      } else if (sessionStorage.getItem("wei_strategy_access") === ACCESS_PASSWORD_HASH) {
+        $("loginGate").classList.add("hidden");
+      }
       setTimeout(() => $("accessPassword")?.focus(), 80);
     }
     function toggleDisplayMode() {
@@ -961,6 +972,28 @@
     }
     async function unlockApp() {
       const value = $("accessPassword").value || "";
+      if (CLOUD_MODE) {
+        try {
+          const response = await cloudFetch("/auth/login", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({password: value})
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || "登入失敗");
+          state.csrfToken = data.csrf_token || "";
+          $("loginGate").classList.add("hidden");
+          $("gateError").textContent = "";
+          $("accessPassword").value = "";
+          unlockSoundOnce();
+          await loadBook();
+          return;
+        } catch (error) {
+          $("gateError").textContent = error.message || "登入失敗。";
+          $("accessPassword").select();
+          return;
+        }
+      }
       const hash = await sha256(value);
       if (hash === ACCESS_PASSWORD_HASH) {
         sessionStorage.setItem("wei_strategy_access", hash);
@@ -977,6 +1010,43 @@
       return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
     }
 
+    function cloudFetch(path, options = {}) {
+      const headers = {...(options.headers || {})};
+      if (state.csrfToken && !["GET", "HEAD"].includes(String(options.method || "GET").toUpperCase())) {
+        headers["X-CSRF-Token"] = state.csrfToken;
+      }
+      return fetch(`${CLOUD_API_BASE}${path}`, {...options, headers, credentials: "include"});
+    }
+
+    async function cloudSignals() {
+      const response = await cloudFetch("/signals?page=1&limit=100");
+      if (response.status === 401) {
+        $("loginGate").classList.remove("hidden");
+        throw new Error("登入已過期");
+      }
+      if (!response.ok) throw new Error("雲端訊號讀取失敗");
+      const data = await response.json();
+      const rows = (data.rows || []).map(row => ({...(row.raw_payload || {}), ...row}));
+      state.historyTotal = Number(data.meta?.total || rows.length);
+      return {rows, markets: state.markets};
+    }
+
+    async function cloudMarkets(query = "") {
+      const params = new URLSearchParams(String(query || ""));
+      if (!params.has("limit")) params.set("limit", "200");
+      const response = await cloudFetch(`/market?${params}`);
+      if (!response.ok) throw new Error("雲端行情讀取失敗");
+      const rows = (await response.json()).map(row => ({
+        ...row,
+        price_change_pct: row.change_24h_pct,
+        quote_volume: row.quote_volume_24h,
+        live_price: true,
+        live_source: row.source
+      }));
+      const prices = Object.fromEntries(rows.map(row => [clean(row.symbol), Number(row.price)]));
+      return {rows, markets: rows, prices, updated_at: rows[0]?.observed_at || null};
+    }
+
     async function initialize() {
       await loadBook();
       await loadSectorFlows();
@@ -986,7 +1056,11 @@
       toggleAutoScan();
     }
     async function apiJson(endpoint, query = "") {
-      if (!STATIC_MODE) {
+      if (CLOUD_MODE) {
+        if (["book", "tick", "scan", "backtest"].includes(endpoint)) return cloudSignals();
+        if (["markets", "prices"].includes(endpoint)) return cloudMarkets(query);
+      }
+      if (!STATIC_MODE && !CLOUD_MODE) {
         const suffix = query ? `?${query}` : "";
         const res = await fetch(`/api/${endpoint}${suffix}`);
         const data = await res.json();

@@ -1,7 +1,8 @@
-﻿const CACHE_NAME = "wei-strategy-room-v10";
+const CACHE_NAME = "wei-strategy-room-v11";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./api-config.js",
   "./manifest.webmanifest",
   "./icon.svg",
   "./icon-192.png",
@@ -41,4 +42,3 @@ self.addEventListener("fetch", event => {
       .catch(() => caches.match(event.request))
   );
 });
-
