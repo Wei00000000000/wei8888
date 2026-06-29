@@ -45,9 +45,9 @@ async def all_strategy_summaries(
     groups = {
         None: rows,
         "sentiment_oi": [row for row in rows if row.strategy == "sentiment_oi"],
-        "stable_dog": [row for row in rows if row.strategy == "stable_dog" or signal_quality(row) >= 88],
+        "stable_dog": [row for row in rows if row.strategy == "stable_dog" or stable_score(row) >= 88],
         "contract_anomaly": [row for row in rows if row.strategy == "contract_anomaly"],
-        "high_quality": [row for row in rows if row.strategy == "high_quality" or signal_quality(row) >= 70],
+        "high_quality": [row for row in rows if row.strategy == "high_quality" or is_high_quality(row)],
     }
     return [summarize_signals(groups[key], key) for key in (None, *KNOWN_STRATEGIES)]
 
@@ -61,7 +61,87 @@ def signal_quality(signal: Signal) -> int:
             return int(float(payload.get(key)))
         except (TypeError, ValueError):
             continue
-    return 0
+    return signal_score(signal)
+
+
+def metric(signal: Signal, name: str) -> object:
+    payload = signal.raw_payload or {}
+    if payload.get(name) is not None:
+        return payload[name]
+    snapshot = payload.get("snapshot_data")
+    if isinstance(snapshot, dict):
+        return snapshot.get(name)
+    return None
+
+
+def number(value: object, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+        return parsed if isfinite(parsed) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(value, high))
+
+
+def signal_score(signal: Signal) -> int:
+    direction = 1 if signal.side == "long" else -1
+    oi_percentile = clamp(number(metric(signal, "oi_percentile")), 0, 100)
+    oi_move = abs(number(metric(signal, "oi_change_pct")))
+    price_move = number(metric(signal, "price_change_pct")) * direction
+    taker_value = metric(signal, "taker_buy_ratio")
+    taker_bias = (number(taker_value, 0.5) - 0.5) * 200 * direction if taker_value is not None else 0
+    risk = risk_pct(signal)
+    status_boost = 6 if is_open_position(signal) else 3 if signal.reached_state in WIN_STATES else 0
+    score = (
+        clamp(oi_percentile / 100 * 28, 0, 28)
+        + clamp(oi_move * 7, 0, 18)
+        + clamp(price_move * 8, 0, 18)
+        + clamp(taker_bias / 2, 0, 12)
+        + (clamp(14 - abs(risk - 3) * 2.4, 0, 14) if risk > 0 else 4)
+        + (8 if metric(signal, "mtf_5m_confluence") else 0)
+        + status_boost
+    )
+    return round(clamp(score, 0, 100))
+
+
+def stable_score(signal: Signal) -> int:
+    direction = 1 if signal.side == "long" else -1
+    oi_percentile = clamp(number(metric(signal, "oi_percentile")), 0, 100)
+    oi_move = abs(number(metric(signal, "oi_change_pct")))
+    price_move = number(metric(signal, "price_change_pct")) * direction
+    taker_value = metric(signal, "taker_buy_ratio")
+    taker_bias = (number(taker_value, 0.5) - 0.5) * 200 * direction if taker_value is not None else 0
+    risk = risk_pct(signal)
+    status_boost = 8 if is_open_position(signal) else 4 if signal.reached_state in WIN_STATES else 0
+    score = (
+        clamp(oi_percentile / 100 * 24, 0, 24)
+        + clamp(oi_move * 8, 0, 22)
+        + clamp(price_move * 9, 0, 18)
+        + clamp(taker_bias / 2, 0, 12)
+        + (clamp(16 - abs(risk - 2.5) * 2.5, 0, 16) if risk > 0 else 5)
+        + status_boost
+    )
+    return round(clamp(score, 0, 100))
+
+
+def is_high_quality(signal: Signal) -> bool:
+    base = signal_score(signal)
+    volume = number(metric(signal, "volume_24h") or metric(signal, "quote_volume"))
+    risk = risk_pct(signal)
+    price = abs(number(metric(signal, "price_change_pct")))
+    score = base
+    if metric(signal, "mtf_5m_confluence") or metric(signal, "mtf_5m_oi_confluence"):
+        score += 8
+    if 0.5 <= risk <= 8:
+        score += 6
+    if price >= 0.5:
+        score += 3
+    if volume >= 5_000_000 or volume == 0:
+        score += 3
+    return score >= 70 and (volume >= 5_000_000 or volume == 0) and risk >= 0.5
 
 
 def is_open_position(signal: Signal) -> bool:
