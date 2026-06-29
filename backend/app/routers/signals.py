@@ -5,7 +5,7 @@ from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
@@ -16,6 +16,26 @@ from ..security import User
 
 router = APIRouter(prefix="/signals", tags=["signals"])
 Session = Annotated[AsyncSession, Depends(get_session)]
+
+
+@router.get("/positions", response_model=list[SignalResponse])
+async def active_positions(_user: User, session: Session) -> list[SignalResponse]:
+    active_status = func.lower(func.coalesce(Signal.raw_payload["status"].as_string(), "active")) == "active"
+    rows = (
+        await session.scalars(
+            select(Signal)
+            .where(
+                Signal.official_trade.is_(True),
+                or_(
+                    Signal.reached_state.in_(("holding", "active", "warning")),
+                    and_(Signal.reached_state.in_(("tp1", "tp2", "tp3")), active_status),
+                ),
+            )
+            .order_by(Signal.triggered_at.asc(), Signal.id.asc())
+            .limit(500)
+        )
+    ).all()
+    return [SignalResponse.model_validate(row) for row in rows]
 
 
 @router.get("", response_model=SignalPage)

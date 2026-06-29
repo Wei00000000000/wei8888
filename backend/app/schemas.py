@@ -63,11 +63,14 @@ class SignalPage(BaseModel):
 class BacktestSummary(BaseModel):
     strategy: str | None
     total_entries: int
+    closed_entries: int
     wins: int
     losses: int
     open_positions: int
     win_rate_pct: float
     total_pnl_pct: float
+    realized_pnl_pct: float
+    unrealized_pnl_pct: float
     tp1_rate_pct: float
     tp2_rate_pct: float
     tp3_rate_pct: float

@@ -112,7 +112,7 @@
     .pill.bear { color: var(--bear); border-color: rgba(255,85,119,.38); background: var(--bear-soft); }
     .pill.warn { color: var(--warn); border-color: rgba(255,177,59,.38); background: var(--warn-soft); }
     .pill.accent { color: var(--accent); border-color: rgba(179,107,255,.45); background: var(--accent-soft); }
-    .stats-row { display: grid; grid-template-columns: repeat(6, minmax(120px,1fr)); border-bottom: 1px solid var(--line); }
+    .stats-row { display: grid; grid-template-columns: repeat(7, minmax(120px,1fr)); border-bottom: 1px solid var(--line); }
     .stat { padding: 14px 16px; border-right: 1px solid var(--line); min-height: 86px; }
     .stat:last-child { border-right: 0; }
     .stat-label { color: var(--faint); font-size: 12px; font-weight: 800; }
@@ -814,6 +814,7 @@
       lastVolumeAt: null,
       lastContractAt: null,
       scannerStatus: null,
+      strategySummaries: {},
       manifest: null,
       historyLoaded: false,
       historyLoading: null,
@@ -1023,14 +1024,25 @@
     }
 
     async function cloudSignals() {
-      const response = await cloudFetch("/signals?page=1&limit=100");
+      const [response, positionsResponse, summariesResponse] = await Promise.all([
+        cloudFetch("/signals?page=1&limit=100"),
+        cloudFetch("/signals/positions"),
+        cloudFetch("/backtest/summaries")
+      ]);
       if (response.status === 401) {
         $("loginGate").classList.remove("hidden");
         throw new Error("登入已過期");
       }
       if (!response.ok) throw new Error("雲端訊號讀取失敗");
       const data = await response.json();
-      const rows = (data.rows || []).map(row => ({...(row.raw_payload || {}), ...row}));
+      const positions = positionsResponse.ok ? await positionsResponse.json() : [];
+      const summaries = summariesResponse.ok ? await summariesResponse.json() : [];
+      state.strategySummaries = Object.fromEntries(summaries.map(row => [row.strategy || "all", row]));
+      const mergedRows = new Map();
+      [...(data.rows || []), ...positions]
+        .map(row => ({...(row.raw_payload || {}), ...row}))
+        .forEach(row => mergedRows.set(row.id || row.signal_id || signalKey(row), row));
+      const rows = [...mergedRows.values()];
       state.historyTotal = Number(data.meta?.total || rows.length);
       return {rows, markets: state.markets};
     }
@@ -1330,6 +1342,7 @@
           state.priceBaselineReady = true;
         }
         state.lastPriceAt = new Date();
+        renderStats();
         renderVisibleNumbers();
         renderHealth();
         if (state.currentView === "dashboard") {
@@ -1513,6 +1526,24 @@
       $(targetId).value = $(sourceId).value;
       renderAll();
     }
+    function historySummary(key) {
+      return state.strategySummaries[key || "all"] || null;
+    }
+    function currentStrategyKey() {
+      if (state.currentView === "stable") return "stable_dog";
+      if (state.currentView === "quality") return "high_quality";
+      if (state.currentView === "contract") return "contract_anomaly";
+      return "sentiment_oi";
+    }
+    function historicalWinText(summary, fallback) {
+      if (!summary) return fallback.total ? `${fmt(fallback.rate, 1)}%` : "尚無結案";
+      return Number(summary.closed_entries || 0) ? `${fmt(summary.win_rate_pct, 1)}%` : "尚無結案";
+    }
+    function historicalPnl(summary, liveRows, fallback) {
+      if (!summary) return fallback;
+      const live = liveRows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).reduce((sum, s) => sum + pnlPct(s, true), 0);
+      return Number(summary.realized_pnl_pct || 0) + live;
+    }
     function renderStats() {
       const stableMode = state.currentView === "stable";
       if (state.currentView === "contract") {
@@ -1530,6 +1561,9 @@
       const realized = closed.reduce((sum, s) => sum + pnlPct(s, false), 0);
       const unrealized = [...open, ...partial].reduce((sum, s) => sum + pnlPct(s, true), 0);
       const total = realized + unrealized;
+      const history = historySummary(currentStrategyKey());
+      const historyTotal = historicalPnl(history, sourceRows, total);
+      const historyDetail = history ? `${history.closed_entries} 結案 / ${history.total_entries} 全部交易` : `${closedStats.total} 筆目前資料`;
       const hot = stableMode ? sourceRows.filter(s => stableTradeMeta(s).score >= 80).length : state.markets.filter(m => m.signal_type).length;
       const avgScore = sourceRows.length ? sourceRows.reduce((sum, s) => sum + (stableMode ? stableTradeMeta(s).score : signalScore(s).value), 0) / sourceRows.length : 0;
       const maxDd = maxDrawdownOf(sourceRows);
@@ -1539,14 +1573,16 @@
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
         [totalLabel, closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP1 ${fmt(tpStats.tp1, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`],
-        ["穩狗累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
+        ["歷史總勝率", historicalWinText(history, closedStats), historyDetail],
+        ["穩狗累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
         [totalLabel, closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP1 ${fmt(tpStats.tp1, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`],
-        ["總累積盈虧", signed(total), `已實現 ${signed(realized)} / 浮動 ${signed(unrealized)}`],
+        ["歷史總勝率", historicalWinText(history, closedStats), historyDetail],
+        ["總累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["市場熱點", hot, `${watchMarkets().length} 個觀察中`]
@@ -1565,6 +1601,8 @@
       const rate = active.length ? aligned / active.length * 100 : 0;
       const avgRadar = active.length ? active.reduce((sum, row) => sum + Math.abs(Number(row.radar_score ?? row.score) || 0), 0) / active.length : 0;
       const avgQuality = active.length ? active.reduce((sum, row) => sum + Number(row.quality_score || 0), 0) / active.length : 0;
+      const history = historySummary("contract_anomaly");
+      const historyPnl = historicalPnl(history, contractFormalSignals(), 0);
       const groups = active.reduce((acc, row) => {
         const label = oiMarketGroup(row).label;
         acc[label] = (acc[label] || 0) + 1;
@@ -1573,6 +1611,8 @@
       const cells = [
         ["雷達樣本", active.length, `${rows.length} 個候選`],
         ["方向命中率", `${fmt(rate, 1)}%`, `${aligned} 對 / ${active.length - aligned} 錯`],
+        ["歷史總勝率", historicalWinText(history, {total:0, rate:0}), history ? `${history.closed_entries} 結案 / ${history.total_entries} 全部交易` : "等待統計"],
+        ["歷史累積盈虧", signed(historyPnl), "全部正式交易持續累積"],
         ["高分預警", warnings.length, "獨立於嘎多嘎空"],
         ["平均品質", `${fmt(avgQuality, 1)}/6`, `雷達 ${fmt(avgRadar, 0)}`],
         ["偏多 / 偏空", `${active.filter(r => contractBias(r) === "long").length} / ${active.filter(r => contractBias(r) === "short").length}`, "依 OI 分組判斷"],
@@ -1639,12 +1679,15 @@
       const neutral = rows.filter(row => row.bias === "neutral").length;
       const avgScore = rows.length ? rows.reduce((sum, row) => sum + Math.abs(Number(row.radar_score ?? row.score) || 0), 0) / rows.length : 0;
       const avgQuality = rows.length ? rows.reduce((sum, row) => sum + Number(row.quality_score || 0), 0) / rows.length : 0;
+      const contractHistory = historySummary("contract_anomaly");
       $("contractStats").innerHTML = [
         ["偏多候選", longs, "bull-text"],
         ["偏空候選", shorts, "bear-text"],
         ["觀察", neutral, "warn-text"],
         ["平均品質", `${fmt(avgQuality, 1)}/6`, "bull-text"],
         ["平均雷達", fmt(avgScore, 0), "accent-text"],
+        ["歷史總勝率", historicalWinText(contractHistory, {total:0, rate:0}), "bull-text"],
+        ["歷史累積盈虧", signed(historicalPnl(contractHistory, contractFormalSignals(), 0)), "accent-text"],
         ["成交量門檻", "500萬", ""],
         ["更新", lastTimeText(state.lastContractAt), ""]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
@@ -2149,10 +2192,13 @@
       const todayClosed = finalWinStats(todayRows);
       const todayTp = targetHitStats(todayRows);
       const avg = rows.length ? rows.reduce((sum, s) => sum + highQualityScore(s).score, 0) / rows.length : 0;
+      const qualityHistory = historySummary("high_quality");
       $("qualityCount").textContent = `(${rows.length})`;
       $("qualityStats").innerHTML = [
         ["正式持倉", open.length, "bull-text"],
         ["總進場勝率", totalStats.total ? `${fmt(totalStats.rate, 1)}%` : "未進場", "bull-text"],
+        ["歷史總勝率", historicalWinText(qualityHistory, totalStats), "bull-text"],
+        ["歷史累積盈虧", signed(historicalPnl(qualityHistory, allRows, 0)), "accent-text"],
         ["總樣本", `${totalStats.total} 倉`, ""],
         ["今日進場勝率", todayClosed.total ? `${fmt(todayClosed.rate, 1)}%` : "未進場", "accent-text"],
         ["今日TP觸發", `${fmt(todayTp.tp1, 1)}%`, "bull-text"],
@@ -2370,10 +2416,13 @@
       const tradable = metas.filter(s => s.score >= 92).length;
       const wait = metas.filter(s => s.side === "neutral").length;
       const avg = metas.length ? metas.reduce((sum, s) => sum + s.score, 0) / metas.length : 0;
+      const stableHistory = historySummary("stable_dog");
       $("stableStats").innerHTML = [
         ["穩狗訊號", rows.length, "bull-text"],
         ["正式 / 預警", `${officialRows.length} / ${warningRows.length}`, "accent-text"],
         ["總進場勝率", totalStats.total ? `${fmt(totalStats.rate, 1)}%` : "未進場", "bull-text"],
+        ["歷史總勝率", historicalWinText(stableHistory, totalStats), "bull-text"],
+        ["歷史累積盈虧", signed(historicalPnl(stableHistory, totalStableRows, 0)), "accent-text"],
         ["總TP1/FTP", `${fmt(totalTp.tp1, 1)}% / ${fmt(totalTp.ftp, 1)}%`, "accent-text"],
         ["平均分數", fmt(avg, 0), "accent-text"],
         ["嘎空方向", metas.filter(s => s.side === "bull").length, "bull-text"],
@@ -2495,7 +2544,8 @@
       const losses = entered.filter(isFinalLoss).length;
       const open = Math.max(0, entered.length - wins - losses);
       const total = entered.length;
-      return {wins, losses, open, total, rate: total ? wins / total * 100 : 0};
+      const closed = wins + losses;
+      return {wins, losses, open, total, closed, rate: closed ? wins / closed * 100 : 0};
     }
     function strategyHealthSummary(rows) {
       const stats = finalWinStats(rows);

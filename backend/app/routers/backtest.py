@@ -12,7 +12,7 @@ from ..database import get_session
 from ..models import BacktestRun, Signal
 from ..schemas import BacktestRequest, BacktestRunResponse, BacktestSummary, PageMeta, SignalPage, SignalResponse
 from ..security import Admin, User, require_csrf
-from ..stats import backtest_summary, filtered_signals
+from ..stats import all_strategy_summaries, backtest_summary, filtered_signals
 
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
@@ -28,6 +28,16 @@ async def summary(
     date_to: datetime | None = None,
 ) -> BacktestSummary:
     return BacktestSummary(**await backtest_summary(session, strategy, date_from, date_to))
+
+
+@router.get("/summaries", response_model=list[BacktestSummary])
+async def summaries(
+    _user: User,
+    session: Session,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[BacktestSummary]:
+    return [BacktestSummary(**row) for row in await all_strategy_summaries(session, date_from, date_to)]
 
 
 @router.get("/trades", response_model=SignalPage)
