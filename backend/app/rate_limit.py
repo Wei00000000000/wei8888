@@ -5,7 +5,7 @@ from collections import defaultdict, deque
 from time import monotonic
 
 from fastapi import Request
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -39,7 +39,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 bucket.popleft()
             if len(bucket) >= limit:
                 retry_after = max(1, int(60 - (now - bucket[0])))
-                return ORJSONResponse(
+                return JSONResponse(
                     status_code=429,
                     content={"detail": "Too many requests"},
                     headers={"Retry-After": str(retry_after)},

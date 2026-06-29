@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import settings
@@ -34,7 +34,6 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs" if settings.app_env != "production" else None,
     redoc_url=None,
-    default_response_class=ORJSONResponse,
     lifespan=lifespan,
 )
 
@@ -51,9 +50,9 @@ app.add_middleware(
 
 
 @app.exception_handler(Exception)
-async def unhandled_error(_request: Request, exc: Exception) -> ORJSONResponse:
+async def unhandled_error(_request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled request error", exc_info=exc)
-    return ORJSONResponse(status_code=500, content={"detail": "Internal server error"})
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/health", include_in_schema=False)
