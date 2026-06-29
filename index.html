@@ -1449,7 +1449,7 @@
     }
     function renderDecisionDashboard() {
       if (!$("decisionMarketStats")) return;
-      const all = dataSignals();
+      const all = state.signals.filter(isOfficialTrade);
       const active = sortSignals(all).filter(s => isOpenSignal(s) || isPartialActiveSignal(s));
       const formal = active.filter(s => signalDecisionModel(s).grade === "A").slice(0, 5);
       const btc = marketFor("BTC");
@@ -1851,6 +1851,7 @@
     function contractFormalSignals() {
       return sortSignals(state.signals)
         .filter(s => String(s.source || "").includes("coinglass_contract") || String(s.setup_id || "").includes("coinglass_contract"))
+        .filter(isOfficialTrade)
         .filter(s => isOpenSignal(s) || isPartialActiveSignal(s));
     }
     function renderContractVisualScreener(rows) {
