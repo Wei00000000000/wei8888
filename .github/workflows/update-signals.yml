@@ -1,9 +1,7 @@
 name: Update live signals
 
 on:
-  schedule:
-    # Offset from the top of the hour to reduce GitHub's peak-time schedule delays.
-    - cron: "2-59/5 * * * *"
+  # Zeabur is the primary 24/7 scheduler. Keep this workflow as manual backup only.
   workflow_dispatch:
 
 permissions:

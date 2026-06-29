@@ -15,6 +15,8 @@ class SessionResponse(BaseModel):
     authenticated: bool = True
     expires_at: datetime
     csrf_token: str
+    access_token: str
+    token_type: str = "bearer"
 
 
 class SignalResponse(BaseModel):

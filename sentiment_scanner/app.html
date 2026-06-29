@@ -837,7 +837,8 @@
       displayMode: localStorage.getItem("wei_display_mode") || (matchMedia("(max-width: 760px)").matches ? "novice" : "pro"),
       soundUnlocked: false,
       priceBaselineReady: false,
-      csrfToken: ""
+      csrfToken: "",
+      accessToken: sessionStorage.getItem("wei_cloud_access_token") || ""
     };
     const MAIN_WATCH_SYMBOLS = [
       "BTC","ETH","BNB","SOL","XRP","DOGE","ADA","AVAX","LINK","TON",
@@ -982,6 +983,8 @@
           const data = await response.json();
           if (!response.ok) throw new Error(data.detail || "登入失敗");
           state.csrfToken = data.csrf_token || "";
+          state.accessToken = data.access_token || "";
+          if (state.accessToken) sessionStorage.setItem("wei_cloud_access_token", state.accessToken);
           $("loginGate").classList.add("hidden");
           $("gateError").textContent = "";
           $("accessPassword").value = "";
@@ -1012,6 +1015,7 @@
 
     function cloudFetch(path, options = {}) {
       const headers = {...(options.headers || {})};
+      if (state.accessToken) headers.Authorization = `Bearer ${state.accessToken}`;
       if (state.csrfToken && !["GET", "HEAD"].includes(String(options.method || "GET").toUpperCase())) {
         headers["X-CSRF-Token"] = state.csrfToken;
       }

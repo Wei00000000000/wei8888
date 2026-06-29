@@ -23,7 +23,7 @@ async def login(payload: LoginRequest, request: Request, response: Response) -> 
     }
     response.set_cookie(settings.cookie_name, token, httponly=True, **cookie_options)
     response.set_cookie(settings.csrf_cookie_name, csrf_token, httponly=False, **cookie_options)
-    return SessionResponse(expires_at=expires_at, csrf_token=csrf_token)
+    return SessionResponse(expires_at=expires_at, csrf_token=csrf_token, access_token=token)
 
 
 @router.post("/logout", status_code=204, response_class=Response, dependencies=[Depends(require_csrf)])
