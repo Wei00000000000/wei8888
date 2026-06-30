@@ -90,13 +90,31 @@ def metric_value(row: dict[str, object], name: str, default: object = None) -> o
     return default
 
 
+def trade_score(row: dict[str, object]) -> float:
+    """Return the strongest normalized confidence score available for a signal."""
+    snapshot = row.get("snapshot_data")
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    candidates = (
+        row.get("score"),
+        row.get("radar_score"),
+        row.get("oi_percentile"),
+        row.get("quality_score"),
+        snapshot.get("score"),
+        snapshot.get("radar_score"),
+        snapshot.get("oi_percentile"),
+        snapshot.get("quality_score"),
+    )
+    return max((abs(raw_number(value)) for value in candidates if value not in (None, "")), default=0.0)
+
+
 def classify_trade_layer(row: dict[str, object]) -> tuple[str, list[str]]:
     reasons: list[str] = []
     blocks: list[str] = []
     snapshot = row.get("snapshot_data")
     if not isinstance(snapshot, dict):
         snapshot = {}
-    score = raw_number(row.get("score"), raw_number(snapshot.get("score"), raw_number(snapshot.get("oi_percentile"), 0)))
+    score = trade_score(row)
     entry = raw_number(row.get("entry_price") or row.get("trigger_price"), 0)
     sl = raw_number(row.get("sl_price"), 0)
     risk = abs(entry - sl) / entry * 100 if entry > 0 and sl > 0 else 0
