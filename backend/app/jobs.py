@@ -1,25 +1,99 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import AsyncIterator
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from .config import settings
 from .database import SessionFactory, engine
 from .importer import ROOT, import_legacy_history, import_market_file
-from .models import SystemLog
+from .models import Signal, SystemLog
 
 
 logger = logging.getLogger("wei.worker")
 SCAN_LOCK_ID = 928_884_215
 _local_scan_lock = asyncio.Lock()
+ACTIVE_POSITION_STATES = ("holding", "active", "tp1", "tp2", "tp3")
+
+
+def _json_value(value: object) -> object:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value) if isinstance(value, Decimal) else value
+
+
+async def export_active_positions_to_seed() -> int:
+    """Make database-only positions visible to the file-based state replayer."""
+    seed_path = ROOT / "sentiment_scanner" / "seed_signals.json"
+    try:
+        payload = json.loads(seed_path.read_text(encoding="utf-8"))
+        seed_rows = payload if isinstance(payload, list) else payload.get("rows", [])
+    except (FileNotFoundError, json.JSONDecodeError, AttributeError):
+        seed_rows = []
+
+    by_id = {
+        str(row.get("signal_id") or row.get("id")): row
+        for row in seed_rows
+        if isinstance(row, dict) and (row.get("signal_id") or row.get("id"))
+    }
+    async with SessionFactory() as session:
+        positions = (
+            await session.scalars(
+                select(Signal).where(
+                    Signal.official_trade.is_(True),
+                    Signal.reached_state.in_(ACTIVE_POSITION_STATES),
+                )
+            )
+        ).all()
+
+    for signal in positions:
+        row = dict(signal.raw_payload or {})
+        row.update(
+            {
+                "id": signal.id,
+                "signal_id": signal.id,
+                "symbol": signal.symbol,
+                "timeframe": signal.timeframe,
+                "strategy": signal.strategy,
+                "strategy_version": signal.strategy_version,
+                "signal_type": row.get("signal_type") or ("reversal_bullish" if signal.side == "long" else "reversal_bearish"),
+                "trade_layer": signal.trade_layer,
+                "official_trade": True,
+                "triggered_at": signal.triggered_at.isoformat(),
+                "triggered_at_ms": int(signal.triggered_at.timestamp() * 1000),
+                "entry_price": _json_value(signal.entry_price),
+                "trigger_price": _json_value(signal.entry_price),
+                "sl_price": _json_value(signal.sl_price),
+                "tp1_price": _json_value(signal.tp1_price),
+                "tp2_price": _json_value(signal.tp2_price),
+                "tp3_price": _json_value(signal.tp3_price),
+                "ftp_price": _json_value(signal.ftp_price),
+                "current_price": _json_value(signal.current_price),
+                "reached_state": signal.reached_state,
+                "status": "active",
+                "pnl_pct": signal.pnl_pct,
+                "hit_at": _json_value(signal.hit_at),
+                "max_gain_pct": signal.max_gain_pct,
+                "max_drawdown_pct": signal.max_drawdown_pct,
+                "quality_score": signal.quality_score,
+                "radar_score": signal.radar_score,
+            }
+        )
+        by_id[signal.id] = row
+
+    seed_path.write_text(json.dumps(list(by_id.values()), ensure_ascii=False, indent=2), encoding="utf-8")
+    return len(positions)
 
 
 @asynccontextmanager
@@ -77,6 +151,7 @@ async def run_scanner_job() -> None:
         env.setdefault("MAX_SEED_ROWS", "0")
         env.setdefault("MAX_ACTIVE_PER_SYMBOL_SIDE", "2")
         env.setdefault("MIN_QUOTE_VOLUME_USDT", "5000000")
+        exported_positions = await export_active_positions_to_seed()
         command = [sys.executable, str(ROOT / "scripts" / "update_seed_signals.py")]
         try:
             process = await asyncio.create_subprocess_exec(
@@ -95,7 +170,12 @@ async def run_scanner_job() -> None:
                 "INFO",
                 "scan_succeeded",
                 "Scan completed and database was updated",
-                {**result, "elapsed_seconds": elapsed, "output_tail": stdout.decode("utf-8", errors="replace")[-500:]},
+                {
+                    **result,
+                    "exported_positions": exported_positions,
+                    "elapsed_seconds": elapsed,
+                    "output_tail": stdout.decode("utf-8", errors="replace")[-500:],
+                },
             )
         except asyncio.TimeoutError:
             if "process" in locals():

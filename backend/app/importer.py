@@ -133,7 +133,9 @@ def iter_legacy_rows(root: Path = ROOT) -> Iterable[dict[str, Any]]:
     seed = root / "sentiment_scanner" / "seed_signals.json"
     if seed.exists():
         files.append(seed)
-    seen: set[str] = set()
+    # Later files are more authoritative. In particular, the live seed must
+    # override immutable history chunks for mutable price and position state.
+    latest: dict[str, dict[str, Any]] = {}
     for path in files:
         if not path.exists():
             continue
@@ -143,9 +145,9 @@ def iter_legacy_rows(root: Path = ROOT) -> Iterable[dict[str, Any]]:
             if not isinstance(row, dict):
                 continue
             signal_id = str(row.get("signal_id") or row.get("id") or "")
-            if signal_id and signal_id not in seen:
-                seen.add(signal_id)
-                yield row
+            if signal_id:
+                latest[signal_id] = row
+    yield from latest.values()
 
 
 async def import_signals(session: AsyncSession, rows: Iterable[dict[str, Any]], batch_size: int = 500) -> dict[str, int]:
