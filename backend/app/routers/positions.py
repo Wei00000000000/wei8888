@@ -14,7 +14,6 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_session
 from ..models import Position
-from ..positions import sync_positions_from_signals
 from ..schemas import PageMeta, PositionDetail, PositionPage, PositionResponse
 from ..security import User
 
@@ -49,7 +48,6 @@ def position_filters(
 
 @router.get("/open", response_model=list[PositionResponse])
 async def open_positions(_user: User, session: Session) -> list[PositionResponse]:
-    await sync_positions_from_signals(session)
     rows = (
         await session.scalars(
             select(Position)
@@ -75,7 +73,6 @@ async def position_history(
     date_to: datetime | None = None,
     sort: Annotated[str, Query(pattern="^(asc|desc)$")] = "desc",
 ) -> PositionPage:
-    await sync_positions_from_signals(session)
     filters = position_filters(symbol, side, timeframe, status, date_from, date_to)
     total = int((await session.scalar(select(func.count(Position.id)).where(*filters))) or 0)
     order = Position.entry_time.asc() if sort == "asc" else Position.entry_time.desc()
@@ -105,7 +102,6 @@ async def export_positions_csv(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> Response:
-    await sync_positions_from_signals(session)
     filters = position_filters(symbol, side, timeframe, status, date_from, date_to)
     rows = (
         await session.scalars(
@@ -148,7 +144,6 @@ async def export_positions_csv(
 
 @router.get("/{position_id}", response_model=PositionDetail)
 async def position_detail(position_id: str, _user: User, session: Session) -> PositionDetail:
-    await sync_positions_from_signals(session)
     position = await session.scalar(
         select(Position)
         .where(Position.id == position_id)
