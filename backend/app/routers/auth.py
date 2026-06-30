@@ -14,7 +14,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def login(payload: LoginRequest, request: Request, response: Response) -> SessionResponse:
     if not verify_site_password(payload.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Password is incorrect")
-    token, expires_at, csrf_token = create_session_token()
+    token, expires_at, csrf_token = create_session_token(role="admin")
     cookie_options = {
         "secure": settings.cookie_secure,
         "samesite": settings.cookie_samesite,

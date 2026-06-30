@@ -100,6 +100,80 @@ class SignalEvent(Base):
     )
 
 
+class Position(Base):
+    __tablename__ = "positions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid4()))
+    signal_id: Mapped[str] = mapped_column(ForeignKey("signals.id", ondelete="CASCADE"), unique=True, index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    side: Mapped[str] = mapped_column(String(8), index=True)
+    timeframe: Mapped[str] = mapped_column(String(12), index=True)
+    strategy_name: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(24), default="OPEN", index=True)
+    entry_price: Mapped[Decimal | None] = mapped_column(PRICE)
+    stop_loss: Mapped[Decimal | None] = mapped_column(PRICE)
+    take_profit_1: Mapped[Decimal | None] = mapped_column(PRICE)
+    take_profit_2: Mapped[Decimal | None] = mapped_column(PRICE)
+    take_profit_3: Mapped[Decimal | None] = mapped_column(PRICE)
+    take_profit_final: Mapped[Decimal | None] = mapped_column(PRICE)
+    exit_price: Mapped[Decimal | None] = mapped_column(PRICE)
+    pnl: Mapped[float | None] = mapped_column(Float)
+    pnl_percent: Mapped[float | None] = mapped_column(Float)
+    rr: Mapped[float | None] = mapped_column(Float)
+    entry_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    exit_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    entry_reason: Mapped[str | None] = mapped_column(Text)
+    exit_reason: Mapped[str | None] = mapped_column(Text)
+    score: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    signal: Mapped[Signal] = relationship()
+    events: Mapped[list["PositionEvent"]] = relationship(back_populates="position", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_positions_symbol_status_time", "symbol", "status", "entry_time"),
+        Index("ix_positions_strategy_status", "strategy_name", "status"),
+    )
+
+
+class PositionEvent(Base):
+    __tablename__ = "position_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    position_id: Mapped[str] = mapped_column(ForeignKey("positions.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String(32), index=True)
+    event_price: Mapped[Decimal | None] = mapped_column(PRICE)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    position: Mapped[Position] = relationship(back_populates="events")
+
+    __table_args__ = (
+        UniqueConstraint("position_id", "event_type", "event_time", name="uq_position_event_once"),
+    )
+
+
+class NotificationLog(Base):
+    __tablename__ = "notification_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    signal_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    position_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    side: Mapped[str] = mapped_column(String(8), index=True)
+    timeframe: Mapped[str] = mapped_column(String(12), index=True)
+    message_type: Mapped[str] = mapped_column(String(32), index=True)
+    message_text: Mapped[str] = mapped_column(Text)
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(128))
+    sent_status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    dedupe_key: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class MarketSnapshot(Base):
     __tablename__ = "market_snapshots"
 

@@ -122,3 +122,79 @@ class MarketResponse(BaseModel):
     observed_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PositionEventResponse(BaseModel):
+    id: int
+    position_id: str
+    event_type: str
+    event_price: Decimal | None
+    event_time: datetime
+    description: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PositionResponse(BaseModel):
+    id: str
+    signal_id: str
+    symbol: str
+    side: str
+    timeframe: str
+    strategy_name: str
+    status: str
+    entry_price: Decimal | None
+    stop_loss: Decimal | None
+    take_profit_1: Decimal | None
+    take_profit_2: Decimal | None
+    take_profit_3: Decimal | None
+    take_profit_final: Decimal | None
+    exit_price: Decimal | None
+    pnl: float | None
+    pnl_percent: float | None
+    rr: float | None
+    entry_time: datetime
+    exit_time: datetime | None
+    entry_reason: str | None
+    exit_reason: str | None
+    score: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PositionPage(BaseModel):
+    rows: list[PositionResponse]
+    meta: PageMeta
+
+
+class PositionDetail(PositionResponse):
+    signal: SignalResponse | None = None
+    events: list[PositionEventResponse] = Field(default_factory=list)
+
+
+class NotificationLogResponse(BaseModel):
+    id: int
+    signal_id: str | None
+    position_id: str | None
+    symbol: str
+    side: str
+    timeframe: str
+    message_type: str
+    message_text: str
+    telegram_chat_id: str | None
+    sent_status: str
+    sent_at: datetime | None
+    error_message: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationTestRequest(BaseModel):
+    symbol: str = Field(default="BTCUSDT", max_length=24)
+    side: Literal["long", "short"] = "long"
+    timeframe: str = Field(default="15M", max_length=12)
+    message: str = Field(default="Wei strategy notification test", max_length=500)

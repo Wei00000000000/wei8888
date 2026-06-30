@@ -471,6 +471,7 @@
         <button data-view="contract">合約異常雷達</button>
         <button data-view="quality">高品質訊號</button>
         <button data-view="stable">穩如老狗</button>
+        <button data-view="positions">倉位歷史</button>
         <button data-view="review">交易檢討</button>
       </nav>
       <div class="top-actions">
@@ -766,6 +767,30 @@
       <div class="review-grid" id="reviewCards"></div>
     </section>
 
+    <section id="positions" class="view">
+      <div class="section-head">
+        <div>
+          <div class="kicker">Position History</div>
+          <h2 class="section-title">倉位歷史與通知</h2>
+          <p class="section-copy">正式倉位會保存 entry / SL / TP / exit / PnL 與事件時間線，預警不會列入正式倉位。</p>
+        </div>
+        <div class="section-actions">
+          <input id="positionSearch" placeholder="搜尋幣種，例如 BTC">
+          <select id="positionStatus"><option value="">全部狀態</option><option>OPEN</option><option>CLOSED</option><option>EXPIRED</option><option>INVALIDATED</option><option>CANCELLED</option></select>
+          <select id="positionSide"><option value="">全部方向</option><option value="long">多</option><option value="short">空</option></select>
+          <button class="btn" id="positionExport">CSV</button>
+          <button class="btn primary" id="positionRefresh">更新倉位</button>
+        </div>
+      </div>
+      <div class="watch-stats" id="positionStats"></div>
+      <div class="table-wrap"><table><thead><tr><th>幣種</th><th>方向</th><th>週期</th><th>策略</th><th>狀態</th><th>Entry</th><th>SL</th><th>TP</th><th>Exit</th><th>PnL</th><th>進場</th></tr></thead><tbody id="positionRows"></tbody></table></div>
+      <div class="section-head">
+        <div><div class="kicker">Telegram</div><h2 class="section-title">通知測試與紀錄</h2></div>
+        <div class="section-actions"><button class="btn primary" id="notificationTest">測試 Telegram</button><button class="btn" id="notificationRefresh">更新紀錄</button></div>
+      </div>
+      <div class="review-grid" id="notificationLogs"></div>
+    </section>
+
   </main>
 
   <div class="notify-panel" id="notifyPanel">
@@ -806,6 +831,9 @@
       sectorFlows: [],
       volumeAnomalies: [],
       contractAnomalies: [],
+      positions: [],
+      positionMeta: null,
+      notificationLogs: [],
       notifications: [],
       lastBookAt: null,
       lastTickAt: null,
@@ -838,7 +866,7 @@
       displayMode: localStorage.getItem("wei_display_mode") || (matchMedia("(max-width: 760px)").matches ? "novice" : "pro"),
       soundUnlocked: false,
       priceBaselineReady: false,
-      csrfToken: "",
+      csrfToken: sessionStorage.getItem("wei_csrf_token") || "",
       accessToken: sessionStorage.getItem("wei_cloud_access_token") || ""
     };
     const MAIN_WATCH_SYMBOLS = [
@@ -913,6 +941,13 @@
     $("stableLoadMore").addEventListener("click", () => showMore("stable", renderStable));
     $("qualityLoadMore").addEventListener("click", () => showMore("quality", renderHighQuality));
     $("loadFullReview").addEventListener("click", () => loadFullHistoryFor("SL 完整診斷", renderReview));
+    $("positionRefresh").addEventListener("click", loadPositions);
+    $("positionSearch").addEventListener("input", () => debounceAction("positions", loadPositions, 400));
+    $("positionStatus").addEventListener("change", loadPositions);
+    $("positionSide").addEventListener("change", loadPositions);
+    $("positionExport").addEventListener("click", exportPositionsCsv);
+    $("notificationTest").addEventListener("click", sendTestNotification);
+    $("notificationRefresh").addEventListener("click", loadNotificationLogs);
     document.querySelectorAll("[data-visual-tf]").forEach(btn => btn.addEventListener("click", () => {
       state.visualTf = btn.dataset.visualTf;
       renderContractRadar();
@@ -957,6 +992,7 @@
         try {
           const response = await cloudFetch("/auth/me");
           if (response.ok) $("loginGate").classList.add("hidden");
+          else if (location.pathname.endsWith("/app.html")) location.href = "login.html";
         } catch {}
       } else if (sessionStorage.getItem("wei_strategy_access") === ACCESS_PASSWORD_HASH) {
         $("loginGate").classList.add("hidden");
@@ -986,6 +1022,7 @@
           state.csrfToken = data.csrf_token || "";
           state.accessToken = data.access_token || "";
           if (state.accessToken) sessionStorage.setItem("wei_cloud_access_token", state.accessToken);
+          if (state.csrfToken) sessionStorage.setItem("wei_csrf_token", state.csrfToken);
           $("loginGate").classList.add("hidden");
           $("gateError").textContent = "";
           $("accessPassword").value = "";
@@ -1055,6 +1092,84 @@
       const rows = [...mergedRows.values()];
       state.historyTotal = Number(data.meta?.total || rows.length);
       return {rows, markets: state.markets};
+    }
+
+    async function loadPositions() {
+      if (!CLOUD_MODE) {
+        state.positions = [];
+        state.positionMeta = {total: 0};
+        renderPositions();
+        return;
+      }
+      try {
+        const params = new URLSearchParams({page: "1", limit: "100"});
+        const symbol = clean($("positionSearch").value);
+        if (symbol) params.set("symbol", symbol);
+        if ($("positionStatus").value) params.set("status", $("positionStatus").value);
+        if ($("positionSide").value) params.set("side", $("positionSide").value);
+        const response = await cloudFetch(`/positions/history?${params}`);
+        if (!response.ok) throw new Error("倉位歷史讀取失敗");
+        const data = await response.json();
+        state.positions = data.rows || [];
+        state.positionMeta = data.meta || {total: state.positions.length};
+        renderPositions();
+        await loadNotificationLogs();
+      } catch (err) {
+        rememberError(err);
+      }
+    }
+
+    async function loadNotificationLogs() {
+      if (!CLOUD_MODE) {
+        state.notificationLogs = [];
+        renderNotificationLogs();
+        return;
+      }
+      try {
+        const response = await cloudFetch("/notifications/logs?limit=30");
+        if (!response.ok) throw new Error("通知紀錄讀取失敗");
+        state.notificationLogs = await response.json();
+        renderNotificationLogs();
+      } catch (err) {
+        rememberError(err);
+      }
+    }
+
+    async function sendTestNotification() {
+      if (!CLOUD_MODE) {
+        status("靜態模式無法測試 Telegram，請使用雲端 API。");
+        return;
+      }
+      try {
+        const response = await cloudFetch("/notifications/test", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({symbol: "BTCUSDT", side: "long", timeframe: "15M", message: "Wei 策略情報室 Telegram 測試"})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Telegram 測試失敗");
+        status(`Telegram 測試完成：${data.sent_status}`);
+        await loadNotificationLogs();
+      } catch (err) {
+        rememberError(err);
+      }
+    }
+
+    async function exportPositionsCsv() {
+      if (!CLOUD_MODE) return;
+      const params = new URLSearchParams();
+      const symbol = clean($("positionSearch").value);
+      if (symbol) params.set("symbol", symbol);
+      if ($("positionStatus").value) params.set("status", $("positionStatus").value);
+      if ($("positionSide").value) params.set("side", $("positionSide").value);
+      try {
+        const response = await cloudFetch(`/positions/export.csv?${params}`);
+        if (!response.ok) throw new Error("CSV 匯出失敗");
+        const text = await response.text();
+        downloadText(`positions_${Date.now()}.csv`, text, "text/csv;charset=utf-8");
+      } catch (err) {
+        rememberError(err);
+      }
     }
 
     async function cloudMarkets(query = "") {
@@ -1461,7 +1576,92 @@
       else if (state.currentView === "quality") renderHighQuality();
       else if (state.currentView === "stable") renderStable();
       else if (state.currentView === "contract") renderContractRadar();
+      else if (state.currentView === "positions") {
+        renderPositions();
+        renderNotificationLogs();
+        if (!state.positions.length && CLOUD_MODE) loadPositions();
+      }
       else if (state.currentView === "review") renderReview();
+    }
+
+    function renderPositions() {
+      if (!$("positionRows")) return;
+      const rows = state.positions || [];
+      const total = Number(state.positionMeta?.total || rows.length);
+      const open = rows.filter(row => row.status === "OPEN").length;
+      const closed = rows.filter(row => row.status === "CLOSED").length;
+      const pnl = rows.reduce((sum, row) => sum + (Number(row.pnl_percent) || 0), 0);
+      $("positionStats").innerHTML = [
+        statCard("查詢筆數", `${rows.length}/${total}`, "目前頁面"),
+        statCard("OPEN", open, "仍在追蹤"),
+        statCard("CLOSED", closed, "已結案"),
+        statCard("頁面累積盈虧", signed(pnl), "目前查詢頁")
+      ].join("");
+      $("positionRows").innerHTML = rows.map(row => {
+        const side = row.side === "long" ? "多" : "空";
+        const tp = [row.take_profit_1, row.take_profit_2, row.take_profit_3, row.take_profit_final].filter(v => v !== null && v !== undefined).map(v => fmt(v, 6)).join(" / ");
+        return `<tr data-position-id="${row.id}">
+          <td><button class="link-btn" data-position-detail="${row.id}">${clean(row.symbol)}</button></td>
+          <td class="${row.side === "long" ? "bull-text" : "bear-text"}">${side}</td>
+          <td>${row.timeframe}</td>
+          <td>${cleanStrategyName(row.strategy_name)}</td>
+          <td><span class="pill ${row.status === "OPEN" ? "warn" : row.status === "CLOSED" ? "bull" : "bear"}">${row.status}</span></td>
+          <td>${fmt(row.entry_price, 6)}</td>
+          <td>${fmt(row.stop_loss, 6)}</td>
+          <td>${tp}</td>
+          <td>${fmt(row.exit_price, 6)}</td>
+          <td class="${numClass(row.pnl_percent)}">${signed(row.pnl_percent)}</td>
+          <td>${shortTime(row.entry_time)}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="11" class="empty">尚無倉位紀錄。</td></tr>`;
+      document.querySelectorAll("[data-position-detail]").forEach(btn => btn.addEventListener("click", () => openPositionDetail(btn.dataset.positionDetail)));
+    }
+
+    function renderNotificationLogs() {
+      if (!$("notificationLogs")) return;
+      const rows = state.notificationLogs || [];
+      $("notificationLogs").innerHTML = rows.map(row => `<article class="review-card">
+        <div class="review-title"><span>${clean(row.symbol)} ${row.side.toUpperCase()} ${row.timeframe}</span><span class="pill ${row.sent_status === "sent" ? "bull" : row.sent_status === "failed" ? "bear" : "warn"}">${row.sent_status}</span></div>
+        <div class="subline">${row.message_type} · ${shortTime(row.created_at)}</div>
+        <div class="review-item">${cleanText(row.message_text).replace(/\n/g, "<br>")}</div>
+        ${row.error_message ? `<div class="review-item bear-text">${cleanText(row.error_message)}</div>` : ""}
+      </article>`).join("") || `<div class="empty">尚無通知紀錄。</div>`;
+    }
+
+    async function openPositionDetail(positionId) {
+      if (!CLOUD_MODE || !positionId) return;
+      try {
+        const response = await cloudFetch(`/positions/${encodeURIComponent(positionId)}`);
+        if (!response.ok) throw new Error("倉位明細讀取失敗");
+        const item = await response.json();
+        const events = (item.events || []).map(event => `${shortTime(event.event_time)} ${event.event_type} ${event.event_price ? fmt(event.event_price, 6) : ""} ${event.description || ""}`);
+        state.notificationLogs = [{
+          id: -1,
+          symbol: item.symbol,
+          side: item.side,
+          timeframe: item.timeframe,
+          message_type: "POSITION_DETAIL",
+          message_text: [
+            `${clean(item.symbol)} ${item.side.toUpperCase()} ${item.timeframe}`,
+            `狀態：${item.status}`,
+            `Entry：${fmt(item.entry_price, 6)} / SL：${fmt(item.stop_loss, 6)}`,
+            `TP：${fmt(item.take_profit_1, 6)} / ${fmt(item.take_profit_2, 6)} / ${fmt(item.take_profit_3, 6)} / ${fmt(item.take_profit_final, 6)}`,
+            `Exit：${fmt(item.exit_price, 6)} / PnL：${signed(item.pnl_percent)}`,
+            `進場原因：${item.entry_reason || "-"}`,
+            `出場原因：${item.exit_reason || "-"}`,
+            "",
+            "事件時間線：",
+            ...(events.length ? events : ["尚無事件"])
+          ].join("\n"),
+          sent_status: "detail",
+          created_at: new Date().toISOString(),
+          error_message: ""
+        }, ...(state.notificationLogs || [])];
+        renderNotificationLogs();
+        status(`已載入 ${clean(item.symbol)} 倉位明細`);
+      } catch (err) {
+        rememberError(err);
+      }
     }
     function renderDecisionDashboard() {
       if (!$("decisionMarketStats")) return;
@@ -4132,6 +4332,15 @@
       if (!vals.length) return "-";
       const avg = vals.reduce((a,b) => a + b, 0) / vals.length;
       return avg >= 24 ? `${fmt(avg / 24, 1)}天` : `${fmt(avg, 1)}小時`;
+    }
+    function cleanText(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+    }
+    function cleanStrategyName(value) {
+      return String(value || "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+    }
+    function statCard(label, value, subline = "") {
+      return `<div class="watch-stat"><div class="watch-stat-label">${cleanText(label)}</div><div class="watch-stat-value">${cleanText(value)}</div><div class="subline">${cleanText(subline)}</div></div>`;
     }
     function setView(view) {
       state.currentView = view;

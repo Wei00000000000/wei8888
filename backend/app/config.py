@@ -24,7 +24,14 @@ class Settings(BaseSettings):
     access_token_minutes: int = Field(default=480, ge=5, le=10080)
     app_password_hash: str = ""
     admin_token: str = ""
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:8000", "http://127.0.0.1:8000"]
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    public_site_url: str = "https://wei00000000000.github.io/wei8888/"
+    cors_origins: Annotated[list[str], NoDecode] = [
+        "https://wei00000000000.github.io",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
     allowed_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1", "testserver"]
     cookie_name: str = "wei_session"
     csrf_cookie_name: str = "wei_csrf"
@@ -36,6 +43,8 @@ class Settings(BaseSettings):
     general_rate_limit: int = Field(default=120, ge=10, le=10000)
     login_rate_limit: int = Field(default=5, ge=1, le=100)
     backtest_rate_limit: int = Field(default=2, ge=1, le=30)
+    history_rate_limit: int = Field(default=60, ge=10, le=1000)
+    notification_rate_limit: int = Field(default=20, ge=1, le=200)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

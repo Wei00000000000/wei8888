@@ -23,6 +23,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return settings.login_rate_limit
         if path.endswith("/backtest/run"):
             return settings.backtest_rate_limit
+        if path.endswith("/notifications/test"):
+            return settings.notification_rate_limit
+        if path.endswith("/positions/history") or path.endswith("/backtest/trades"):
+            return settings.history_rate_limit
         return settings.general_rate_limit
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:

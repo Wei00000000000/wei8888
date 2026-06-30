@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wei 策略情報室｜登入</title>
+  <meta name="robots" content="noindex">
+  <style>
+    :root { color-scheme: dark; --bg:#050a0f; --panel:#101923; --line:#223149; --text:#eff6ff; --muted:#8aa2bd; --accent:#a855f7; --bull:#00e0a4; --bear:#ff4f82; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at 30% 20%, rgba(0,224,164,.13), transparent 32%), linear-gradient(135deg, #050a0f, #071019 55%, #0b1020); color: var(--text); font-family: Inter, "Noto Sans TC", system-ui, sans-serif; }
+    .card { width: min(420px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 18px; background: rgba(16,25,35,.92); box-shadow: 0 24px 80px rgba(0,0,0,.45); padding: 28px; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .logo { width: 48px; height: 48px; border-radius: 12px; background: #201135; border: 1px solid #6d35b8; display: grid; place-items: center; font-weight: 950; color: #d8b4fe; }
+    h1 { margin: 0; font-size: 22px; }
+    p { margin: 4px 0 0; color: var(--muted); font-size: 13px; letter-spacing: .08em; font-weight: 800; }
+    label { display: block; color: var(--muted); font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+    input { width: 100%; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: #080f17; color: var(--text); padding: 0 14px; font-size: 16px; outline: none; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(168,85,247,.18); }
+    button { margin-top: 14px; width: 100%; height: 48px; border: 1px solid #7c3aed; border-radius: 12px; background: linear-gradient(135deg, #7c3aed, #00a884); color: white; font-weight: 950; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .error { min-height: 20px; margin-top: 12px; color: var(--bear); font-size: 13px; }
+    .foot { margin-top: 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">
+      <div class="logo">Wei</div>
+      <div><h1>Wei 策略情報室</h1><p>SECURE ACCESS</p></div>
+    </div>
+    <form id="loginForm">
+      <label for="password">存取密碼</label>
+      <input id="password" type="password" autocomplete="current-password" autofocus>
+      <button id="loginBtn" type="submit">登入</button>
+      <div id="error" class="error"></div>
+    </form>
+    <div class="foot">登入資訊只送往 Zeabur API 驗證，不會存入 GitHub Pages 原始碼。</div>
+  </main>
+  <script src="api-config.js"></script>
+  <script>
+    const API_BASE = String(window.WEI_API_BASE || "").replace(/\/+$/, "");
+    const form = document.getElementById("loginForm");
+    const btn = document.getElementById("loginBtn");
+    const error = document.getElementById("error");
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      error.textContent = "";
+      if (!API_BASE) {
+        error.textContent = "API 尚未設定。";
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          credentials: "include",
+          body: JSON.stringify({password: document.getElementById("password").value})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "登入失敗");
+        sessionStorage.setItem("wei_cloud_access_token", data.access_token || "");
+        sessionStorage.setItem("wei_csrf_token", data.csrf_token || "");
+        location.href = "app.html";
+      } catch (err) {
+        error.textContent = err.message || "登入失敗";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

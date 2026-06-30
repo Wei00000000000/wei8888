@@ -12,7 +12,7 @@ from .config import settings
 from .database import create_schema
 from .rate_limit import RateLimitMiddleware
 from .security_headers import SecurityHeadersMiddleware
-from .routers import auth, backtest, market, signals, system
+from .routers import auth, backtest, market, notifications, positions, signals, system
 
 
 logging.basicConfig(
@@ -62,6 +62,8 @@ async def health() -> dict[str, str]:
 
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(signals.router, prefix=settings.api_prefix)
+app.include_router(positions.router, prefix=settings.api_prefix)
 app.include_router(market.router, prefix=settings.api_prefix)
 app.include_router(backtest.router, prefix=settings.api_prefix)
+app.include_router(notifications.router, prefix=settings.api_prefix)
 app.include_router(system.router, prefix=settings.api_prefix)

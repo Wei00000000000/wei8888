@@ -17,6 +17,7 @@ from .config import settings
 from .database import SessionFactory, engine
 from .importer import ROOT, import_legacy_history, import_market_file
 from .models import Signal, SystemLog
+from .positions import sync_positions_from_signals
 
 
 logger = logging.getLogger("wei.worker")
@@ -165,6 +166,8 @@ async def run_scanner_job() -> None:
             if process.returncode != 0:
                 raise RuntimeError(stderr.decode("utf-8", errors="replace")[-1500:] or "Scanner returned non-zero status")
             result = await import_existing_data()
+            async with SessionFactory() as session:
+                position_result = await sync_positions_from_signals(session, notify_new_since=started)
             elapsed = round((datetime.now(timezone.utc) - started).total_seconds(), 2)
             await write_log(
                 "INFO",
@@ -172,6 +175,7 @@ async def run_scanner_job() -> None:
                 "Scan completed and database was updated",
                 {
                     **result,
+                    **position_result,
                     "exported_positions": exported_positions,
                     "elapsed_seconds": elapsed,
                     "output_tail": stdout.decode("utf-8", errors="replace")[-500:],
