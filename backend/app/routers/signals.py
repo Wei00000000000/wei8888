@@ -31,7 +31,7 @@ async def active_positions(_user: User, session: Session) -> list[SignalResponse
                     and_(Signal.reached_state.in_(("tp1", "tp2", "tp3")), active_status),
                 ),
             )
-            .order_by(Signal.triggered_at.asc(), Signal.id.asc())
+            .order_by(Signal.triggered_at.desc(), Signal.id.desc())
             .limit(500)
         )
     ).all()

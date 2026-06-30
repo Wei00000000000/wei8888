@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy import select
@@ -14,6 +16,24 @@ def notification_dedupe_key(position: Position, message_type: str) -> str:
     return f"{position.symbol}:{position.side}:{position.timeframe}:{position.signal_id}:{message_type}"
 
 
+def format_price(value: Decimal | None) -> str:
+    if value is None:
+        return "-"
+    number = float(value)
+    decimals = 8 if 0 < abs(number) < 0.0001 else 5
+    text = f"{number:.{decimals}f}"
+    whole, fraction = text.split(".")
+    minimum = 5 if decimals == 8 else 4
+    return f"{whole}.{fraction.rstrip('0').ljust(minimum, '0')}"
+
+
+def format_taipei_time(value: datetime) -> str:
+    local = value.astimezone(ZoneInfo("Asia/Taipei"))
+    period = "上午" if local.hour < 12 else "下午"
+    hour = local.hour % 12 or 12
+    return f"{local:%Y/%m/%d} {period}{hour}:{local:%M}"
+
+
 def position_message(position: Position, message_type: str = "NEW_POSITION") -> str:
     direction = "LONG" if position.side == "long" else "SHORT"
     lines = [
@@ -23,12 +43,13 @@ def position_message(position: Position, message_type: str = "NEW_POSITION") -> 
         f"方向：{direction}",
         f"週期：{position.timeframe}",
         f"策略：{position.strategy_name}",
-        f"Entry：{position.entry_price}",
-        f"SL：{position.stop_loss}",
-        f"TP1/TP2/TP3/FTP：{position.take_profit_1} / {position.take_profit_2} / {position.take_profit_3} / {position.take_profit_final}",
+        f"Entry：{format_price(position.entry_price)}",
+        f"SL：{format_price(position.stop_loss)}",
+        "TP1/TP2/TP3/FTP："
+        f"{format_price(position.take_profit_1)} / {format_price(position.take_profit_2)} / "
+        f"{format_price(position.take_profit_3)} / {format_price(position.take_profit_final)}",
         f"Score：{position.score if position.score is not None else '-'}",
-        f"時間：{position.entry_time.astimezone(timezone.utc).isoformat()}",
-        settings.public_site_url,
+        f"成立時間：{format_taipei_time(position.entry_time)}",
     ]
     return "\n".join(lines)
 

@@ -984,7 +984,7 @@
     status("Auto scanner warming up.");
     initialize();
     setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 10000 : 5000);
-    setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, 120000);
+    setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, CLOUD_MODE ? 30000 : 120000);
     setInterval(renderHealth, 5000);
 
     async function initAccessGate() {
@@ -1497,7 +1497,7 @@
         renderHealth();
         return;
       }
-      const seconds = 120;
+      const seconds = CLOUD_MODE ? 30 : 120;
       $("autoScan").textContent = "停止自動";
       if (STATIC_MODE) {
         autoTimer = setInterval(loadBook, seconds * 1000);
@@ -2464,6 +2464,11 @@
       const reasons = [];
       const blocks = [];
       const score = isDivergenceSignal(s) ? stableTradeMeta(s).score : signalScore(s).value;
+      if (s.official_trade === true || s.trade_layer === "official_trade") {
+        const result = {raw_signal: true, layer: "official_trade", label: "正式", kind: "bull", score, requiredScore: 70, reasons: []};
+        state.tradeGateCache.set(key, result);
+        return result;
+      }
       const profile = slRiskProfile();
       const strategy = strategyBucket(s);
       const sector = sectorForSymbol(s.symbol);

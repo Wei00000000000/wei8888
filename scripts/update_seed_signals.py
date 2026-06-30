@@ -1289,6 +1289,64 @@ def merge_locked_signal(old: dict[str, object], new: dict[str, object]) -> dict[
     return normalize_row(merged)
 
 
+def lock_signal_to_latest_price(row: dict[str, object], latest_price: float) -> dict[str, object]:
+    """Lock a newly formalized trade to the executable ticker price."""
+    if not row.get("official_trade") or latest_price <= 0:
+        return row
+    previous_entry = as_float(row.get("entry_price") or row.get("trigger_price"))
+    previous_sl = as_float(row.get("sl_price"))
+    if previous_entry is None or previous_entry <= 0 or previous_sl is None or previous_sl <= 0:
+        return row
+    risk_ratio = abs(previous_entry - previous_sl) / previous_entry
+    if risk_ratio <= 0:
+        return row
+    risk = latest_price * risk_ratio
+    bullish = row.get("signal_type") == "reversal_bullish"
+    direction = 1 if bullish else -1
+    row["entry_price"] = latest_price
+    row["trigger_price"] = latest_price
+    row["current_price"] = latest_price
+    row["price"] = latest_price
+    row["risk"] = risk
+    row["sl_price"] = latest_price - direction * risk
+    row["tp1_price"] = latest_price + direction * risk
+    row["tp2_price"] = latest_price + direction * risk * 2
+    row["tp3_price"] = latest_price + direction * risk * 3
+    row["ftp_price"] = latest_price + direction * risk * 5
+    snapshot = row.get("snapshot_data")
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    snapshot["entry_price_source"] = "latest_ticker_at_formalization"
+    snapshot["indicator_reference_price"] = previous_entry
+    row["snapshot_data"] = snapshot
+    return row
+
+
+def lock_new_official_entries(found: list[dict[str, object]], existing_ids: set[str]) -> int:
+    candidates = [
+        row
+        for row in found
+        if str(row.get("id") or signal_id(row)) not in existing_ids and row.get("official_trade")
+    ]
+    symbols = sorted({clean_symbol(row.get("symbol")) for row in candidates})
+    if not symbols:
+        return 0
+    try:
+        with market_client(timeout=20) as client:
+            latest_prices = client.ticker_price(symbols)
+    except Exception as exc:
+        print(f"WARN latest entry prices unavailable; keeping candle prices: {exc}")
+        return 0
+    locked = 0
+    for row in candidates:
+        price = as_float(latest_prices.get(clean_symbol(row.get("symbol"))))
+        if price is None or price <= 0:
+            continue
+        lock_signal_to_latest_price(row, price)
+        locked += 1
+    return locked
+
+
 def validate_state_consistency(rows: list[dict[str, object]]) -> dict[str, int]:
     changed = 0
     closed = 0
@@ -1528,6 +1586,8 @@ def main() -> None:
         print(f"coinglass_contract_signals={len(contract_signals)}")
 
     by_id = {str(row.get("id") or signal_id(row)): row for row in existing}
+    locked_entries = lock_new_official_entries(found, set(by_id))
+    print(f"latest_entry_prices_locked={locked_entries}")
     max_same_side = int(os.getenv("MAX_ACTIVE_PER_SYMBOL_SIDE", "2"))
     active_counts = active_position_counts(existing)
     new_count = 0
