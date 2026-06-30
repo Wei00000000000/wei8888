@@ -931,10 +931,11 @@ def preserve_previous_detail(rows: list[dict[str, object]]) -> list[dict[str, ob
 
 
 def is_active_position(row: dict[str, object]) -> bool:
-    return (
-        str(row.get("status") or "active") == "active"
-        and str(row.get("reached_state") or "holding") in {"holding", "tp1", "tp2", "tp3"}
-    )
+    state = str(row.get("reached_state") or "holding")
+    status = str(row.get("status") or "active")
+    if state == "holding":
+        return status == "active" or bool(row.get("official_trade"))
+    return status == "active" and state in {"tp1", "tp2", "tp3"}
 
 
 def position_key(row: dict[str, object]) -> tuple[str, str]:
@@ -1134,12 +1135,7 @@ def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[s
 
 
 def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
-    active_rows = [
-        row
-        for row in rows
-        if str(row.get("status") or "active") == "active"
-        and str(row.get("reached_state") or "holding") in {"holding", "tp1", "tp2", "tp3"}
-    ]
+    active_rows = [row for row in rows if is_active_position(row)]
     earliest_by_pair: dict[tuple[str, str], int] = {}
     for row in active_rows:
         pair = (clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower())
@@ -1187,22 +1183,48 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
         key = (clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower())
         klines = histories.get(key)
         if not klines:
+            failures = int(row.get("state_replay_failures") or 0) + 1
+            row["state_replay_failures"] = failures
+            changed += 1
+            triggered_ms = int(row.get("triggered_at_ms") or 0)
+            age_hours = (datetime.now(timezone.utc).timestamp() * 1000 - triggered_ms) / 3_600_000 if triggered_ms else 0
+            threshold = 1 if age_hours >= 24 else 3
+            if failures >= threshold:
+                row["reached_state"] = "invalid"
+                row["status"] = "closed"
+                row["hit_at"] = datetime.now(timezone.utc).isoformat()
+                row["state_resolution"] = "market_unavailable"
+                row["invalid_reason"] = "symbol_missing_from_primary_market_sources"
+                closed += 1
             continue
+        row_changed = False
+        if row.get("state_replay_failures"):
+            row["state_replay_failures"] = 0
+            row_changed = True
+        latest_close = as_float(getattr(klines[-1], "close", None))
+        if latest_close is not None and as_float(row.get("current_price")) != latest_close:
+            row["current_price"] = latest_close
+            row["price"] = latest_close
+            row_changed = True
+        if row.get("official_trade") and str(row.get("status") or "") != "active":
+            row["status"] = "active"
+            row_changed = True
         prev = str(row.get("reached_state") or "holding")
         next_state, hit_price, hit_at, max_reached = replay_signal_state(row, klines)
-        if next_state == prev and max_reached == str(row.get("max_reached_state") or prev):
-            continue
-        changed += 1
-        row["reached_state"] = next_state
-        row["max_reached_state"] = max_reached
-        row["hit_price"] = hit_price
-        row["hit_at"] = hit_at
-        row["state_resolution"] = "chronological_ohlc_stop_first"
+        if next_state != prev or max_reached != str(row.get("max_reached_state") or prev):
+            row["reached_state"] = next_state
+            row["max_reached_state"] = max_reached
+            row["hit_price"] = hit_price
+            row["hit_at"] = hit_at
+            row["state_resolution"] = "chronological_ohlc_stop_first"
+            row_changed = True
         if target_order(max_reached) >= target_order("tp2"):
             row["active_sl_price"] = row.get("entry_price") or row.get("trigger_price")
         if next_state in {"sl", "ftp"}:
             row["status"] = "closed"
             closed += 1
+        if row_changed:
+            changed += 1
     return {"checked": len(active_rows), "changed": changed, "closed": closed}
 
 

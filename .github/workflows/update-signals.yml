@@ -3,6 +3,12 @@ name: Update live signals
 on:
   # Zeabur is the primary 24/7 scheduler. Keep this workflow as manual backup only.
   workflow_dispatch:
+    inputs:
+      run_backup_scan:
+        description: "Run the manual backup scanner"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -13,6 +19,7 @@ concurrency:
 
 jobs:
   update:
+    if: ${{ inputs.run_backup_scan == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

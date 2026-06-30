@@ -1024,10 +1024,11 @@
     }
 
     async function cloudSignals() {
-      const [response, positionsResponse, summariesResponse] = await Promise.all([
+      const [response, positionsResponse, summariesResponse, statusResponse] = await Promise.all([
         cloudFetch("/signals?page=1&limit=100"),
         cloudFetch("/signals/positions"),
-        cloudFetch("/backtest/summaries")
+        cloudFetch("/backtest/summaries"),
+        cloudFetch("/system/status")
       ]);
       if (response.status === 401) {
         $("loginGate").classList.remove("hidden");
@@ -1037,6 +1038,15 @@
       const data = await response.json();
       const positions = positionsResponse.ok ? await positionsResponse.json() : [];
       const summaries = summariesResponse.ok ? await summariesResponse.json() : [];
+      if (statusResponse.ok) {
+        const cloudStatus = await statusResponse.json();
+        state.scannerStatus = {
+          ok: cloudStatus.status === "ok",
+          last_success_at: cloudStatus.last_successful_scan_at,
+          market_data_provider: "mixed",
+          coinglass_calls: 0
+        };
+      }
       state.strategySummaries = Object.fromEntries(summaries.map(row => [row.strategy || "all", row]));
       const mergedRows = new Map();
       [...(data.rows || []), ...positions]
@@ -4119,7 +4129,7 @@
     function renderHealth() {
       const status = state.scannerStatus || {};
       const lastSuccess = status.last_success_at ? new Date(status.last_success_at) : null;
-      const cronFresh = lastSuccess && Date.now() - lastSuccess.getTime() < 20 * 60 * 1000;
+      const workerFresh = lastSuccess && Date.now() - lastSuccess.getTime() < 20 * 60 * 1000;
       const ok = status.ok !== false;
       const provider = status.market_data_provider || "bybit";
       const parts = [
@@ -4136,7 +4146,7 @@
       $("healthText").innerHTML = `<span class="health-pack">
         <span class="health-dot ${provider === "bybit" && ok ? "ok" : provider === "okx" && ok ? "ok" : "warn"}">Bybit/OKX</span>
         <span class="health-dot ${Number(status.coinglass_calls || 0) >= 0 ? "ok" : "warn"}">CoinGlass</span>
-        <span class="health-dot ${cronFresh ? "ok" : "warn"}">GitHub Cron</span>
+        <span class="health-dot ${workerFresh ? "ok" : "warn"}">Zeabur Worker</span>
         <span class="health-dot ${ok ? "ok" : "bad"}">${ok ? "資料正常" : "資料源異常"}</span>
         <span>成功 ${status.last_success_at ? shortTime(status.last_success_at) : "-"}</span>
       </span>`;
