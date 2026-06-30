@@ -948,7 +948,7 @@
     renderAll();
     status("Auto scanner warming up.");
     initialize();
-    setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 30000 : 15000);
+    setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 10000 : 5000);
     setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, 120000);
     setInterval(renderHealth, 5000);
 
@@ -1084,7 +1084,8 @@
     async function apiJson(endpoint, query = "") {
       if (CLOUD_MODE) {
         if (["book", "tick", "scan", "backtest"].includes(endpoint)) return cloudSignals();
-        if (["markets", "prices"].includes(endpoint)) return cloudMarkets(query);
+        if (endpoint === "prices") return staticPrices(query);
+        if (endpoint === "markets") return cloudMarkets(query);
       }
       if (!STATIC_MODE && !CLOUD_MODE) {
         const suffix = query ? `?${query}` : "";
@@ -1175,8 +1176,13 @@
     async function staticPrices(query = "") {
       const params = new URLSearchParams(String(query || ""));
       const wanted = new Set((params.get("symbols") || "").split(",").map(clean).filter(Boolean));
-      const fallbackRes = await fetch(`data/markets.json?ts=${Date.now()}`);
-      const fallbackData = fallbackRes.ok ? await fallbackRes.json() : {rows: []};
+      let fallbackData = {rows: state.markets || []};
+      try {
+        const fallbackRes = await fetch(`data/markets.json?ts=${Date.now()}`);
+        if (fallbackRes.ok) fallbackData = await fallbackRes.json();
+      } catch {
+        fallbackData = {rows: state.markets || []};
+      }
       try {
         let tickers = [];
         let source = "bybit";
@@ -1225,7 +1231,7 @@
               live_source: source
             };
           });
-        return {markets: liveRows.length ? liveRows : (fallbackData.rows || []), prices};
+        return {markets: liveRows.length ? liveRows : (fallbackData.rows || []), prices, updated_at: new Date().toISOString()};
       } catch (err) {
         rememberError(err, "Live price unavailable");
         return {markets: fallbackData.rows || [], prices: {}};
@@ -2849,7 +2855,7 @@
         <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span>${isOfficial ? `<span class="mini-tag">${protectiveStopText(s)}</span>` : ""}${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}" data-live-change="${clean(s.symbol)}">最新漲跌 ${signed(market?.price_change_pct)}</span>${isOfficial ? `<span class="mini-tag">${protectiveStopText(s)}</span>` : ""}${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateClass}">${stateText}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
@@ -2994,7 +3000,7 @@
         <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}" data-live-change="${clean(s.symbol)}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="decision-grade grade-${decision.grade.toLowerCase()}">${decision.grade}</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
@@ -3153,6 +3159,15 @@
         const pnl = pnlPct(s, isLivePricedSignal(s));
         node.textContent = signed(pnl);
         node.classList.toggle("positive", pnl >= 0);
+      });
+      document.querySelectorAll("[data-live-change]").forEach(node => {
+        if (!isElementNearViewport(node)) return;
+        const market = marketFor(node.dataset.liveChange);
+        if (!market || !Number.isFinite(Number(market.price_change_pct))) return;
+        node.textContent = `最新漲跌 ${signed(market.price_change_pct)}`;
+        const cls = numClass(market.price_change_pct);
+        node.classList.toggle("bull", cls.includes("bull"));
+        node.classList.toggle("bear", cls.includes("bear"));
       });
     }
     function renderContractVisiblePrices() {
