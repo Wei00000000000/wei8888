@@ -2440,7 +2440,7 @@
       return dataSignals()
         .filter(s => !activeOnly || isOpenSignal(s) || isPartialActiveSignal(s))
         .filter(isOfficialTrade)
-        .filter(s => highQualityScore(s).tradable);
+        .filter(s => signalMetric(s, "high_quality") === true || highQualityScore(s).tradable);
     }
     function highQualityScore(s) {
       const base = signalScore(s).value;

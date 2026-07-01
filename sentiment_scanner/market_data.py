@@ -13,6 +13,7 @@ class MixedFuturesClient:
 
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
+        self.oi_client = BybitFuturesClient(timeout=timeout)
         self.clients: list[tuple[str, Any]] = [
             ("bingx", BingxFuturesClient(timeout=timeout)),
             ("okx", OkxFuturesClient(timeout=timeout)),
@@ -22,6 +23,7 @@ class MixedFuturesClient:
         self.last_provider = "mixed"
 
     def close(self) -> None:
+        self.oi_client.close()
         for _, client in self.clients:
             close = getattr(client, "close", None)
             if close:
@@ -71,7 +73,9 @@ class MixedFuturesClient:
         return self._call("klines_since", *args, **kwargs)
 
     def open_interest_hist(self, *args: Any, **kwargs: Any) -> Any:
-        return self._call("open_interest_hist", *args, **kwargs)
+        result = self.oi_client.open_interest_hist(*args, **kwargs)
+        self.last_provider = "bybit"
+        return result
 
     def taker_buy_sell_volume(self, *args: Any, **kwargs: Any) -> Any:
         return self._call("taker_buy_sell_volume", *args, **kwargs)

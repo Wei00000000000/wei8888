@@ -150,6 +150,17 @@ def classify_trade_layer(row: dict[str, object]) -> tuple[str, list[str]]:
     return "official_trade", []
 
 
+def classify_high_quality(row: dict[str, object]) -> bool:
+    """Classify quality independently so the original strategy is preserved."""
+    if not row.get("official_trade"):
+        return False
+    entry = raw_number(row.get("entry_price") or row.get("trigger_price"), 0)
+    sl = raw_number(row.get("sl_price"), 0)
+    risk = abs(entry - sl) / entry * 100 if entry > 0 and sl > 0 else 0
+    volume = raw_number(metric_value(row, "volume_24h", metric_value(row, "quote_volume", 0)), 0)
+    return trade_score(row) >= 70 and 0.5 <= risk <= 8 and (volume == 0 or volume >= 5_000_000)
+
+
 def apply_trade_layer(row: dict[str, object]) -> None:
     layer, reasons = classify_trade_layer(row)
     row["raw_signal"] = True
@@ -158,6 +169,7 @@ def apply_trade_layer(row: dict[str, object]) -> None:
     row["warning"] = layer == "warning"
     row["filtered_out"] = layer == "filtered_out"
     row["trade_filter_reason"] = "; ".join(reasons)
+    row["high_quality"] = classify_high_quality(row)
 
 
 def normalize_row(row: dict[str, object]) -> dict[str, object]:

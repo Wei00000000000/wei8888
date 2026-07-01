@@ -67,12 +67,15 @@ def _side(row: dict[str, Any]) -> str:
 
 
 def _strategy(row: dict[str, Any]) -> str:
+    explicit = str(row.get("strategy") or "").strip().lower()
+    if explicit in {"sentiment_oi", "stable_dog", "contract_anomaly", "high_quality"}:
+        return explicit
     text = " ".join(str(row.get(key, "")) for key in ("strategy", "setup_id", "signal_type", "narrative")).lower()
     if any(term in text for term in ("stable", "cvd_divergence", "頂背離", "底背離", "穩如老狗")):
         return "stable_dog"
     if any(term in text for term in ("contract", "anomaly", "合約異常")):
         return "contract_anomaly"
-    if row.get("high_quality") or row.get("trade_layer") == "high_quality":
+    if row.get("trade_layer") == "high_quality":
         return "high_quality"
     return "sentiment_oi"
 

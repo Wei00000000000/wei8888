@@ -55,7 +55,15 @@ async def list_signals(
     if symbol:
         filters.append(Signal.symbol == symbol.upper().replace("USDT", ""))
     if strategy:
-        filters.append(Signal.strategy == strategy)
+        if strategy == "high_quality":
+            filters.append(
+                or_(
+                    Signal.strategy == "high_quality",
+                    Signal.raw_payload["high_quality"].as_boolean().is_(True),
+                )
+            )
+        else:
+            filters.append(Signal.strategy == strategy)
     if state:
         filters.append(Signal.reached_state == state)
     if official_only:

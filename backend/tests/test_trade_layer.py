@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.update_seed_signals import classify_trade_layer, lock_signal_to_latest_price, trade_score
+from scripts.update_seed_signals import classify_high_quality, classify_trade_layer, lock_signal_to_latest_price, trade_score
 
 
 class TradeLayerScoreTest(unittest.TestCase):
@@ -39,6 +39,18 @@ class TradeLayerScoreTest(unittest.TestCase):
         layer, reasons = classify_trade_layer(row)
         self.assertEqual(layer, "warning")
         self.assertIn("score_below_60_warning_only", reasons)
+
+    def test_high_quality_is_independent_from_strategy(self) -> None:
+        row = {
+            "official_trade": True,
+            "strategy": "sentiment_oi",
+            "entry_price": 100,
+            "sl_price": 98,
+            "oi_percentile": 92,
+            "volume_24h": 10_000_000,
+        }
+
+        self.assertTrue(classify_high_quality(row))
 
     def test_new_long_trade_is_locked_to_latest_ticker(self) -> None:
         row = {
