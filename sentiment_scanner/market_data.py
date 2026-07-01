@@ -14,6 +14,7 @@ class MixedFuturesClient:
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
         self.oi_client = BybitFuturesClient(timeout=timeout)
+        self._oi_symbols: set[str] | None = None
         self.clients: list[tuple[str, Any]] = [
             ("bingx", BingxFuturesClient(timeout=timeout)),
             ("okx", OkxFuturesClient(timeout=timeout)),
@@ -51,14 +52,35 @@ class MixedFuturesClient:
                     self._disabled.add(name)
         raise RuntimeError("Mixed market data failed: " + " | ".join(errors))
 
+    def _bybit_symbols(self, quote_asset: str = "USDT") -> set[str]:
+        if self._oi_symbols is None:
+            self._oi_symbols = set(self.oi_client.exchange_symbols(quote_asset=quote_asset))
+        return self._oi_symbols
+
     def exchange_symbols(self, *args: Any, **kwargs: Any) -> Any:
-        return self._call("exchange_symbols", *args, **kwargs)
+        price_symbols = set(self._call("exchange_symbols", *args, **kwargs))
+        quote_asset = str(kwargs.get("quote_asset") or (args[0] if args else "USDT"))
+        return sorted(price_symbols & self._bybit_symbols(quote_asset))
 
     def symbols_by_volume(self, *args: Any, **kwargs: Any) -> Any:
-        return self._call("symbols_by_volume", *args, **kwargs)
+        limit = int(kwargs.get("limit") or (args[0] if args else 0))
+        quote_asset = str(kwargs.get("quote_asset") or "USDT")
+        min_quote_volume = float(kwargs.get("min_quote_volume") or 0.0)
+        # Ask for the full price ranking first, then apply the Bybit OI universe
+        # before the final limit so unsupported contracts cannot crowd out valid ones.
+        ranked = self._call(
+            "symbols_by_volume",
+            limit=0,
+            quote_asset=quote_asset,
+            min_quote_volume=min_quote_volume,
+        )
+        filtered = [symbol for symbol in ranked if symbol in self._bybit_symbols(quote_asset)]
+        return filtered[:limit] if limit > 0 else filtered
 
     def top_symbols_by_volume(self, *args: Any, **kwargs: Any) -> Any:
-        return self._call("top_symbols_by_volume", *args, **kwargs)
+        limit = int(kwargs.get("limit") or (args[0] if args else 50))
+        quote_asset = str(kwargs.get("quote_asset") or "USDT")
+        return self.symbols_by_volume(limit=limit, quote_asset=quote_asset)
 
     def ticker_24hr(self, *args: Any, **kwargs: Any) -> Any:
         return self._call("ticker_24hr", *args, **kwargs)
