@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import BinanceFuturesClient
+from sentiment_scanner.bingx import BingxFuturesClient
 from sentiment_scanner.bybit import BybitFuturesClient
 from sentiment_scanner.market_data import MixedFuturesClient
 from sentiment_scanner.okx import OkxFuturesClient
@@ -38,13 +39,15 @@ def market_client(timeout: float = 20.0):
     provider = provider_name()
     if provider == "binance":
         return BinanceFuturesClient(timeout=timeout)
+    if provider == "bingx":
+        return BingxFuturesClient(timeout=timeout)
     if provider == "bybit":
         return BybitFuturesClient(timeout=timeout)
     if provider == "okx":
         return OkxFuturesClient(timeout=timeout)
     if provider == "mixed":
         return MixedFuturesClient(timeout=timeout)
-    return BybitFuturesClient(timeout=timeout)
+    return MixedFuturesClient(timeout=timeout)
 SECTOR_KEYWORDS = [
     ("Layer 1", ("layer-1", "smart-contract-platform")),
     ("DeFi", ("decentralized-finance", "defi")),

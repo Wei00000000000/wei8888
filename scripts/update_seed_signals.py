@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import BinanceFuturesClient
 from sentiment_scanner.binance import BINANCE_FAPI, BINANCE_FDATA
+from sentiment_scanner.bingx import BingxFuturesClient
 from sentiment_scanner.bybit import BybitFuturesClient
 from sentiment_scanner.cli import format_signal
 from sentiment_scanner.coinglass import CoinGlassClient
@@ -36,13 +37,15 @@ def market_client(timeout: float = 20.0):
     provider = provider_name()
     if provider == "binance":
         return BinanceFuturesClient(timeout=timeout)
+    if provider == "bingx":
+        return BingxFuturesClient(timeout=timeout)
     if provider == "bybit":
         return BybitFuturesClient(timeout=timeout)
     if provider == "okx":
         return OkxFuturesClient(timeout=timeout)
     if provider == "mixed":
         return MixedFuturesClient(timeout=timeout)
-    return BybitFuturesClient(timeout=timeout)
+    return MixedFuturesClient(timeout=timeout)
 
 
 def previous_success_at() -> str | None:
@@ -866,6 +869,7 @@ def enrich_coinglass_details(
 def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dict[str, object]], dict[str, object]]:
     with market_client(timeout=20) as client:
         tickers = client.ticker_24hr()
+        actual_provider = str(getattr(client, "last_provider", provider_name()))
     kline_limit = int(os.getenv("CONTRACT_KLINE_CANDIDATES", "120"))
     detail_limit = int(os.getenv("CONTRACT_DETAIL_CANDIDATES", "20"))
     candidates = candidate_symbols_from_tickers(tickers, min_volume, limit=kline_limit)
@@ -914,6 +918,7 @@ def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dic
         "detail_symbols": len(detail_symbols),
         "kline_symbols": len(candidates),
         "market_data_provider": provider_name(),
+        "market_data_actual_provider": actual_provider,
         "positioning_symbols": len(details),
     }
 

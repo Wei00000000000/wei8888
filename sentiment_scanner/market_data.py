@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
+from .bingx import BingxFuturesClient
 from .bybit import BybitFuturesClient
 from .okx import OkxFuturesClient
 
@@ -12,9 +14,11 @@ class MixedFuturesClient:
     def __init__(self, timeout: float = 20.0) -> None:
         self.timeout = timeout
         self.clients: list[tuple[str, Any]] = [
-            ("bybit", BybitFuturesClient(timeout=timeout)),
+            ("bingx", BingxFuturesClient(timeout=timeout)),
             ("okx", OkxFuturesClient(timeout=timeout)),
         ]
+        if os.getenv("MARKET_DATA_ALLOW_BYBIT_FALLBACK", "").strip().lower() in {"1", "true", "yes"}:
+            self.clients.append(("bybit", BybitFuturesClient(timeout=timeout)))
         self.last_provider = "mixed"
 
     def close(self) -> None:

@@ -462,7 +462,7 @@
         <div class="logo"><img src="brand-hero.png" alt="Wei"></div>
         <div>
           <h1 class="brand-title">Wei 策略情報室</h1>
-          <div class="brand-sub">OKX · BYBIT · COINGLASS RADAR</div>
+          <div class="brand-sub">BINGX · OKX · COINGLASS RADAR</div>
         </div>
       </div>
       <nav class="nav">
@@ -489,7 +489,7 @@
         <div>
           <div class="kicker">Sentiment Scanner</div>
           <h2>數據交易訊號系統</h2>
-          <div class="subline">OKX / Bybit 主行情源 · CoinGlass 全市場資料 · 嘎空 / 嘎多 · 終端雷達掃描</div>
+          <div class="subline">BingX / OKX 主行情源 · CoinGlass 全市場資料 · 嘎空 / 嘎多 · 終端雷達掃描</div>
         </div>
         <span class="pill accent" id="statusPill">Live</span>
       </div>
@@ -605,7 +605,7 @@
       <section class="radar-strip">
         <div class="kicker">Contract Anomaly Radar</div>
         <h2>合約異常雷達</h2>
-        <div class="subline">OKX / Bybit 作主行情源，CoinGlass 只補全市場列表與候選幣資料；24H 成交量低於 500 萬 USDT 不列入。</div>
+        <div class="subline">BingX / OKX 作主行情源，CoinGlass 只補全市場列表與候選幣資料；24H 成交量低於 500 萬 USDT 不列入。</div>
       </section>
       <div class="section-head">
         <h2 class="section-title">全市場合約異常 <span id="contractCount" class="section-count">(0)</span></h2>
@@ -1300,16 +1300,17 @@
       }
       try {
         let tickers = [];
-        let source = "bybit";
+        let source = "bingx";
         try {
-          const res = await fetch("https://api.bybit.com/v5/market/tickers?category=linear");
-          if (!res.ok) throw new Error("Bybit ticker unavailable");
+          const res = await fetch("https://open-api.bingx.com/openApi/swap/v2/quote/ticker");
+          if (!res.ok) throw new Error("BingX ticker unavailable");
           const payload = await res.json();
-          tickers = ((payload.result && payload.result.list) || []).map(row => ({
-            symbol: row.symbol,
+          const rows = Array.isArray(payload.data) ? payload.data : (payload.data ? [payload.data] : []);
+          tickers = rows.map(row => ({
+            symbol: String(row.symbol || "").replaceAll("-", ""),
             lastPrice: Number(row.lastPrice),
-            changePct: Number(row.price24hPcnt) * 100,
-            quoteVolume: Number(row.turnover24h)
+            changePct: Number(row.priceChangePercent),
+            quoteVolume: Number(row.quoteVolume)
           }));
         } catch {
           source = "okx";
@@ -4360,7 +4361,7 @@
       const lastSuccess = status.last_success_at ? new Date(status.last_success_at) : null;
       const workerFresh = lastSuccess && Date.now() - lastSuccess.getTime() < 20 * 60 * 1000;
       const ok = status.ok !== false;
-      const provider = status.market_data_provider || "bybit";
+      const provider = status.market_data_actual_provider || status.market_data_provider || "mixed";
       const parts = [
         autoTimer ? "自動掃描中" : "自動掃描停止",
         state.busy ? "請求中" : "待命",
@@ -4373,7 +4374,7 @@
       ];
       $("healthText").textContent = parts.join(" · ");
       $("healthText").innerHTML = `<span class="health-pack">
-        <span class="health-dot ${provider === "bybit" && ok ? "ok" : provider === "okx" && ok ? "ok" : "warn"}">Bybit/OKX</span>
+        <span class="health-dot ${(["mixed", "bingx", "okx"].includes(provider)) && ok ? "ok" : "warn"}">BingX/OKX</span>
         <span class="health-dot ${Number(status.coinglass_calls || 0) >= 0 ? "ok" : "warn"}">CoinGlass</span>
         <span class="health-dot ${workerFresh ? "ok" : "warn"}">Zeabur Worker</span>
         <span class="health-dot ${ok ? "ok" : "bad"}">${ok ? "資料正常" : "資料源異常"}</span>
