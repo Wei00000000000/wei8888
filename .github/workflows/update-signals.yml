@@ -19,7 +19,6 @@ concurrency:
 
 jobs:
   update:
-    if: ${{ inputs.run_backup_scan == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

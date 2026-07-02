@@ -1,7 +1,7 @@
 const OWNER = "Wei00000000000";
 const REPOSITORY = "wei8888";
 const WORKFLOW = "update-signals.yml";
-const VERSION = "2026-06-07-mixed-market-dispatch-v1";
+const VERSION = "2026-07-02-backup-scan-dispatch-v2";
 const BINANCE_HOSTS = {
   fapi: "https://fapi.binance.com",
   fdata: "https://fapi.binance.com/futures/data",
@@ -32,7 +32,12 @@ async function dispatch(env) {
         "User-Agent": "wei-signal-trigger",
         "X-GitHub-Api-Version": "2022-11-28",
       },
-      body: JSON.stringify({ ref: "main" }),
+      body: JSON.stringify({
+        ref: "main",
+        inputs: {
+          run_backup_scan: true,
+        },
+      }),
     },
   );
   if (!response.ok) {
