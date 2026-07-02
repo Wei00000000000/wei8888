@@ -1177,12 +1177,14 @@
       if (!params.has("limit")) params.set("limit", "200");
       const response = await cloudFetch(`/market?${params}`);
       if (!response.ok) throw new Error("雲端行情讀取失敗");
-      const rows = (await response.json()).map(row => ({
+      const payload = await response.json();
+      const sourceRows = Array.isArray(payload) ? payload : (payload.rows || payload.markets || []);
+      const rows = sourceRows.map(row => ({
         ...row,
-        price_change_pct: row.change_24h_pct,
-        quote_volume: row.quote_volume_24h,
+        price_change_pct: Number.isFinite(Number(row.change_24h_pct)) ? Number(row.change_24h_pct) : row.price_change_pct,
+        quote_volume: Number.isFinite(Number(row.quote_volume_24h)) ? Number(row.quote_volume_24h) : row.quote_volume,
         live_price: true,
-        live_source: row.source
+        live_source: row.source || "zeabur"
       }));
       const prices = Object.fromEntries(rows.map(row => [clean(row.symbol), Number(row.price)]));
       return {rows, markets: rows, prices, updated_at: rows[0]?.observed_at || null};
@@ -1194,12 +1196,20 @@
       await loadVolumeAnomalies();
       await loadContractRadar();
       await loadMarkets();
+      await refreshPrices();
       toggleAutoScan();
     }
     async function apiJson(endpoint, query = "") {
       if (CLOUD_MODE) {
         if (["book", "tick", "scan", "backtest"].includes(endpoint)) return cloudSignals();
-        if (endpoint === "prices") return staticPrices(query);
+        if (endpoint === "prices") {
+          try {
+            return await cloudMarkets(query);
+          } catch (err) {
+            rememberError(err, "Cloud price proxy unavailable");
+            return staticPrices(query);
+          }
+        }
         if (endpoint === "markets") return cloudMarkets(query);
       }
       if (!STATIC_MODE && !CLOUD_MODE) {
@@ -1299,59 +1309,76 @@
         fallbackData = {rows: state.markets || []};
       }
       try {
-        let tickers = [];
-        let source = "bingx";
-        try {
+        const [bingxResult, okxResult] = await Promise.allSettled([fetchBingxTickers(), fetchOkxTickers()]);
+        const liveBook = new Map();
+        const mergeLive = rows => {
+          for (const row of rows || []) {
+            const key = clean(row.symbol);
+            if (!key || (wanted.size && !wanted.has(key))) continue;
+            const prev = liveBook.get(key) || {};
+            liveBook.set(key, {...prev, ...row, symbol: `${key}USDT`});
+          }
+        };
+        if (okxResult.status === "fulfilled") mergeLive(okxResult.value);
+        if (bingxResult.status === "fulfilled") mergeLive(bingxResult.value);
+        const prices = {};
+        const fallbackBook = new Map((fallbackData.rows || []).map(row => [clean(row.symbol), row]));
+        const liveRows = [...(wanted.size ? wanted : liveBook.keys())].map(key => {
+          const live = liveBook.get(key);
+          const prev = fallbackBook.get(key) || {};
+          if (!live || !Number.isFinite(Number(live.price))) {
+            return {...prev, symbol: `${key}USDT`, market_stale: true, live_price: false};
+          }
+          prices[key] = Number(live.price);
+          return {
+            ...prev,
+            ...live,
+            price: Number(live.price),
+            price_change_pct: Number.isFinite(Number(live.price_change_pct)) ? Number(live.price_change_pct) : prev.price_change_pct,
+            quote_volume: Number.isFinite(Number(live.quote_volume)) ? Number(live.quote_volume) : prev.quote_volume,
+            live_price: true,
+            market_stale: false,
+            observed_at: new Date().toISOString()
+          };
+        }).filter(row => row && row.symbol);
+        if (!Object.keys(prices).length) throw new Error("No live quotes returned for requested symbols");
+        return {markets: liveRows, prices, updated_at: new Date().toISOString()};
+      } catch (err) {
+        rememberError(err, "Live price unavailable");
+        const rows = (fallbackData.rows || []).map(row => ({...row, market_stale: true, live_price: false}));
+        return {markets: rows, prices: {}, updated_at: null};
+      }
+    }
+    async function fetchBingxTickers() {
           const res = await fetch("https://open-api.bingx.com/openApi/swap/v2/quote/ticker");
           if (!res.ok) throw new Error("BingX ticker unavailable");
           const payload = await res.json();
           const rows = Array.isArray(payload.data) ? payload.data : (payload.data ? [payload.data] : []);
-          tickers = rows.map(row => ({
-            symbol: String(row.symbol || "").replaceAll("-", ""),
-            lastPrice: Number(row.lastPrice),
-            changePct: Number(row.priceChangePercent),
-            quoteVolume: Number(row.quoteVolume)
-          }));
-        } catch {
-          source = "okx";
+      return rows.map(row => ({
+        symbol: String(row.symbol || "").replaceAll("-", ""),
+        price: Number(row.lastPrice || row.last || row.price),
+        price_change_pct: Number(row.priceChangePercent),
+        quote_volume: Number(row.quoteVolume),
+        live_source: "bingx"
+      })).filter(row => Number.isFinite(row.price) && row.price > 0);
+    }
+    async function fetchOkxTickers() {
           const res = await fetch("https://www.okx.com/api/v5/market/tickers?instType=SWAP");
           if (!res.ok) throw new Error("OKX ticker unavailable");
           const payload = await res.json();
-          tickers = (payload.data || [])
+      return (payload.data || [])
             .filter(row => String(row.instId || "").endsWith("-USDT-SWAP"))
             .map(row => {
               const price = Number(row.last);
               const open = Number(row.open24h);
               return {
                 symbol: String(row.instId).replace("-USDT-SWAP", "USDT").replaceAll("-", ""),
-                lastPrice: price,
-                changePct: open > 0 ? (price - open) / open * 100 : 0,
-                quoteVolume: Number(row.volCcy24h) * price
+            price,
+            price_change_pct: open > 0 ? (price - open) / open * 100 : NaN,
+            quote_volume: Number(row.volCcy24h) * price,
+            live_source: "okx"
               };
-            });
-        }
-        const prices = {};
-        const liveRows = tickers
-          .filter(row => wanted.has(clean(row.symbol)))
-          .map(row => {
-            const change = Number(row.changePct);
-            prices[clean(row.symbol)] = Number(row.lastPrice);
-            const prev = (fallbackData.rows || []).find(m => clean(m.symbol) === clean(row.symbol)) || {};
-            return {
-              ...prev,
-              symbol: row.symbol,
-              price: Number(row.lastPrice),
-              price_change_pct: change,
-              quote_volume: Number(row.quoteVolume),
-              live_price: true,
-              live_source: source
-            };
-          });
-        return {markets: liveRows.length ? liveRows : (fallbackData.rows || []), prices, updated_at: new Date().toISOString()};
-      } catch (err) {
-        rememberError(err, "Live price unavailable");
-        return {markets: fallbackData.rows || [], prices: {}};
-      }
+        }).filter(row => Number.isFinite(row.price) && row.price > 0);
     }
 
     function params() {
@@ -1688,7 +1715,7 @@
       $("decisionRiskAlerts").innerHTML = riskAlerts.map(alert => `<div class="decision-row"><span class="decision-grade grade-${alert.grade.toLowerCase()}">${alert.grade}</span><div><strong>${alert.symbol}</strong><div class="subline">${alert.text}</div></div><span class="pill ${alert.kind}">${alert.value}</span></div>`).join("") || `<div class="empty">目前沒有高風險警報。</div>`;
       $("decisionPerformance").innerHTML = [
         ["正式進場", closedStats.total, `${closedStats.open} 持倉`],
-        ["進場勝率", closedStats.total < 30 ? "觀察" : `${fmt(closedStats.rate,1)}%`, closedStats.total < 30 ? "warn-text" : "bull-text"],
+        ["結案勝率", closedStats.closed < 30 ? "觀察" : `${fmt(closedStats.rate,1)}%`, closedStats.closed < 30 ? "warn-text" : "bull-text"],
         ["近 7 天", strategyPeriodRate(all, 7), "accent-text"],
         ["近 30 天", strategyPeriodRate(all, 30), "bull-text"]
       ].map(([label, value, cls]) => `<div class="watch-stat"><div class="watch-stat-label">${label}</div><div class="watch-stat-value ${cls}">${value}</div></div>`).join("");
@@ -1786,19 +1813,23 @@
       const maxDd = maxDrawdownOf(sourceRows);
       const streak = streakSummary(sourceRows);
       const avgHold = avgHoldHours(sourceRows);
-      const totalLabel = stableMode ? "穩狗總進場勝率" : "總進場勝率";
+      const totalLabel = stableMode ? "穩狗結案勝率" : "結案勝率";
+      const closedDetail = `${closedStats.wins}W / ${closedStats.losses}L · ${closedStats.open}持倉 / ${closedStats.total}進場`;
+      const tpDetail = `TP1 ${fmt(tpStats.tp1, 1)}% / TP2 ${fmt(tpStats.tp2, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`;
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        [totalLabel, closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP1 ${fmt(tpStats.tp1, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`],
-        ["歷史總勝率", historicalWinText(history, closedStats), historyDetail],
+        [totalLabel, closedStats.closed ? `${fmt(closedStats.rate, 1)}%` : "尚無結案", closedDetail],
+        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
+        ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
         ["穩狗累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        [totalLabel, closedStats.total ? `${fmt(closedStats.rate, 1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP1 ${fmt(tpStats.tp1, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`],
-        ["歷史總勝率", historicalWinText(history, closedStats), historyDetail],
+        [totalLabel, closedStats.closed ? `${fmt(closedStats.rate, 1)}%` : "尚無結案", closedDetail],
+        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
+        ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
         ["總累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
@@ -1828,7 +1859,7 @@
       const cells = [
         ["雷達樣本", active.length, `${rows.length} 個候選`],
         ["方向命中率", `${fmt(rate, 1)}%`, `${aligned} 對 / ${active.length - aligned} 錯`],
-        ["歷史總勝率", historicalWinText(history, {total:0, rate:0}), history ? `${history.closed_entries} 結案 / ${history.total_entries} 全部交易` : "等待統計"],
+        ["歷史結案勝率", historicalWinText(history, {total:0, rate:0}), history ? `${history.closed_entries} 結案 / ${history.total_entries} 全部交易` : "等待統計"],
         ["歷史累積盈虧", signed(historyPnl), "全部正式交易持續累積"],
         ["高分預警", warnings.length, "獨立於嘎多嘎空"],
         ["平均品質", `${fmt(avgQuality, 1)}/6`, `雷達 ${fmt(avgRadar, 0)}`],
@@ -1903,7 +1934,7 @@
         ["觀察", neutral, "warn-text"],
         ["平均品質", `${fmt(avgQuality, 1)}/6`, "bull-text"],
         ["平均雷達", fmt(avgScore, 0), "accent-text"],
-        ["歷史總勝率", historicalWinText(contractHistory, {total:0, rate:0}), "bull-text"],
+        ["歷史結案勝率", historicalWinText(contractHistory, {total:0, rate:0}), "bull-text"],
         ["歷史累積盈虧", signed(historicalPnl(contractHistory, contractFormalSignals(), 0)), "accent-text"],
         ["成交量門檻", "500萬", ""],
         ["更新", lastTimeText(state.lastContractAt), ""]
@@ -2414,11 +2445,11 @@
       $("qualityCount").textContent = `(${rows.length})`;
       $("qualityStats").innerHTML = [
         ["正式持倉", open.length, "bull-text"],
-        ["總進場勝率", totalStats.total ? `${fmt(totalStats.rate, 1)}%` : "未進場", "bull-text"],
-        ["歷史總勝率", historicalWinText(qualityHistory, totalStats), "bull-text"],
+        ["結案勝率", totalStats.closed ? `${fmt(totalStats.rate, 1)}%` : "尚無結案", "bull-text"],
+        ["歷史結案勝率", historicalWinText(qualityHistory, totalStats), "bull-text"],
         ["歷史累積盈虧", signed(historicalPnl(qualityHistory, allRows, 0)), "accent-text"],
         ["總樣本", `${totalStats.total} 倉`, ""],
-        ["今日進場勝率", todayClosed.total ? `${fmt(todayClosed.rate, 1)}%` : "未進場", "accent-text"],
+        ["今日結案勝率", todayClosed.closed ? `${fmt(todayClosed.rate, 1)}%` : "尚無結案", "accent-text"],
         ["今日TP觸發", `${fmt(todayTp.tp1, 1)}%`, "bull-text"],
         ["平均品質", fmt(avg, 0), "bull-text"],
         ["嘎空 / 嘎多", `${rows.filter(s => qualitySide(s) === "bull").length} / ${rows.filter(s => qualitySide(s) === "bear").length}`, ""],
@@ -2643,8 +2674,8 @@
       $("stableStats").innerHTML = [
         ["穩狗訊號", rows.length, "bull-text"],
         ["正式 / 預警", `${officialRows.length} / ${warningRows.length}`, "accent-text"],
-        ["總進場勝率", totalStats.total ? `${fmt(totalStats.rate, 1)}%` : "未進場", "bull-text"],
-        ["歷史總勝率", historicalWinText(stableHistory, totalStats), "bull-text"],
+        ["結案勝率", totalStats.closed ? `${fmt(totalStats.rate, 1)}%` : "尚無結案", "bull-text"],
+        ["歷史結案勝率", historicalWinText(stableHistory, totalStats), "bull-text"],
         ["歷史累積盈虧", signed(historicalPnl(stableHistory, totalStableRows, 0)), "accent-text"],
         ["總TP1/FTP", `${fmt(totalTp.tp1, 1)}% / ${fmt(totalTp.ftp, 1)}%`, "accent-text"],
         ["平均分數", fmt(avg, 0), "accent-text"],
@@ -2710,7 +2741,7 @@
         ["原始訊號", rawRows.length, ""],
         ["預警/過濾", gatedOut, gatedOut ? "warn-text" : ""],
         ["樣本可信度", confidence.label, confidence.cls],
-        ["進場勝率", closedStats.total ? `${fmt(rate, 1)}%` : "未進場", closedStats.total ? "bull-text" : "warn-text"],
+        ["結案勝率", closedStats.closed ? `${fmt(rate, 1)}%` : "尚無結案", closedStats.closed ? "bull-text" : "warn-text"],
         ["TP1率", `${fmt(targetStats.tp1, 1)}%`, "bull-text"],
         ["TP2率", `${fmt(targetStats.tp2, 1)}%`, "bull-text"],
         ["TP3率", `${fmt(targetStats.tp3, 1)}%`, "accent-text"],
@@ -2751,10 +2782,10 @@
       return {tp1: hit("tp1"), tp2: hit("tp2"), tp3: hit("tp3"), ftp: hit("ftp")};
     }
     function isFinalWin(s) {
-      return targetOrder(displayState(s)) >= targetOrder("tp1");
+      return targetOrder(s.reached_state) >= targetOrder("tp1");
     }
     function isFinalLoss(s) {
-      return displayState(s) === "sl";
+      return s.reached_state === "sl";
     }
     function finalWinStats(rows) {
       const entered = rows
@@ -2768,7 +2799,7 @@
       const open = Math.max(0, entered.length - wins - losses);
       const total = entered.length;
       const closed = wins + losses;
-      return {wins, losses, open, total, closed, rate: closed ? wins / closed * 100 : 0};
+      return {wins, losses, open, total, closed, rate: closed ? wins / closed * 100 : 0, entryRate: total ? wins / total * 100 : 0};
     }
     function strategyHealthSummary(rows) {
       const stats = finalWinStats(rows);
@@ -2820,7 +2851,7 @@
         <line x1="${w-pad}" y1="${pad}" x2="${w-pad}" y2="${h-pad}" stroke="rgba(179,107,255,.35)" stroke-dasharray="6 7"/>
         <text x="${pad}" y="${pad - 16}" fill="#b36bff" font-size="13" font-weight="900">累計R</text>
         <text x="${pad}" y="${pad + 14}" fill="#00e0a4" font-size="24" font-weight="950">${signed(summary.equity || values[values.length - 1])}</text>
-        <text x="${pad}" y="${pad + 40}" fill="#7791ad" font-size="12">進場勝率 ${fmt(summary.rate || 0,1)}% · 平均 ${signed(summary.avgR || 0)} · 回撤 ${signed(summary.maxDrawdown || 0)}</text>
+        <text x="${pad}" y="${pad + 40}" fill="#7791ad" font-size="12">結案勝率 ${fmt(summary.rate || 0,1)}% · 平均 ${signed(summary.avgR || 0)} · 回撤 ${signed(summary.maxDrawdown || 0)}</text>
         <text x="${w - pad - 8}" y="${lastY - 8}" text-anchor="end" fill="#dceaff" font-size="13" font-weight="900">${signed(values[values.length - 1])}</text>
       </svg>`;
     }
@@ -3623,7 +3654,7 @@
       $("modalTier").textContent = rate >= 70 ? "高等" : rate >= 50 ? "中等" : "低等";
       $("modalStats").innerHTML = [
         ["訊號總數", rows.length, `${rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length} 進行中`],
-        ["進場勝率", closedStats.total ? `${fmt(rate,1)}%` : "未進場", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP觸發 ${fmt(tpStats.tp1,1)}%`],
+        ["結案勝率", closedStats.closed ? `${fmt(rate,1)}%` : "尚無結案", `${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉 · TP觸發 ${fmt(tpStats.tp1,1)}%`],
         ["累計盈虧", signed(pnl), `${rows.length} 筆`],
         ["平均評分", fmt(avgScore, 0), rows.length ? scoreGrade(avgScore).label : "尚無樣本"]
       ].map(metricCard).join("");
@@ -3655,7 +3686,7 @@
     function modalStrategy(name, rows, kind) {
       const closedStats = finalWinStats(rows);
       const pnl = rows.reduce((sum, s) => sum + pnlPct(s, isLivePricedSignal(s)), 0);
-      return `<div class="modal-card"><strong class="${kind}-text">${name}</strong><span class="subline"> ${rows.length} 筆</span><div class="mini-grid"><div class="mini">進場勝率 <b class="accent-text">${closedStats.total ? `${fmt(closedStats.rate,1)}%` : "未進場"}</b><span>${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉</span></div><div class="mini">累計盈虧 <b class="${pnl >= 0 ? "bull-text" : "bear-text"}">${signed(pnl)}</b></div></div></div>`;
+      return `<div class="modal-card"><strong class="${kind}-text">${name}</strong><span class="subline"> ${rows.length} 筆</span><div class="mini-grid"><div class="mini">結案勝率 <b class="accent-text">${closedStats.closed ? `${fmt(closedStats.rate,1)}%` : "尚無結案"}</b><span>${closedStats.wins}W / ${closedStats.losses}L / ${closedStats.open}持倉</span></div><div class="mini">累計盈虧 <b class="${pnl >= 0 ? "bull-text" : "bear-text"}">${signed(pnl)}</b></div></div></div>`;
     }
     function metricCard([a,b,c]) {
       return `<div class="modal-card"><div class="subline">${a}</div><div class="stat-value ${String(b).startsWith("-") ? "bear-text" : "bull-text"}">${b}</div><div class="subline">${c || ""}</div></div>`;
@@ -3998,7 +4029,13 @@
       for (const row of rows) {
         if (!row || row.error || !row.symbol) continue;
         const key = clean(row.symbol);
-        book.set(key, {...book.get(key), ...row});
+        const prev = book.get(key) || {};
+        const next = {...prev, ...row};
+        if (!Number.isFinite(Number(row.price)) && Number.isFinite(Number(prev.price))) next.price = prev.price;
+        if (!Number.isFinite(Number(row.price_change_pct)) && Number.isFinite(Number(prev.price_change_pct))) next.price_change_pct = prev.price_change_pct;
+        if (!Number.isFinite(Number(row.quote_volume)) && Number.isFinite(Number(prev.quote_volume))) next.quote_volume = prev.quote_volume;
+        next.market_stale = row.market_stale === true && !row.live_price;
+        book.set(key, next);
       }
       return [...book.values()].sort((a,b) => Number(b.oi_value_usdt || 0) - Number(a.oi_value_usdt || 0));
     }
@@ -4434,5 +4471,6 @@
   </script>
 </body>
 </html>
+
 
 
