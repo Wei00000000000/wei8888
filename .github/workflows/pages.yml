@@ -1,8 +1,8 @@
 name: Deploy GitHub Pages
 
 on:
-  push:
-    branches: ["main"]
+  # GitHub Pages is configured to deploy from the main branch.
+  # Keep this workflow as a manual fallback to avoid duplicate Pages deployments.
   workflow_dispatch:
 
 permissions:
