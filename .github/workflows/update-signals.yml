@@ -60,9 +60,12 @@ jobs:
       - name: Export GitHub Pages data
         run: python scripts/export_github_pages.py
       - name: Commit updated signals
+        env:
+          GIT_TERMINAL_PROMPT: "0"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config pull.rebase true
           rm -rf data index.html
           cp -r site/* .
           git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json data index.html
@@ -71,7 +74,8 @@ jobs:
           else
             git commit -m "Update live sentiment signals"
             for attempt in 1 2 3; do
-              git pull --rebase -X theirs
+              git fetch origin main
+              git rebase -X theirs origin/main
               git push && exit 0
               echo "Push attempt ${attempt} failed; retrying after rebase"
               sleep 5
