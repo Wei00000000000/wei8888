@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   update:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_backup_scan == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -67,9 +68,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config pull.rebase true
-          rm -rf data index.html
-          cp -r site/* .
-          git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json data index.html
+          rm -rf data
+          cp -r site/data ./data
+          cp -f site/sentiment_scanner/seed_signals.json sentiment_scanner/seed_signals.json
+          cp -f site/sentiment_scanner/contract_anomalies.json sentiment_scanner/contract_anomalies.json
+          cp -f site/sentiment_scanner/scanner_status.json sentiment_scanner/scanner_status.json
+          git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json data
           if git diff --cached --quiet; then
             echo "No signal updates"
           else
