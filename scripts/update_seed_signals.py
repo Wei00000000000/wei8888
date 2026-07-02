@@ -1637,6 +1637,9 @@ def main() -> None:
     max_rows = int(os.getenv("MAX_SEED_ROWS", "0"))
     allowed_errors = int(os.getenv("MAX_SCAN_ERRORS", str(max(5, int(len(symbols) * 0.05)))))
     scan_ok = bool(found) and len(errors) <= allowed_errors
+    previous_success = previous_success_at()
+    data_preserved = not scan_ok and bool(previous_success)
+    status_ok = scan_ok or data_preserved
     if scan_ok:
         rows_to_save = rows[:max_rows] if max_rows > 0 else rows
         SEED.write_text(json.dumps(rows_to_save, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1646,10 +1649,13 @@ def main() -> None:
     SCANNER_STATUS.write_text(
         json.dumps(
             {
-                "ok": scan_ok,
+                "ok": status_ok,
+                "scan_ok": scan_ok,
+                "data_preserved": data_preserved,
+                "data_stale": data_preserved,
                 "updated_at": status_time,
                 "last_attempt_at": status_time,
-                "last_success_at": status_time if scan_ok else previous_success_at(),
+                "last_success_at": status_time if scan_ok else previous_success,
                 "market_data_provider": provider_name(),
                 "symbols_scanned": len(symbols),
                 "signals_found": len(found),

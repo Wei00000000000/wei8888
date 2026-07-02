@@ -4361,12 +4361,13 @@
       const lastSuccess = status.last_success_at ? new Date(status.last_success_at) : null;
       const workerFresh = lastSuccess && Date.now() - lastSuccess.getTime() < 20 * 60 * 1000;
       const ok = status.ok !== false;
+      const stale = status.data_stale === true || status.scan_ok === false;
       const provider = status.market_data_actual_provider || status.market_data_provider || "mixed";
       const parts = [
         autoTimer ? "自動掃描中" : "自動掃描停止",
         state.busy ? "請求中" : "待命",
         `源 ${provider}`,
-        ok ? "資料源正常" : "資料源異常，保留舊資料",
+        stale ? "本輪掃描異常，保留舊資料" : ok ? "資料源正常" : "資料源異常，保留舊資料",
         `成功 ${status.last_success_at ? shortTime(status.last_success_at) : "-"}`,
         `book ${lastTimeText(state.lastBookAt)}`,
         `tick ${lastTimeText(state.lastTickAt)}`,
@@ -4374,10 +4375,10 @@
       ];
       $("healthText").textContent = parts.join(" · ");
       $("healthText").innerHTML = `<span class="health-pack">
-        <span class="health-dot ${(["mixed", "bingx", "okx"].includes(provider)) && ok ? "ok" : "warn"}">BingX/OKX</span>
+        <span class="health-dot ${ok && !stale ? "ok" : "warn"}">Market</span>
         <span class="health-dot ${Number(status.coinglass_calls || 0) >= 0 ? "ok" : "warn"}">CoinGlass</span>
         <span class="health-dot ${workerFresh ? "ok" : "warn"}">Zeabur Worker</span>
-        <span class="health-dot ${ok ? "ok" : "bad"}">${ok ? "資料正常" : "資料源異常"}</span>
+        <span class="health-dot ${ok ? stale ? "warn" : "ok" : "bad"}">${stale ? "保留舊資料" : ok ? "資料正常" : "資料源異常"}</span>
         <span>成功 ${status.last_success_at ? shortTime(status.last_success_at) : "-"}</span>
       </span>`;
     }
