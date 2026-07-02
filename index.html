@@ -4099,6 +4099,10 @@
     function currentPrice(s) {
       const market = marketFor(s.symbol);
       if (market && Number.isFinite(Number(market.price))) return Number(market.price);
+      for (const key of ["current_price", "price", "last_price"]) {
+        const value = Number(s[key]);
+        if (Number.isFinite(value) && value > 0) return value;
+      }
       const entry = Number(entryPrice(s));
       const pnl = pnlPct(s, false) / 100;
       if (!Number.isFinite(entry)) return NaN;
@@ -4139,7 +4143,12 @@
     }
     function currentMarketPrice(s) {
       const market = marketFor(s.symbol);
-      return market ? Number(market.price) : NaN;
+      if (market && Number.isFinite(Number(market.price))) return Number(market.price);
+      for (const key of ["current_price", "price", "last_price"]) {
+        const value = Number(s[key]);
+        if (Number.isFinite(value) && value > 0) return value;
+      }
+      return NaN;
     }
     function displayState(s) {
       const saved = s.reached_state;
@@ -4421,7 +4430,12 @@
     }
     function querySymbol() { return $("symbolSearch").value.trim().toUpperCase(); }
     function signalKey(s) { return `${clean(s.symbol)}|${s.signal_type}|${s.triggered_at || s.triggered_at_ms || ""}`; }
-    function clean(s) { return String(s || "").toUpperCase().replace(/USDT$/,""); }
+    function clean(s) {
+      return String(s || "")
+        .toUpperCase()
+        .replace(/[-_/]/g, "")
+        .replace(/(USDT|USDC|USD)$/,"");
+    }
     function isMobileView() { return window.matchMedia && window.matchMedia("(max-width: 760px)").matches; }
     function displayLimit(desktop = 120, mobile = 40) { return isMobileView() ? mobile : desktop; }
     function numClass(v) { return Number(v) > 0 ? "bull-text" : Number(v) < 0 ? "bear-text" : "muted"; }
