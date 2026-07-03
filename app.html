@@ -1230,6 +1230,12 @@
           if (!response.ok) throw new Error("合約異常資料讀取失敗");
           return response.json();
         }
+        if (endpoint === "sector_flows" || endpoint === "volume_anomalies") {
+          const path = endpoint === "sector_flows" ? "sector-flows" : "volume-anomalies";
+          const response = await cloudFetch(`/market/${path}`);
+          if (!response.ok) throw new Error(endpoint === "sector_flows" ? "板塊資金流讀取失敗" : "成交量異常讀取失敗");
+          return response.json();
+        }
       }
       if (!STATIC_MODE && !CLOUD_MODE) {
         const suffix = query ? `?${query}` : "";
@@ -2492,7 +2498,7 @@
       const rows = highQualitySignals(false)
         .filter(s => !q || clean(s.symbol).includes(q))
         .filter(s => side === "all" || qualitySide(s) === side)
-        .sort((a,b) => highQualityScore(b).score - highQualityScore(a).score || new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
+        .sort((a,b) => new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
       const allRows = highQualitySignals(false);
       const todayRows = allRows.filter(s => new Date(s.triggered_at || 0) >= todayStartTaipei());
       const open = rows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s));
@@ -2841,10 +2847,10 @@
       return {tp1: hit("tp1"), tp2: hit("tp2"), tp3: hit("tp3"), ftp: hit("ftp")};
     }
     function isFinalWin(s) {
-      return targetOrder(s.reached_state) >= targetOrder("tp1");
+      return targetOrder(s.reached_state) >= targetOrder("tp1") && !isOpenSignal(s) && !isPartialActiveSignal(s);
     }
     function isFinalLoss(s) {
-      return s.reached_state === "sl";
+      return s.reached_state === "sl" && !isOpenSignal(s) && !isPartialActiveSignal(s);
     }
     function finalWinStats(rows) {
       const entered = rows
@@ -2855,7 +2861,7 @@
         });
       const wins = entered.filter(isFinalWin).length;
       const losses = entered.filter(isFinalLoss).length;
-      const open = Math.max(0, entered.length - wins - losses);
+      const open = entered.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).length;
       const total = entered.length;
       const closed = wins + losses;
       return {wins, losses, open, total, closed, rate: closed ? wins / closed * 100 : 0, entryRate: total ? wins / total * 100 : 0};
