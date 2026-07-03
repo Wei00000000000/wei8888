@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Wei 策略情報室</title>
-  <meta name="description" content="Wei 策略情報室是加密貨幣量化終端雷達，整合嘎空、嘎多、穩如老狗、合約異常、板塊資金流與交易訊號追蹤。">
-  <meta name="keywords" content="Wei 策略情報室,加密貨幣量化,合約數據,交易訊號,嘎空,嘎多,穩如老狗,板塊資金流,AI 量化">
+  <meta name="description" content="Wei 策略情報室是加密貨幣量化終端雷達，整合嘎空、嘎多、合約異常、板塊資金流與交易訊號追蹤。">
+  <meta name="keywords" content="Wei 策略情報室,加密貨幣量化,合約數據,交易訊號,嘎空,嘎多,板塊資金流,AI 量化">
   <meta name="author" content="Wei">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://wei00000000000.github.io/wei8888/sentiment_scanner/app.html">
@@ -13,7 +13,7 @@
   <meta property="og:locale" content="zh_TW">
   <meta property="og:site_name" content="Wei 策略情報室">
   <meta property="og:title" content="Wei 策略情報室｜加密貨幣量化終端雷達">
-  <meta property="og:description" content="追蹤嘎空、嘎多、穩如老狗、合約異常、板塊資金流與交易訊號，打造個人用 AI 量化研究台。">
+  <meta property="og:description" content="追蹤嘎空、嘎多、合約異常、板塊資金流與交易訊號，打造個人用 AI 量化研究台。">
   <meta property="og:url" content="https://wei00000000000.github.io/wei8888/sentiment_scanner/app.html">
   <meta property="og:image" content="https://wei00000000000.github.io/wei8888/brand-hero.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -470,7 +470,6 @@
         <button data-view="signals">數據交易訊號</button>
         <button data-view="contract">合約異常雷達</button>
         <button data-view="quality">高品質訊號</button>
-        <button data-view="stable">穩如老狗</button>
         <button data-view="positions">倉位歷史</button>
         <button data-view="review">交易檢討</button>
       </nav>
@@ -516,7 +515,7 @@
         <div>
           <div class="kicker">Wei Strategy Intelligence</div>
           <h2>Wei 策略情報室</h2>
-          <div class="subline">整合 15M OI 訊號、穩如老狗、5M 頂底背離、板塊資金流與模擬回測。</div>
+          <div class="subline">整合 15M OI 訊號、5M 頂底背離、板塊資金流與模擬回測。</div>
         </div>
       </section>
       <div class="section-head">
@@ -529,7 +528,7 @@
         <section class="decision-panel"><div class="kicker">策略績效</div><div class="watch-stats" id="decisionPerformance"></div></section>
         <section class="decision-panel"><div class="kicker">交易檢討摘要</div><div class="decision-list" id="decisionReview"></div></section>
       </div>
-      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>穩如老狗</span><span>合約異常雷達</span></div>
+      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>高品質訊號</span><span>合約異常雷達</span></div>
       <div class="section-head">
         <div><span class="watch-title">板塊資金流動</span><span class="watch-sub" id="sectorMeta">等待更新</span></div>
       </div>
@@ -583,7 +582,7 @@
           <div>
             <div class="kicker">訊號回測</div>
             <h2>數據交易訊號回測</h2>
-            <div class="subline">只計算 OI 嘎空/嘎多訊號，不混入穩如老狗或 5M 背離。</div>
+            <div class="subline">只計算 OI 嘎空/嘎多訊號，不混入高品質訊號或 5M 背離。</div>
           </div>
           <div class="section-actions">
             <input id="signalBtFrom" type="date" title="開始日期">
@@ -651,7 +650,7 @@
           <div>
             <div class="kicker">Contract Radar Backtest</div>
             <h2>合約異常雷達回測</h2>
-            <div class="subline">獨立計算後續行情是否與雷達方向一致，不混入嘎多/嘎空或穩如老狗盈虧。</div>
+            <div class="subline">獨立計算後續行情是否與雷達方向一致，不混入嘎多/嘎空或高品質訊號盈虧。</div>
           </div>
           <span class="pill accent" id="contractBacktestMeta">0 samples</span>
         </div>
@@ -708,7 +707,7 @@
       <button class="btn load-more" id="qualityLoadMore">載入更多高品質訊號</button>
     </section>
 
-    <section id="stable" class="view">
+    <section id="stable" class="view" hidden>
       <section class="radar-strip">
         <div class="kicker">Conservative Contract Matrix</div>
         <h2>穩如老狗</h2>
@@ -983,7 +982,7 @@
     renderAll();
     status("Auto scanner warming up.");
     initialize();
-    setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 10000 : 5000);
+    setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 5000 : 3000);
     setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, CLOUD_MODE ? 30000 : 120000);
     setInterval(renderHealth, 5000);
 
@@ -1189,6 +1188,22 @@
       const prices = Object.fromEntries(rows.map(row => [clean(row.symbol), Number(row.price)]));
       return {rows, markets: rows, prices, updated_at: rows[0]?.observed_at || null};
     }
+    async function cloudLivePrices(query = "") {
+      const [cloudResult, liveResult] = await Promise.allSettled([cloudMarkets(query), staticPrices(query)]);
+      const cloudData = cloudResult.status === "fulfilled" ? cloudResult.value : {markets: [], prices: {}, updated_at: null};
+      const liveData = liveResult.status === "fulfilled" ? liveResult.value : {markets: [], prices: {}, updated_at: null};
+      if (!cloudData.markets?.length && !liveData.markets?.length) {
+        const err = liveResult.reason || cloudResult.reason || new Error("No market data returned");
+        throw err;
+      }
+      const markets = mergeMarkets(cloudData.markets || [], liveData.markets || []);
+      return {
+        rows: markets,
+        markets,
+        prices: {...(cloudData.prices || {}), ...(liveData.prices || {})},
+        updated_at: liveData.updated_at || cloudData.updated_at || new Date().toISOString()
+      };
+    }
 
     async function initialize() {
       await loadBook();
@@ -1204,7 +1219,7 @@
         if (["book", "tick", "scan", "backtest"].includes(endpoint)) return cloudSignals();
         if (endpoint === "prices") {
           try {
-            return await cloudMarkets(query);
+            return await cloudLivePrices(query);
           } catch (err) {
             rememberError(err, "Cloud price proxy unavailable");
             return staticPrices(query);
@@ -4395,6 +4410,7 @@
       return `<div class="watch-stat"><div class="watch-stat-label">${cleanText(label)}</div><div class="watch-stat-value">${cleanText(value)}</div><div class="subline">${cleanText(subline)}</div></div>`;
     }
     function setView(view) {
+      if (view === "stable") view = "dashboard";
       state.currentView = view;
       document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
       document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === view));
