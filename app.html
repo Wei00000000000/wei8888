@@ -341,7 +341,7 @@
     .dot-symbol { position: absolute; transform: translate(-50%, -50%) scale(var(--visual-dot-scale, 1)); transform-origin: 50% 50%; border: 1px solid currentColor; border-radius: 999px; padding: 4px 7px; background: rgba(5,10,16,.88); font: 950 11px var(--mono); cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
     .dot-symbol.bull { color: var(--bull); }
     .dot-symbol.bear { color: var(--bear); }
-    .visual-stage { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; pointer-events: none; }
+    .visual-stage { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
     .visual-stage .dot-symbol { pointer-events: auto; }
     .condition-board { position: relative; min-height: 360px; border: 1px solid var(--line); border-radius: 10px; background: rgba(4,9,14,.74); overflow: hidden; touch-action: none; }
     .condition-zone { position: absolute; top: 12px; bottom: 12px; width: calc((100% - 48px) / 3); border: 1px dashed rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.018); padding: 10px; pointer-events: none; }
@@ -857,8 +857,8 @@
       currentView: "dashboard",
       visualTf: "5m",
       visualZoom: 1.8,
-      visualPanX: 0,
-      visualPanY: 0,
+      visualPanX: null,
+      visualPanY: null,
       visualDrag: null,
       conditionDrag: null,
       conditionLayout: loadConditionLayout(),
@@ -952,13 +952,12 @@
       renderContractRadar();
     }));
     $("visualZoom").addEventListener("input", event => {
-      state.visualZoom = Number(event.target.value) || 1;
-      applyVisualTransform();
+      setVisualZoom(Number(event.target.value) || 1);
     });
     $("visualReset").addEventListener("click", () => {
       state.visualZoom = 1.8;
-      state.visualPanX = 0;
-      state.visualPanY = 0;
+      state.visualPanX = null;
+      state.visualPanY = null;
       $("visualZoom").value = state.visualZoom;
       applyVisualTransform();
     });
@@ -1226,6 +1225,11 @@
           }
         }
         if (endpoint === "markets") return cloudMarkets(query);
+        if (endpoint === "contract_anomalies") {
+          const response = await cloudFetch("/market/contract-anomalies");
+          if (!response.ok) throw new Error("合約異常資料讀取失敗");
+          return response.json();
+        }
       }
       if (!STATIC_MODE && !CLOUD_MODE) {
         const suffix = query ? `?${query}` : "";
@@ -2134,13 +2138,21 @@
         });
       const xScale = visualScale(plotted.map(item => item.xRaw));
       const yScale = visualScale(plotted.map(item => item.yRaw));
+      const occupied = [];
       const points = plotted.map(item => {
           const row = item.row;
           const x = clamp(item.xRaw / xScale, -1, 1);
           const y = clamp(item.yRaw / yScale, -1, 1);
           const jitter = visualJitter(clean(row.symbol));
-          const left = clamp(50 + x * 43 + jitter.x, 3, 97);
-          const top = clamp(50 - y * 43 + jitter.y, 3, 97);
+          let left = clamp(50 + x * 43 + jitter.x, 3, 97);
+          let top = clamp(50 - y * 43 + jitter.y, 3, 97);
+          for (let pass = 0; pass < 12 && occupied.some(point => Math.hypot(point.x - left, point.y - top) < 3.4); pass += 1) {
+            const angle = (pass + 1) * 2.399963 + jitter.x;
+            const radius = 2.2 + Math.floor(pass / 3) * 1.7;
+            left = clamp(left + Math.cos(angle) * radius, 3, 97);
+            top = clamp(top + Math.sin(angle) * radius, 3, 97);
+          }
+          occupied.push({x: left, y: top});
           const kind = contractBias(row) === "long" ? "bull" : "bear";
           const size = clamp(Math.abs(Number(row.radar_score ?? row.score) || 0) / 14, 4, 9);
           return `<button class="dot-symbol ${kind}" data-contract-symbol="${clean(row.symbol)}" title="${clean(row.symbol)} · OI ${fmt(item.xRaw,2)} · 動能 ${fmt(item.yRaw,2)}" style="left:${left}%;top:${top}%;font-size:${size + 7}px">${clean(row.symbol)}</button>`;
@@ -2173,9 +2185,11 @@
     function bindVisualPanZoom(target) {
       target.onwheel = event => {
         event.preventDefault();
-        state.visualZoom = clamp(state.visualZoom + (event.deltaY < 0 ? 0.25 : -0.25), 1, 5);
-        $("visualZoom").value = state.visualZoom;
-        applyVisualTransform(target);
+        const rect = target.getBoundingClientRect();
+        setVisualZoom(state.visualZoom + (event.deltaY < 0 ? 0.25 : -0.25), {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top
+        }, target);
       };
       target.onpointerdown = event => {
         if (event.target.closest(".dot-symbol")) return;
@@ -2186,8 +2200,8 @@
           pointerId: event.pointerId,
           startX: event.clientX - rect.left,
           startY: event.clientY - rect.top,
-          originX: Number(state.visualPanX) || 0,
-          originY: Number(state.visualPanY) || 0,
+          originX: visualPan(target).x,
+          originY: visualPan(target).y,
           width: rect.width,
           height: rect.height
         };
@@ -2197,8 +2211,8 @@
         const rect = target.getBoundingClientRect();
         const currentX = event.clientX - rect.left;
         const currentY = event.clientY - rect.top;
-        state.visualPanX = clamp(state.visualDrag.originX + currentX - state.visualDrag.startX, -state.visualDrag.width, state.visualDrag.width);
-        state.visualPanY = clamp(state.visualDrag.originY + currentY - state.visualDrag.startY, -state.visualDrag.height, state.visualDrag.height);
+        state.visualPanX = state.visualDrag.originX + currentX - state.visualDrag.startX;
+        state.visualPanY = state.visualDrag.originY + currentY - state.visualDrag.startY;
         applyVisualTransform(target);
       };
       target.onpointerup = target.onpointercancel = () => {
@@ -2206,12 +2220,40 @@
         target.classList.remove("dragging");
       };
     }
+    function visualPan(target = $("contractVisualScreener")) {
+      const width = target?.clientWidth || 0;
+      const height = target?.clientHeight || 0;
+      const scale = Number(state.visualZoom) || 1;
+      return {
+        x: Number.isFinite(Number(state.visualPanX)) ? Number(state.visualPanX) : (width - width * scale) / 2,
+        y: Number.isFinite(Number(state.visualPanY)) ? Number(state.visualPanY) : (height - height * scale) / 2
+      };
+    }
+    function setVisualZoom(nextZoom, anchor = null, target = $("contractVisualScreener")) {
+      if (!target) return;
+      const oldScale = Number(state.visualZoom) || 1;
+      const oldPan = visualPan(target);
+      const nextScale = clamp(Number(nextZoom) || 1, 1, 5);
+      const focus = anchor || {x: target.clientWidth / 2, y: target.clientHeight / 2};
+      const contentX = (focus.x - oldPan.x) / oldScale;
+      const contentY = (focus.y - oldPan.y) / oldScale;
+      state.visualZoom = nextScale;
+      state.visualPanX = focus.x - contentX * nextScale;
+      state.visualPanY = focus.y - contentY * nextScale;
+      $("visualZoom").value = nextScale;
+      applyVisualTransform(target);
+    }
     function applyVisualTransform(target = $("contractVisualScreener")) {
       const stage = target?.querySelector(".visual-stage");
       if (!stage) return;
-      const x = Number(state.visualPanX) || 0;
-      const y = Number(state.visualPanY) || 0;
       const scale = Number(state.visualZoom) || 1;
+      const pan = visualPan(target);
+      const minX = Math.min(0, target.clientWidth * (1 - scale));
+      const minY = Math.min(0, target.clientHeight * (1 - scale));
+      const x = clamp(pan.x, minX, 0);
+      const y = clamp(pan.y, minY, 0);
+      state.visualPanX = x;
+      state.visualPanY = y;
       stage.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
       stage.style.setProperty("--visual-dot-scale", String(clamp(1 / Math.sqrt(scale), 0.48, 1)));
     }
