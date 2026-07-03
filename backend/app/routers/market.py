@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
+from time import monotonic
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +17,7 @@ from ..database import get_session
 from ..models import MarketSnapshot
 from ..schemas import MarketResponse
 from ..security import User
+from sentiment_scanner.market_data import MixedFuturesClient
 
 
 router = APIRouter(prefix="/market", tags=["market"])
@@ -27,6 +32,8 @@ SECTOR_SYMBOLS = {
     "Meme": {"DOGE", "SHIB", "PEPE", "BONK", "FLOKI", "WIF", "MEME", "NEIRO"},
     "Gaming": {"SAND", "MANA", "GALA", "IMX", "RON", "PIXEL", "MAGIC", "AXS", "YGG"},
 }
+LIVE_TICKER_TTL_SECONDS = 60.0
+_live_ticker_cache: tuple[float, list[MarketResponse]] = (0.0, [])
 
 
 def read_contract_anomalies() -> dict[str, object]:
@@ -92,6 +99,45 @@ def build_sector_flows(rows: list[MarketResponse]) -> list[dict[str, object]]:
     return sorted(result, key=lambda item: float(item["volume_24h"]), reverse=True)
 
 
+def fetch_live_tickers() -> list[MarketResponse]:
+    global _live_ticker_cache
+    cached_at, cached_rows = _live_ticker_cache
+    if cached_rows and monotonic() - cached_at < LIVE_TICKER_TTL_SECONDS:
+        return cached_rows
+    with MixedFuturesClient(timeout=12) as client:
+        payload = client.ticker_24hr()
+    observed_at = datetime.now(timezone.utc)
+    rows = []
+    for item in payload if isinstance(payload, list) else []:
+        try:
+            price = Decimal(str(item.get("lastPrice") or item.get("price") or 0))
+            if price <= 0:
+                continue
+            rows.append(MarketResponse(
+                symbol=str(item.get("symbol") or "").upper().replace("USDT", ""),
+                source=str(item.get("source") or "mixed-live"),
+                price=price,
+                change_24h_pct=float(item.get("priceChangePercent") or item.get("price_change_pct") or 0),
+                quote_volume_24h=float(item.get("quoteVolume") or item.get("quote_volume") or 0),
+                observed_at=observed_at,
+            ))
+        except (TypeError, ValueError, ArithmeticError):
+            continue
+    if rows:
+        _live_ticker_cache = (monotonic(), rows)
+    return rows
+
+
+async def dashboard_market_rows(_user: User, session: Session) -> list[MarketResponse]:
+    try:
+        live_rows = await run_in_threadpool(fetch_live_tickers)
+        if any(float(row.quote_volume_24h or 0) > 0 for row in live_rows):
+            return live_rows
+    except Exception:
+        pass
+    return await latest_market(_user, session, symbols=None, limit=500)
+
+
 @router.get("", response_model=list[MarketResponse])
 async def latest_market(
     _user: User,
@@ -127,11 +173,11 @@ async def contract_anomalies(_user: User) -> dict[str, object]:
 
 @router.get("/volume-anomalies")
 async def volume_anomalies(_user: User, session: Session) -> dict[str, object]:
-    rows = await latest_market(_user, session, symbols=None, limit=500)
+    rows = await dashboard_market_rows(_user, session)
     return {"rows": build_volume_anomalies(rows), "updated_at": max((row.observed_at for row in rows), default=None)}
 
 
 @router.get("/sector-flows")
 async def sector_flows(_user: User, session: Session) -> dict[str, object]:
-    rows = await latest_market(_user, session, symbols=None, limit=500)
+    rows = await dashboard_market_rows(_user, session)
     return {"rows": build_sector_flows(rows), "updated_at": max((row.observed_at for row in rows), default=None)}
