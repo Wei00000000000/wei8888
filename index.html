@@ -1843,18 +1843,18 @@
       const tpDetail = `TP1 ${fmt(tpStats.tp1, 1)}% / TP2 ${fmt(tpStats.tp2, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`;
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        [totalLabel, closedStats.closed ? `${fmt(closedStats.rate, 1)}%` : "尚無結案", closedDetail],
-        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
         ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
+        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
+        ["目前清單狀態", `${closedStats.closed} 已結案`, `${closedStats.open} 持倉 / ${closedStats.total} 進場`],
         ["穩狗累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
         ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        [totalLabel, closedStats.closed ? `${fmt(closedStats.rate, 1)}%` : "尚無結案", closedDetail],
-        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
         ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
+        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
+        ["目前清單狀態", `${closedStats.closed} 已結案`, `${closedStats.open} 持倉 / ${closedStats.total} 進場`],
         ["總累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
         ["連勝連敗", streak, `平均持倉 ${avgHold}`],
@@ -2510,8 +2510,8 @@
       $("qualityCount").textContent = `(${rows.length})`;
       $("qualityStats").innerHTML = [
         ["正式持倉", open.length, "bull-text"],
-        ["結案勝率", totalStats.closed ? `${fmt(totalStats.rate, 1)}%` : "尚無結案", "bull-text"],
         ["歷史結案勝率", historicalWinText(qualityHistory, totalStats), "bull-text"],
+        ["目前清單狀態", `${totalStats.closed} 結案 / ${totalStats.open} 持倉`, ""],
         ["歷史累積盈虧", signed(historicalPnl(qualityHistory, allRows, 0)), "accent-text"],
         ["總樣本", `${totalStats.total} 倉`, ""],
         ["今日結案勝率", todayClosed.closed ? `${fmt(todayClosed.rate, 1)}%` : "尚無結案", "accent-text"],
