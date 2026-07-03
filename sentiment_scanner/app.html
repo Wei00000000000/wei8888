@@ -2224,9 +2224,11 @@
       const width = target?.clientWidth || 0;
       const height = target?.clientHeight || 0;
       const scale = Number(state.visualZoom) || 1;
+      const hasPanX = state.visualPanX !== null && state.visualPanX !== undefined && Number.isFinite(Number(state.visualPanX));
+      const hasPanY = state.visualPanY !== null && state.visualPanY !== undefined && Number.isFinite(Number(state.visualPanY));
       return {
-        x: Number.isFinite(Number(state.visualPanX)) ? Number(state.visualPanX) : (width - width * scale) / 2,
-        y: Number.isFinite(Number(state.visualPanY)) ? Number(state.visualPanY) : (height - height * scale) / 2
+        x: hasPanX ? Number(state.visualPanX) : (width - width * scale) / 2,
+        y: hasPanY ? Number(state.visualPanY) : (height - height * scale) / 2
       };
     }
     function setVisualZoom(nextZoom, anchor = null, target = $("contractVisualScreener")) {
