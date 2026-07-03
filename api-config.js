@@ -1,3 +1,5 @@
-// Set this to the deployed Zeabur API root, including /api/v1.
-// Keeping it empty preserves the current static GitHub Pages data source.
-window.WEI_API_BASE = "https://wei-strategy-api.zeabur.app/api/v1";
+// GitHub Pages uses the Zeabur API. When the site is served by Zeabur, use the
+// same origin so the API service can host both frontend and backend.
+window.WEI_API_BASE = location.hostname.endsWith("github.io")
+  ? "https://wei-strategy-api.zeabur.app/api/v1"
+  : "/api/v1";

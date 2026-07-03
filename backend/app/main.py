@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import settings
@@ -20,6 +21,20 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 logger = logging.getLogger("wei.api")
+ROOT_DIR = Path(__file__).resolve().parents[2]
+FRONTEND_FILES = {
+    "api-config.js",
+    "app.html",
+    "brand-hero.png",
+    "icon-192.png",
+    "icon-512.png",
+    "icon.svg",
+    "index.html",
+    "login.html",
+    "manifest.webmanifest",
+    "markets.json",
+    "sw.js",
+}
 
 
 @asynccontextmanager
@@ -67,3 +82,28 @@ app.include_router(market.router, prefix=settings.api_prefix)
 app.include_router(backtest.router, prefix=settings.api_prefix)
 app.include_router(notifications.router, prefix=settings.api_prefix)
 app.include_router(system.router, prefix=settings.api_prefix)
+
+
+@app.get("/", include_in_schema=False)
+async def frontend_root() -> FileResponse:
+    return FileResponse(ROOT_DIR / "login.html")
+
+
+@app.get("/app", include_in_schema=False)
+async def frontend_app() -> FileResponse:
+    return FileResponse(ROOT_DIR / "app.html")
+
+
+@app.get("/login", include_in_schema=False)
+async def frontend_login() -> FileResponse:
+    return FileResponse(ROOT_DIR / "login.html")
+
+
+@app.get("/{asset_path:path}", include_in_schema=False)
+async def frontend_asset(asset_path: str) -> FileResponse:
+    normalized = asset_path.strip("/")
+    if normalized == "sentiment_scanner/app.html":
+        return FileResponse(ROOT_DIR / "sentiment_scanner" / "app.html")
+    if normalized in FRONTEND_FILES:
+        return FileResponse(ROOT_DIR / normalized)
+    return FileResponse(ROOT_DIR / "login.html")

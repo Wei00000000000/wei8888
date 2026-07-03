@@ -32,7 +32,13 @@ class Settings(BaseSettings):
         "http://localhost:8000",
         "http://127.0.0.1:8000",
     ]
-    allowed_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1", "testserver"]
+    allowed_hosts: Annotated[list[str], NoDecode] = [
+        "localhost",
+        "127.0.0.1",
+        "testserver",
+        "wei-strategy-api.zeabur.app",
+        "*.zeabur.app",
+    ]
     cookie_name: str = "wei_session"
     csrf_cookie_name: str = "wei_csrf"
     cookie_secure: bool = False
