@@ -8,12 +8,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_session
-from ..models import Position
+from ..models import Position, Signal
+from ..positions import position_from_signal
 from ..schemas import PageMeta, PositionDetail, PositionPage, PositionResponse
 from ..security import User
 
@@ -46,6 +47,66 @@ def position_filters(
     return filters
 
 
+def signal_filters(
+    symbol: str | None = None,
+    side: str | None = None,
+    timeframe: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list:
+    filters = [Signal.official_trade.is_(True), Signal.entry_price.is_not(None)]
+    if symbol:
+        filters.append(Signal.symbol == symbol.upper().replace("USDT", ""))
+    if side:
+        filters.append(Signal.side == side.lower())
+    if timeframe:
+        filters.append(Signal.timeframe == timeframe.upper())
+    if date_from:
+        filters.append(Signal.triggered_at >= date_from)
+    if date_to:
+        filters.append(Signal.triggered_at <= date_to)
+    return filters
+
+
+async def merged_position_rows(
+    session: AsyncSession,
+    *,
+    symbol: str | None = None,
+    side: str | None = None,
+    timeframe: str | None = None,
+    status: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[Position]:
+    """Return persisted positions plus official signals projected as positions.
+
+    The position table is the source of event timelines. When a sync/import gap leaves
+    it empty or incomplete, official locked signals still represent real trade records,
+    so the history page should not go blank.
+    """
+    persisted = (
+        await session.scalars(
+            select(Position).where(*position_filters(symbol, side, timeframe, status, date_from, date_to))
+        )
+    ).all()
+    rows_by_signal = {row.signal_id: row for row in persisted}
+    rows_by_id = {row.id: row for row in persisted if not row.signal_id}
+
+    signals = (await session.scalars(select(Signal).where(*signal_filters(symbol, side, timeframe, date_from, date_to)))).all()
+    wanted_status = status.upper() if status else None
+    for signal in signals:
+        if signal.id in rows_by_signal:
+            continue
+        row = position_from_signal(signal)
+        row.created_at = signal.created_at
+        row.updated_at = signal.updated_at
+        if wanted_status and row.status != wanted_status:
+            continue
+        rows_by_signal[signal.id] = row
+
+    return [*rows_by_id.values(), *rows_by_signal.values()]
+
+
 @router.get("/open", response_model=list[PositionResponse])
 async def open_positions(_user: User, session: Session) -> list[PositionResponse]:
     rows = (
@@ -73,18 +134,20 @@ async def position_history(
     date_to: datetime | None = None,
     sort: Annotated[str, Query(pattern="^(asc|desc)$")] = "desc",
 ) -> PositionPage:
-    filters = position_filters(symbol, side, timeframe, status, date_from, date_to)
-    total = int((await session.scalar(select(func.count(Position.id)).where(*filters))) or 0)
-    order = Position.entry_time.asc() if sort == "asc" else Position.entry_time.desc()
-    rows = (
-        await session.scalars(
-            select(Position)
-            .where(*filters)
-            .order_by(order, Position.id.desc())
-            .offset((page - 1) * limit)
-            .limit(limit)
-        )
-    ).all()
+    rows = await merged_position_rows(
+        session,
+        symbol=symbol,
+        side=side,
+        timeframe=timeframe,
+        status=status,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    reverse = sort != "asc"
+    rows.sort(key=lambda row: (row.entry_time, row.id), reverse=reverse)
+    total = len(rows)
+    start = (page - 1) * limit
+    rows = rows[start : start + limit]
     return PositionPage(
         rows=[PositionResponse.model_validate(row) for row in rows],
         meta=PageMeta(page=page, limit=limit, total=total, pages=ceil(total / limit) if total else 0),
@@ -102,12 +165,17 @@ async def export_positions_csv(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> Response:
-    filters = position_filters(symbol, side, timeframe, status, date_from, date_to)
-    rows = (
-        await session.scalars(
-            select(Position).where(*filters).order_by(Position.entry_time.desc(), Position.id.desc()).limit(5000)
-        )
-    ).all()
+    rows = await merged_position_rows(
+        session,
+        symbol=symbol,
+        side=side,
+        timeframe=timeframe,
+        status=status,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    rows.sort(key=lambda row: (row.entry_time, row.id), reverse=True)
+    rows = rows[:5000]
     output = StringIO()
     writer = csv.writer(output)
     headers = [

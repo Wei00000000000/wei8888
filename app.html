@@ -775,6 +775,8 @@
         </div>
         <div class="section-actions">
           <input id="positionSearch" placeholder="搜尋幣種，例如 BTC">
+          <input id="positionDateFrom" type="date" title="開始日期">
+          <input id="positionDateTo" type="date" title="結束日期">
           <select id="positionStatus"><option value="">全部狀態</option><option>OPEN</option><option>CLOSED</option><option>EXPIRED</option><option>INVALIDATED</option><option>CANCELLED</option></select>
           <select id="positionSide"><option value="">全部方向</option><option value="long">多</option><option value="short">空</option></select>
           <button class="btn" id="positionExport">CSV</button>
@@ -942,6 +944,8 @@
     $("loadFullReview").addEventListener("click", () => loadFullHistoryFor("SL 完整診斷", renderReview));
     $("positionRefresh").addEventListener("click", loadPositions);
     $("positionSearch").addEventListener("input", () => debounceAction("positions", loadPositions, 400));
+    $("positionDateFrom").addEventListener("change", loadPositions);
+    $("positionDateTo").addEventListener("change", loadPositions);
     $("positionStatus").addEventListener("change", loadPositions);
     $("positionSide").addEventListener("change", loadPositions);
     $("positionExport").addEventListener("click", exportPositionsCsv);
@@ -1103,6 +1107,7 @@
         const params = new URLSearchParams({page: "1", limit: "100"});
         const symbol = clean($("positionSearch").value);
         if (symbol) params.set("symbol", symbol);
+        applyDateRangeParams(params, $("positionDateFrom").value, $("positionDateTo").value);
         if ($("positionStatus").value) params.set("status", $("positionStatus").value);
         if ($("positionSide").value) params.set("side", $("positionSide").value);
         const response = await cloudFetch(`/positions/history?${params}`);
@@ -1115,6 +1120,19 @@
       } catch (err) {
         rememberError(err);
       }
+    }
+
+    function dateStartIso(day) {
+      return day ? new Date(`${day}T00:00:00+08:00`).toISOString() : "";
+    }
+
+    function dateEndIso(day) {
+      return day ? new Date(`${day}T23:59:59.999+08:00`).toISOString() : "";
+    }
+
+    function applyDateRangeParams(params, fromDay, toDay) {
+      if (fromDay) params.set("date_from", dateStartIso(fromDay));
+      if (toDay) params.set("date_to", dateEndIso(toDay));
     }
 
     async function loadNotificationLogs() {
@@ -1158,6 +1176,7 @@
       const params = new URLSearchParams();
       const symbol = clean($("positionSearch").value);
       if (symbol) params.set("symbol", symbol);
+      applyDateRangeParams(params, $("positionDateFrom").value, $("positionDateTo").value);
       if ($("positionStatus").value) params.set("status", $("positionStatus").value);
       if ($("positionSide").value) params.set("side", $("positionSide").value);
       try {
@@ -3699,15 +3718,16 @@
       } catch {}
     }
 
-    function openSymbolModal(symbol) {
+    async function openSymbolModal(symbol) {
       symbol = clean(symbol);
       if (!state.historyLoaded && !state.historyLoading) {
         ensureHistorySignals(`${symbol} 歷史`).then(() => openSymbolModal(symbol)).catch(() => {});
       }
       const modalDay = $("modalDate").value;
-      const rows = state.signals
+      const localRows = state.signals
         .filter(s => clean(s.symbol) === symbol)
         .filter(s => !modalDay || sameDay(s.triggered_at, modalDay))
+      const rows = mergeModalRows(localRows, await fetchSymbolSignalHistory(symbol, modalDay))
         .sort((a,b) => new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0));
       const market = marketFor(symbol);
       $("modalSymbol").textContent = symbol;
@@ -3746,6 +3766,27 @@
         });
       });
       $("symbolModal").classList.add("open");
+    }
+
+    async function fetchSymbolSignalHistory(symbol, day) {
+      if (!CLOUD_MODE || !symbol) return [];
+      try {
+        const params = new URLSearchParams({symbol, page: "1", limit: "100"});
+        if (day) applyDateRangeParams(params, day, day);
+        const response = await cloudFetch(`/signals?${params}`);
+        if (!response.ok) throw new Error("單幣歷史訊號讀取失敗");
+        const data = await response.json();
+        return (data.rows || []).map(row => ({...(row.raw_payload || {}), ...row}));
+      } catch (err) {
+        rememberError(err);
+        return [];
+      }
+    }
+
+    function mergeModalRows(primary, secondary) {
+      const merged = new Map();
+      [...primary, ...secondary].forEach(row => merged.set(row.id || row.signal_id || signalKey(row), row));
+      return [...merged.values()];
     }
     function closeSymbolModal() { $("symbolModal").classList.remove("open"); }
     function modalStrategy(name, rows, kind) {
