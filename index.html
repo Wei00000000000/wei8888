@@ -834,6 +834,8 @@
       contractAnomalies: [],
       positions: [],
       positionMeta: null,
+      positionsLoading: false,
+      positionsLoadedAt: null,
       notificationLogs: [],
       notifications: [],
       lastBookAt: null,
@@ -1097,6 +1099,7 @@
     }
 
     async function loadPositions() {
+      if (state.positionsLoading) return;
       if (!CLOUD_MODE) {
         state.positions = [];
         state.positionMeta = {total: 0};
@@ -1104,6 +1107,7 @@
         return;
       }
       try {
+        state.positionsLoading = true;
         const params = new URLSearchParams({page: "1", limit: "100"});
         const symbol = clean($("positionSearch").value);
         if (symbol) params.set("symbol", symbol);
@@ -1115,10 +1119,13 @@
         const data = await response.json();
         state.positions = data.rows || [];
         state.positionMeta = data.meta || {total: state.positions.length};
+        state.positionsLoadedAt = Date.now();
         renderPositions();
         await loadNotificationLogs();
       } catch (err) {
         rememberError(err);
+      } finally {
+        state.positionsLoading = false;
       }
     }
 
@@ -1651,7 +1658,8 @@
       else if (state.currentView === "positions") {
         renderPositions();
         renderNotificationLogs();
-        if (!state.positions.length && CLOUD_MODE) loadPositions();
+        const stalePositions = !state.positionsLoadedAt || Date.now() - state.positionsLoadedAt > 60000;
+        if (CLOUD_MODE && stalePositions) loadPositions();
       }
       else if (state.currentView === "review") renderReview();
     }
