@@ -12,6 +12,7 @@ class TradeLayerScoreTest(unittest.TestCase):
             "sl_price": 98,
             "oi_percentile": 92,
             "setup_id": "oi_15m_long_buildup",
+            "volume_24h": 10_000_000,
         }
 
         self.assertEqual(trade_score(row), 92)
@@ -22,6 +23,7 @@ class TradeLayerScoreTest(unittest.TestCase):
             "entry_price": 100,
             "sl_price": 103,
             "setup_id": "coinglass_contract_short_price_24h",
+            "volume_24h": 10_000_000,
             "snapshot_data": {"radar_score": -88},
         }
 
@@ -39,6 +41,46 @@ class TradeLayerScoreTest(unittest.TestCase):
         layer, reasons = classify_trade_layer(row)
         self.assertEqual(layer, "warning")
         self.assertIn("score_below_60_warning_only", reasons)
+
+    def test_missing_volume_remains_warning(self) -> None:
+        row = {
+            "entry_price": 100,
+            "sl_price": 98,
+            "oi_percentile": 92,
+            "setup_id": "oi_15m_long_buildup",
+        }
+
+        layer, reasons = classify_trade_layer(row)
+        self.assertEqual(layer, "warning")
+        self.assertIn("volume_missing_warning_only", reasons)
+        self.assertFalse(classify_high_quality(row))
+
+    def test_low_volume_remains_warning(self) -> None:
+        row = {
+            "entry_price": 100,
+            "sl_price": 98,
+            "oi_percentile": 92,
+            "setup_id": "oi_15m_long_buildup",
+            "volume_24h": 4_999_999,
+        }
+
+        layer, reasons = classify_trade_layer(row)
+        self.assertEqual(layer, "warning")
+        self.assertIn("volume_below_5m_warning_only", reasons)
+        self.assertFalse(classify_high_quality(row))
+
+    def test_volume_at_threshold_can_promote_official_trade(self) -> None:
+        row = {
+            "entry_price": 100,
+            "sl_price": 98,
+            "oi_percentile": 92,
+            "setup_id": "oi_15m_long_buildup",
+            "volume_24h": 5_000_000,
+            "official_trade": True,
+        }
+
+        self.assertEqual(classify_trade_layer(row), ("official_trade", []))
+        self.assertTrue(classify_high_quality(row))
 
     def test_high_quality_is_independent_from_strategy(self) -> None:
         row = {

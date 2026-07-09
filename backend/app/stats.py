@@ -139,9 +139,9 @@ def is_high_quality(signal: Signal) -> bool:
         score += 6
     if price >= 0.5:
         score += 3
-    if volume >= 5_000_000 or volume == 0:
+    if volume >= 5_000_000:
         score += 3
-    return score >= 70 and (volume >= 5_000_000 or volume == 0) and risk >= 0.5
+    return score >= 70 and volume >= 5_000_000 and risk >= 0.5
 
 
 def is_open_position(signal: Signal) -> bool:

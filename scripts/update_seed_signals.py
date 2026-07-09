@@ -27,6 +27,11 @@ SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
 CONTRACT_RADAR = ROOT / "sentiment_scanner" / "contract_anomalies.json"
 SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"
 TARGET_ORDER = {"holding": 0, "tp1": 1, "tp2": 2, "tp3": 3, "ftp": 4, "sl": -1}
+SYMBOL_VOLUME_24H: dict[str, float] = {}
+
+
+def min_quote_volume() -> float:
+    return float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
 
 
 def provider_name() -> str:
@@ -134,7 +139,10 @@ def classify_trade_layer(row: dict[str, object]) -> tuple[str, list[str]]:
         blocks.append("missing_entry_or_sl")
     elif risk < 0.5 or risk > 5:
         reasons.append("risk_distance_outside_0_5_to_5_pct")
-    if volume > 0 and volume < 5_000_000:
+    required_volume = min_quote_volume()
+    if volume <= 0:
+        reasons.append("volume_missing_warning_only")
+    elif volume < required_volume:
         reasons.append("volume_below_5m_warning_only")
     if price_move > 5:
         reasons.append("chasing_price_move_too_large")
@@ -158,7 +166,7 @@ def classify_high_quality(row: dict[str, object]) -> bool:
     sl = raw_number(row.get("sl_price"), 0)
     risk = abs(entry - sl) / entry * 100 if entry > 0 and sl > 0 else 0
     volume = raw_number(metric_value(row, "volume_24h", metric_value(row, "quote_volume", 0)), 0)
-    return trade_score(row) >= 70 and 0.5 <= risk <= 8 and (volume == 0 or volume >= 5_000_000)
+    return trade_score(row) >= 70 and 0.5 <= risk <= 8 and volume >= min_quote_volume()
 
 
 def apply_trade_layer(row: dict[str, object]) -> None:
@@ -287,6 +295,44 @@ def cvd_ratio(row: dict[str, object], suffix: str = "1h") -> float:
     if total <= 0:
         return 0.0
     return (long_vol - short_vol) / total * 100.0
+
+
+def ticker_volume_book(min_volume: float) -> tuple[list[str], dict[str, float]]:
+    with market_client(timeout=20) as client:
+        tickers = client.ticker_24hr()
+    rows = [
+        item
+        for item in tickers
+        if str(item.get("symbol") or "").upper().endswith("USDT")
+    ]
+    volumes = {
+        clean_symbol(item.get("symbol")): first_float(item, ("quoteVolume", "quote_volume", "volume_24h", "volume_24h_usd"))
+        for item in rows
+    }
+    ranked = sorted(
+        (item for item in rows if volumes.get(clean_symbol(item.get("symbol")), 0.0) >= min_volume),
+        key=lambda item: volumes.get(clean_symbol(item.get("symbol")), 0.0),
+        reverse=True,
+    )
+    return [clean_symbol(item.get("symbol")) for item in ranked], volumes
+
+
+def apply_volume_gate(row: dict[str, object], volume_book: dict[str, float] | None = None) -> dict[str, object]:
+    symbol = clean_symbol(row.get("symbol"))
+    volume = raw_number(metric_value(row, "volume_24h", metric_value(row, "quote_volume", 0)), 0)
+    if volume <= 0 and volume_book:
+        volume = raw_number(volume_book.get(symbol), 0)
+    if volume > 0:
+        row["volume_24h"] = volume
+        row["quote_volume"] = volume
+        snapshot = row.get("snapshot_data")
+        if not isinstance(snapshot, dict):
+            snapshot = {}
+        snapshot["volume_24h"] = volume
+        snapshot["quote_volume"] = volume
+        row["snapshot_data"] = snapshot
+    apply_trade_layer(row)
+    return row
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -1043,7 +1089,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
             quality += 1
         if abs(float(row.get("price_change_5m") or 0)) >= 3 or abs(float(row.get("price_change_15m") or 0)) >= 3:
             quality += 1
-        if float(row.get("volume_24h") or 0) >= 5_000_000:
+        if float(row.get("volume_24h") or 0) >= min_quote_volume():
             quality += 1
         if abs(float(row.get("funding_rate") or 0)) >= 0.02:
             quality += 1
@@ -1071,6 +1117,8 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "oi_percentile": min(100.0, max(0.0, 88.0 + abs(float(row.get("score") or 0)) / 8)),
                     "oi_change_pct": row.get("oi_change_1h"),
                     "price_change_pct": row.get("price_change_15m") or row.get("price_change_1h"),
+                    "volume_24h": row.get("volume_24h"),
+                    "quote_volume": row.get("volume_24h"),
                     "taker_buy_ratio": None,
                     "oi_value": 0,
                     "oi_value_usdt": row.get("oi_usd"),
@@ -1534,10 +1582,12 @@ def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerCo
 
 def resolve_symbols() -> list[str]:
     top = int(os.getenv("SCAN_TOP", "0") or "0")
-    min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
+    min_volume = min_quote_volume()
     try:
-        with market_client(timeout=20) as client:
-            return client.symbols_by_volume(limit=top, min_quote_volume=min_volume)
+        symbols, volumes = ticker_volume_book(min_volume)
+        SYMBOL_VOLUME_24H.clear()
+        SYMBOL_VOLUME_24H.update(volumes)
+        return symbols[:top] if top > 0 else symbols
     except Exception as exc:
         existing_symbols = sorted({clean_symbol(row.get("symbol")) for row in load_rows() if row.get("symbol")})
         fallback_limit = int(os.getenv("SCAN_FALLBACK_LIMIT", "120"))
@@ -1553,7 +1603,7 @@ def main() -> None:
         for raw in load_rows()
         if valid_signal_time(row := normalize_row(raw)) and not is_legacy_oi_divergence(row)
     ]
-    min_volume = float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
+    min_volume = min_quote_volume()
     config = ScannerConfig(
         lookback_limit=int(os.getenv("LOOKBACK_LIMIT", "500")),
         oi_percentile_threshold=float(os.getenv("OI_PERCENTILE", "99")),
@@ -1596,10 +1646,10 @@ def main() -> None:
             except Exception as exc:
                 errors.append(f"{symbol}: {exc}")
                 continue
-            found.extend(rows)
+            found.extend(apply_volume_gate(row, SYMBOL_VOLUME_24H) for row in rows)
     if contract_radar:
         contract_signals = signals_from_contract_radar(contract_radar, existing + found, config)
-        found.extend(contract_signals)
+        found.extend(apply_volume_gate(row, SYMBOL_VOLUME_24H) for row in contract_signals)
         print(f"coinglass_contract_signals={len(contract_signals)}")
 
     by_id = {str(row.get("id") or signal_id(row)): row for row in existing}
