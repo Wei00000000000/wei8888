@@ -1841,6 +1841,17 @@
       const live = liveRows.filter(s => isOpenSignal(s) || isPartialActiveSignal(s)).reduce((sum, s) => sum + pnlPct(s, true), 0);
       return Number(summary.realized_pnl_pct || 0) + live;
     }
+    function historicalTargetStats(summary, fallback) {
+      if (!summary || !Number(summary.total_entries || 0)) return fallback;
+      return {
+        tp1: Number(summary.tp1_rate_pct || 0),
+        tp2: Number(summary.tp2_rate_pct || 0),
+        tp3: Number(summary.tp3_rate_pct || 0),
+        ftp: Number(summary.ftp_rate_pct || 0),
+        total: Number(summary.total_entries || 0),
+        historical: true
+      };
+    }
     function renderStats() {
       const stableMode = state.currentView === "stable";
       if (state.currentView === "contract") {
@@ -1860,6 +1871,7 @@
       const total = realized + unrealized;
       const history = historySummary(currentStrategyKey());
       const historyTotal = historicalPnl(history, sourceRows, total);
+      const targetStats = historicalTargetStats(history, tpStats);
       const historyDetail = history ? `${history.closed_entries} 結案 / ${history.total_entries} 全部交易` : `${closedStats.total} 筆目前資料`;
       const hot = stableMode ? sourceRows.filter(s => stableTradeMeta(s).score >= 80).length : state.markets.filter(m => m.signal_type).length;
       const avgScore = sourceRows.length ? sourceRows.reduce((sum, s) => sum + (stableMode ? stableTradeMeta(s).score : signalScore(s).value), 0) / sourceRows.length : 0;
@@ -1868,11 +1880,11 @@
       const avgHold = avgHoldHours(sourceRows);
       const totalLabel = stableMode ? "穩狗結案勝率" : "結案勝率";
       const closedDetail = `${closedStats.wins}W / ${closedStats.losses}L · ${closedStats.open}持倉 / ${closedStats.total}進場`;
-      const tpDetail = `TP1 ${fmt(tpStats.tp1, 1)}% / TP2 ${fmt(tpStats.tp2, 1)}% / FTP ${fmt(tpStats.ftp, 1)}%`;
+      const tpDetail = `TP1 ${fmt(targetStats.tp1, 1)}% / TP2 ${fmt(targetStats.tp2, 1)}% / FTP ${fmt(targetStats.ftp, 1)}%${targetStats.historical ? ` · ${targetStats.total} 全部交易` : ""}`;
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
         ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
-        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
+        ["TP 觸發率", `${fmt(targetStats.tp1, 1)}%`, tpDetail],
         ["目前清單狀態", `${closedStats.closed} 已結案`, `${closedStats.open} 持倉 / ${closedStats.total} 進場`],
         ["穩狗累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
@@ -1881,7 +1893,7 @@
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
         ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
-        ["TP 觸發率", `${fmt(tpStats.tp1, 1)}%`, tpDetail],
+        ["TP 觸發率", `${fmt(targetStats.tp1, 1)}%`, tpDetail],
         ["目前清單狀態", `${closedStats.closed} 已結案`, `${closedStats.open} 持倉 / ${closedStats.total} 進場`],
         ["總累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
