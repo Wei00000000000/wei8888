@@ -245,6 +245,15 @@
     .tp-progress-line span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--bull), #f5df00); }
     .tp-progress-labels { display: flex; justify-content: space-between; color: var(--muted); font: 800 10px var(--mono); }
     .reversal-alert { margin-top: 12px; border: 1px solid rgba(255,177,59,.4); border-left: 4px solid var(--warn); border-radius: 10px; padding: 10px 12px; background: var(--warn-soft); color: #ffd28a; font-weight: 950; }
+    .life-cycle { margin-top: 12px; display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
+    .life-step { min-height: 48px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.025); padding: 7px; color: var(--faint); }
+    .life-step.done { border-color: rgba(0,224,164,.42); color: var(--bull); background: rgba(0,224,164,.055); }
+    .life-step.loss { border-color: rgba(255,85,119,.45); color: var(--bear); background: rgba(255,85,119,.055); }
+    .life-step.current { box-shadow: inset 0 0 0 1px rgba(255,177,59,.32); color: var(--warn); }
+    .life-step b { display: block; font-size: 11px; }
+    .life-step span { display: block; margin-top: 4px; font: 800 10px var(--mono); color: inherit; opacity: .78; }
+    .scope-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font: 850 10px var(--mono); vertical-align: middle; }
+    .mini-tag.bad { color: var(--bear); border-color: rgba(255,85,119,.35); background: rgba(255,85,119,.08); }
     .notify-panel { position: fixed; top: 60px; right: 18px; width: 360px; max-width: calc(100vw - 24px); max-height: 480px; overflow: hidden; z-index: 1200; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 36px rgba(0,0,0,.55); display: none; }
     .notify-panel.open { display: block; }
     .notify-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
@@ -1852,6 +1861,43 @@
         historical: true
       };
     }
+    function scopeTag(text) {
+      return `<span class="scope-tag">${text}</span>`;
+    }
+    function strategyVersionTag(s) {
+      const raw = String(s.strategy_version || signalMetric(s, "strategy_version") || "current").replace(/^legacy-v/i, "v");
+      return `<span class="mini-tag">版本 ${raw}</span>`;
+    }
+    function dataHealthTags(s) {
+      const market = marketFor(s.symbol);
+      const tags = [];
+      if (s.market_stale === true || market?.market_stale === true) tags.push(`<span class="mini-tag bad">資料異常</span>`);
+      if (market && market.live_price === false) tags.push(`<span class="mini-tag warn">使用舊價</span>`);
+      if (!market || !Number.isFinite(Number(market.price))) tags.push(`<span class="mini-tag bad">價格缺資料</span>`);
+      const volumeReason = volumeGateReason(signalVolume24h(s));
+      if (volumeReason) tags.push(`<span class="mini-tag warn" title="${volumeReason}">量能待確認</span>`);
+      return tags.join("");
+    }
+    function signalLifecycleHtml(s, official = true) {
+      const stateValue = displayState(s);
+      const isWarning = !official || tradeGate(s).layer !== "official_trade";
+      const steps = isWarning
+        ? [
+          ["預警", "current", shortTime(s.triggered_at)],
+          ["正式進場", "", "未成立"],
+          ["TP 階段", "", "-"],
+          ["SL / FTP", "", "-"],
+          ["結案", "", "-"]
+        ]
+        : [
+          ["預警", "done", shortTime(s.detected_at || s.triggered_at)],
+          ["正式進場", "done", shortTime(s.triggered_at)],
+          ["TP1", targetOrder(stateValue) >= 1 ? "done" : stateValue === "holding" ? "current" : "", targetOrder(stateValue) >= 1 ? shortTime(s.hit_at || s.triggered_at) : protectiveStopText(s)],
+          [stateValue === "sl" ? "SL" : "TP2/TP3/FTP", stateValue === "sl" ? "loss current" : targetOrder(stateValue) >= 2 ? "done current" : "", stateValue === "sl" ? shortTime(s.hit_at || s.triggered_at) : stateLabel(stateValue)],
+          ["結案", ["sl","ftp"].includes(stateValue) ? (stateValue === "sl" ? "loss done" : "done") : "", ["sl","ftp"].includes(stateValue) ? shortTime(s.hit_at || s.triggered_at) : "追蹤中"]
+        ];
+      return `<div class="life-cycle">${steps.map(([label, cls, sub]) => `<div class="life-step ${cls}"><b>${label}</b><span>${sub || "-"}</span></div>`).join("")}</div>`;
+    }
     function renderStats() {
       const stableMode = state.currentView === "stable";
       if (state.currentView === "contract") {
@@ -1872,7 +1918,7 @@
       const history = historySummary(currentStrategyKey());
       const historyTotal = historicalPnl(history, sourceRows, total);
       const targetStats = historicalTargetStats(history, tpStats);
-      const historyDetail = history ? `${history.closed_entries} 結案 / ${history.total_entries} 全部交易` : `${closedStats.total} 筆目前資料`;
+      const historyDetail = history ? `${history.closed_entries} 結案 / ${history.total_entries} 全部交易` : `${closedStats.total} 筆目前清單`;
       const hot = stableMode ? sourceRows.filter(s => stableTradeMeta(s).score >= 80).length : state.markets.filter(m => m.signal_type).length;
       const avgScore = sourceRows.length ? sourceRows.reduce((sum, s) => sum + (stableMode ? stableTradeMeta(s).score : signalScore(s).value), 0) / sourceRows.length : 0;
       const maxDd = maxDrawdownOf(sourceRows);
@@ -1880,11 +1926,11 @@
       const avgHold = avgHoldHours(sourceRows);
       const totalLabel = stableMode ? "穩狗結案勝率" : "結案勝率";
       const closedDetail = `${closedStats.wins}W / ${closedStats.losses}L · ${closedStats.open}持倉 / ${closedStats.total}進場`;
-      const tpDetail = `TP1 ${fmt(targetStats.tp1, 1)}% / TP2 ${fmt(targetStats.tp2, 1)}% / FTP ${fmt(targetStats.ftp, 1)}%${targetStats.historical ? ` · ${targetStats.total} 全部交易` : ""}`;
+      const tpDetail = `TP1 ${fmt(targetStats.tp1, 1)}% / TP2 ${fmt(targetStats.tp2, 1)}% / FTP ${fmt(targetStats.ftp, 1)}% · ${targetStats.historical ? `${targetStats.total} 全部交易` : "目前清單"}`;
       const cells = stableMode ? [
         ["穩如老狗持倉", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
-        ["TP 觸發率", `${fmt(targetStats.tp1, 1)}%`, tpDetail],
+        [`歷史結案勝率 ${scopeTag(history ? "全歷史" : "目前清單")}`, historicalWinText(history, closedStats), historyDetail],
+        [`TP 觸發率 ${scopeTag(targetStats.historical ? "全歷史" : "目前清單")}`, `${fmt(targetStats.tp1, 1)}%`, tpDetail],
         ["目前清單狀態", `${closedStats.closed} 已結案`, `${closedStats.open} 持倉 / ${closedStats.total} 進場`],
         ["穩狗累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
@@ -1892,8 +1938,8 @@
         ["高分訊號", hot, `平均 ${fmt(avgScore, 0)} 分`]
       ] : [
         ["持倉中", open.length + partial.length, `${open.length} 新倉 / ${partial.length} 已達TP`],
-        ["歷史結案勝率", historicalWinText(history, closedStats), historyDetail],
-        ["TP 觸發率", `${fmt(targetStats.tp1, 1)}%`, tpDetail],
+        [`歷史結案勝率 ${scopeTag(history ? "全歷史" : "目前清單")}`, historicalWinText(history, closedStats), historyDetail],
+        [`TP 觸發率 ${scopeTag(targetStats.historical ? "全歷史" : "目前清單")}`, `${fmt(targetStats.tp1, 1)}%`, tpDetail],
         ["目前清單狀態", `${closedStats.closed} 已結案`, `${closedStats.open} 持倉 / ${closedStats.total} 進場`],
         ["總累積盈虧", signed(historyTotal), `全歷史已實現 ${signed(history?.realized_pnl_pct ?? realized)} / 即時浮動 ${signed(unrealized)}`],
         ["最大回撤", signed(maxDd), `${sourceRows.length} 筆訊號`],
@@ -3208,10 +3254,11 @@
         <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}" data-live-change="${clean(s.symbol)}">最新漲跌 ${signed(market?.price_change_pct)}</span>${isOfficial ? `<span class="mini-tag">${protectiveStopText(s)}</span>` : ""}${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">穩如老狗 · ${meta.label}</div><div class="tag-row"><span class="mini-tag">${sector}</span>${strategyVersionTag(s)}<span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}" data-live-change="${clean(s.symbol)}">最新漲跌 ${signed(market?.price_change_pct)}</span>${dataHealthTags(s)}${isOfficial ? `<span class="mini-tag">${protectiveStopText(s)}</span>` : ""}${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="score-pill ${meta.kind}"><small>穩</small>${meta.score}</span><span class="state-tag ${stateClass}">${stateText}</span></div><div class="tf-row"><span class="tf-pill hot">${s.timeframe || "15M"}</span><span class="tf-pill">全幣</span><span class="tf-pill">獨立</span></div></div>
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
+        ${signalLifecycleHtml(s, isOfficial)}
         ${isOfficial ? `<div class="pnl-box"><div class="pnl-label">穩狗累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(entryPrice(s), 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>` : `<div class="pnl-box"><div class="pnl-label">預警原因</div><div class="subline">${gate.reasons.join("；") || "等待正式進場確認"}</div></div>`}
         ${visual}
@@ -3354,11 +3401,12 @@
         <div class="sector-strip ${sectorClass(sector)}"></div>
         <div class="signal-main">
           <div class="side-badge ${isBull ? "" : "short"}">${isBull ? "多" : "空"}</div>
-          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sector}</span><span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}" data-live-change="${clean(s.symbol)}">最新漲跌 ${signed(market?.price_change_pct)}</span><span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
+          <div><div class="signal-symbol">${clean(s.symbol)}</div><div class="signal-time">${shortTime(s.triggered_at)}</div><div class="signal-strategy ${isBull ? "" : "bear"}">${strategyNameForSignal(s)}</div><div class="tag-row"><span class="mini-tag">${sector}</span>${strategyVersionTag(s)}<span class="mini-tag ${gate.kind}" title="${gate.reasons.join("；") || "已通過正式交易門檻"}">${gate.label}</span><span class="mini-tag ${numClass(market?.price_change_pct).includes("bull") ? "bull" : numClass(market?.price_change_pct).includes("bear") ? "bear" : ""}" data-live-change="${clean(s.symbol)}">最新漲跌 ${signed(market?.price_change_pct)}</span>${dataHealthTags(s)}<span class="mini-tag">${protectiveStopText(s)}</span>${reversal ? `<span class="mini-tag warn">${reversal}</span>` : ""}</div></div>
           <div><div class="signal-actions"><span class="icon-btn">♡</span><span class="icon-btn">⌘</span><span class="decision-grade grade-${decision.grade.toLowerCase()}">${decision.grade}</span><span class="score-pill ${score.kind}"><small>S</small>${score.value}</span><span class="state-tag ${stateKind(s)}">${stateLabel(displayState(s))}</span></div><div class="tf-row"><span class="tf-pill ${signalMetric(s, "mtf_5m_confluence") ? "hot" : ""}">5M</span><span class="tf-pill hot">15M</span><span class="tf-pill">1H</span></div></div>
         </div>
         ${reversal ? `<div class="reversal-alert">${reversal}：同幣已出現反向訊號，建議強制觀察，不再加碼原方向。</div>` : ""}
         ${signalDecisionHtml(s)}
+        ${signalLifecycleHtml(s, true)}
         <div class="pnl-box"><div class="pnl-label">累計盈虧</div><div class="pnl-value ${pnl >= 0 ? "positive" : ""}" data-pnl="${signalKey(s)}">${signed(pnl)}</div></div>
         <div class="price-grid"><div class="price-box"><div class="price-label">進場價</div><div class="price-num">${fmt(entryPrice(s), 6)}</div></div><div class="price-box"><div class="price-label">當前價</div><div class="price-num" data-current="${clean(s.symbol)}">${fmt(current, 6)}</div></div></div>
         ${visual}
@@ -3602,7 +3650,7 @@
         ${rows.map(s => {
           const model = signalDecisionModel(s);
           const kind = s.signal_type === "reversal_bullish" ? "bull" : "bear";
-          return `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${kind}">${model.grade} · ${strategyNameForSignal(s)}</span></div><div class="notify-meta">${model.entry.status} · ${stateLabel(displayState(s))} · ${shortTime(s.triggered_at)} · ${signed(pnlPct(s, isLivePricedSignal(s)))}</div></div>`;
+          return `<div class="notify-item" data-symbol="${clean(s.symbol)}"><div class="notify-row"><span class="notify-symbol">${clean(s.symbol)}</span><span class="pill ${kind}">${model.grade} · ${strategyNameForSignal(s)}</span></div><div class="notify-meta">${notificationBody(s)}</div></div>`;
         }).join("") || `<div class="empty">暫無${title}。</div>`}`;
     }
     function toggleNotifyPanel() {
@@ -3629,6 +3677,14 @@
       playAlertSound(note.kind);
       showSystemNotification(note);
       updateBell();
+    }
+    function notificationBody(s) {
+      const score = isDivergenceSignal(s) ? stableTradeMeta(s).score : signalScore(s).value;
+      const volume = signalVolume24h(s);
+      const volumeText = volume >= 1_000_000 ? `${fmt(volume / 1_000_000, 1)}M` : volume ? fmt(volume, 0) : "缺資料";
+      const model = signalDecisionModel(s);
+      const reason = tradeGate(s).reasons[0] || model.core || "條件共振";
+      return `${formatDateTime(s.triggered_at)} · S${score} · 量 ${volumeText} · Entry ${fmt(entryPrice(s), 6)} · SL ${fmt(s.sl_price, 6)} · TP1 ${fmt(s.tp1_price, 6)} · ${reason}`;
     }
     function requestNotifyPermission() {
       if (!("Notification" in window)) return;
@@ -3701,7 +3757,7 @@
           kind: s.signal_type === "reversal_bullish" ? "bull" : "bear",
           symbol: clean(s.symbol),
           title: s.signal_type === "reversal_bullish" ? "新持倉：嘎空" : "新持倉：嘎多",
-          body: `${shortTime(s.triggered_at)} · OI ${signed(s.oi_change_pct)} · 價格 ${signed(s.price_change_pct)}`
+          body: notificationBody(s)
         });
       }
       saveNotificationMemory();
@@ -3718,7 +3774,7 @@
             kind: "bull",
             symbol: clean(s.symbol),
             title: stateLabel(next),
-            body: `${strategyNameForSignal(s)} 繼續持倉中 · ${signed(pnlPct(s, isLivePricedSignal(s)))}`
+            body: `${formatDateTime(s.hit_at || new Date())} · ${strategyNameForSignal(s)} 繼續持倉中 · ${signed(pnlPct(s, isLivePricedSignal(s)))} · ${protectiveStopText(s)}`
           });
         }
       }
@@ -4128,9 +4184,8 @@
 
     function sortSignals(rows) {
       return rows.filter(Boolean).filter(r => !r.error).sort((a,b) => {
-        const activeA = isOpenSignal(a) || isPartialActiveSignal(a);
-        const activeB = isOpenSignal(b) || isPartialActiveSignal(b);
-        if (activeA !== activeB) return Number(activeB) - Number(activeA);
+        const rankDiff = signalRank(b) - signalRank(a);
+        if (rankDiff) return rankDiff;
         return new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0);
       });
     }
@@ -4138,11 +4193,13 @@
       const score = isDivergenceSignal(s) ? stableTradeMeta(s).score : signalScore(s).value;
       const ageHours = Math.max(0, (Date.now() - new Date(s.triggered_at || s.detected_at || 0).getTime()) / 3600000);
       const fresh = clamp(24 - ageHours, 0, 24);
-      if (isOpenSignal(s)) return 700 + score + fresh;
-      if (isPartialActiveSignal(s)) return 620 + score + fresh;
-      if (["tp1","tp2","tp3"].includes(s.reached_state)) return 500 + score + fresh;
-      if (s.reached_state === "ftp") return 360 + score;
-      if (s.reached_state === "sl") return -100 + score;
+      if (reversalWarning(s)) return 900 + score + fresh;
+      if (isOpenSignal(s) && isOfficialTrade(s)) return 800 + score + fresh;
+      if (isPartialActiveSignal(s) && isOfficialTrade(s)) return 700 + score + fresh;
+      if (tradeGate(s).layer === "warning" && score >= 80) return 520 + score + fresh;
+      if (["tp1","tp2","tp3"].includes(s.reached_state)) return 460 + score + fresh;
+      if (s.reached_state === "ftp") return 80 + score;
+      if (s.reached_state === "sl") return -220 + score;
       return score + fresh;
     }
     function sortMarkets(a,b) {
@@ -4207,11 +4264,9 @@
     }
     function latestOppositeSignal(s) {
       const symbol = clean(s.symbol);
-      return sortSignals(state.signals).find(row =>
-        clean(row.symbol) === symbol
-        && row.signal_type !== s.signal_type
-        && new Date(row.triggered_at || 0) > new Date(s.triggered_at || 0)
-      );
+      return state.signals
+        .filter(row => clean(row.symbol) === symbol && row.signal_type !== s.signal_type && new Date(row.triggered_at || 0) > new Date(s.triggered_at || 0))
+        .sort((a,b) => new Date(b.triggered_at || 0) - new Date(a.triggered_at || 0))[0];
     }
     function reversalWarning(s) {
       if (!(isOpenSignal(s) || isPartialActiveSignal(s))) return "";
@@ -4610,6 +4665,14 @@
       const d = new Date(s);
       if (Number.isNaN(d.getTime())) return String(s).replace("+00:00", "Z");
       return `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    }
+    function formatDateTime(s) {
+      if (!s) return "-";
+      const d = new Date(s);
+      if (Number.isNaN(d.getTime())) return String(s).replace("+00:00", "Z");
+      const period = d.getHours() < 12 ? "上午" : "下午";
+      const hour = d.getHours() % 12 || 12;
+      return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${period}${hour}:${String(d.getMinutes()).padStart(2,"0")}`;
     }
     function lastTimeText(d) {
       if (!d) return "尚未更新";
