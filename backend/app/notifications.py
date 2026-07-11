@@ -66,6 +66,11 @@ async def create_notification_log(
     dedupe_key = notification_dedupe_key(position, message_type)
     existing = await session.scalar(select(NotificationLog).where(NotificationLog.dedupe_key == dedupe_key))
     if existing is not None:
+        if existing.sent_status != "sent":
+            existing.message_text = message_text or position_message(position, message_type)
+            existing.telegram_chat_id = settings.telegram_chat_id or None
+            existing.error_message = error_message
+            await session.flush()
         return existing
     log = NotificationLog(
         signal_id=position.signal_id,
