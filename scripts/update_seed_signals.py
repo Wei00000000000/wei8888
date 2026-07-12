@@ -1218,7 +1218,18 @@ def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[s
 
 
 def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
-    active_rows = [row for row in rows if is_active_position(row)]
+    max_replay_age_hours = float(os.getenv("STATE_REPLAY_MAX_AGE_HOURS", "48"))
+    now_ms = datetime.now(timezone.utc).timestamp() * 1000
+    active_rows = []
+    for row in rows:
+        if not is_active_position(row):
+            continue
+        triggered_ms = int(row.get("triggered_at_ms") or 0)
+        age_hours = (now_ms - triggered_ms) / 3_600_000 if triggered_ms else 0
+        if age_hours > max_replay_age_hours:
+            row["state_replay_skipped"] = "older_than_replay_window"
+            continue
+        active_rows.append(row)
     earliest_by_pair: dict[tuple[str, str], int] = {}
     for row in active_rows:
         pair = (clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower())
@@ -1269,16 +1280,7 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
             failures = int(row.get("state_replay_failures") or 0) + 1
             row["state_replay_failures"] = failures
             changed += 1
-            triggered_ms = int(row.get("triggered_at_ms") or 0)
-            age_hours = (datetime.now(timezone.utc).timestamp() * 1000 - triggered_ms) / 3_600_000 if triggered_ms else 0
-            threshold = 1 if age_hours >= 24 else 3
-            if failures >= threshold:
-                row["reached_state"] = "invalid"
-                row["status"] = "closed"
-                row["hit_at"] = datetime.now(timezone.utc).isoformat()
-                row["state_resolution"] = "market_unavailable"
-                row["invalid_reason"] = "symbol_missing_from_primary_market_sources"
-                closed += 1
+            row["state_resolution"] = "state_replay_unavailable_preserved"
             continue
         row_changed = False
         if row.get("state_replay_failures"):
@@ -1309,6 +1311,24 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
         if row_changed:
             changed += 1
     return {"checked": len(active_rows), "changed": changed, "closed": closed}
+
+
+def restore_market_unavailable_closures(rows: list[dict[str, object]]) -> dict[str, int]:
+    restored = 0
+    for row in rows:
+        if row.get("state_resolution") != "market_unavailable":
+            continue
+        if str(row.get("status") or "").lower() != "closed":
+            continue
+        row["status"] = "active"
+        row["reached_state"] = str(row.get("max_reached_state") or "holding")
+        if row["reached_state"] in {"sl", "ftp", "invalid"}:
+            row["reached_state"] = "holding"
+        row["hit_at"] = None
+        row["state_resolution"] = "restored_after_market_unavailable_guard"
+        row["invalid_reason"] = None
+        restored += 1
+    return {"restored": restored}
 
 
 LOCKED_SIGNAL_FIELDS = {
@@ -1671,6 +1691,8 @@ def main() -> None:
         if is_active_position(row):
             active_counts[key] = active_counts.get(key, 0) + 1
     rows_for_state = list(by_id.values())
+    restored = restore_market_unavailable_closures(rows_for_state)
+    print(f"restored_unavailable_closures={restored['restored']}")
     state_audit = update_existing_states(rows_for_state)
     print(f"state_audit checked={state_audit['checked']} changed={state_audit['changed']} closed={state_audit['closed']}")
     state_consistency = validate_state_consistency(rows_for_state)
@@ -1715,6 +1737,7 @@ def main() -> None:
                 "allowed_errors": allowed_errors,
                 "state_audit": state_audit,
                 "state_consistency": state_consistency,
+                "restored_unavailable_closures": restored,
                 "min_volume_usdt": min_volume,
                 **radar_meta,
             },

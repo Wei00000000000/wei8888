@@ -1839,7 +1839,7 @@
       if (state.currentView === "stable") return "stable_dog";
       if (state.currentView === "quality") return "high_quality";
       if (state.currentView === "contract") return "contract_anomaly";
-      return "sentiment_oi";
+      return "all";
     }
     function historicalWinText(summary, fallback) {
       if (!summary) return fallback.total ? `${fmt(fallback.rate, 1)}%` : "尚無結案";
