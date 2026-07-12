@@ -48,7 +48,7 @@ class MixedFuturesClient:
             except Exception as exc:
                 text = str(exc)
                 errors.append(f"{name}: {text}")
-                if "403" in text or "Forbidden" in text or "10006" in text:
+                if any(term in text for term in ("403", "Forbidden", "10006", "100410", "429", "Too Many Requests")):
                     self._disabled.add(name)
         raise RuntimeError("Mixed market data failed: " + " | ".join(errors))
 
@@ -83,7 +83,12 @@ class MixedFuturesClient:
         return self.symbols_by_volume(limit=limit, quote_asset=quote_asset)
 
     def ticker_24hr(self, *args: Any, **kwargs: Any) -> Any:
-        return self._call("ticker_24hr", *args, **kwargs)
+        rows = self._call("ticker_24hr", *args, **kwargs)
+        try:
+            valid = self._bybit_symbols(str(kwargs.get("quote_asset") or "USDT"))
+        except Exception:
+            return rows
+        return [row for row in rows if str(row.get("symbol") or "") in valid]
 
     def ticker_price(self, *args: Any, **kwargs: Any) -> Any:
         return self._call("ticker_price", *args, **kwargs)
