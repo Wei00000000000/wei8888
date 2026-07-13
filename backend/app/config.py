@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     history_rate_limit: int = Field(default=60, ge=10, le=1000)
     notification_rate_limit: int = Field(default=20, ge=1, le=200)
     own_signal_start_at: datetime | None = Field(
-        default=datetime(2026, 7, 12, 13, 57, tzinfo=timezone.utc),
-        description="Default cutoff for user-owned live signals. Older imported/replayed rows are kept but excluded.",
+        default=datetime(2026, 6, 30, 7, 55, tzinfo=timezone.utc),
+        description="Default cutoff for strategy-generated signals. Older imported/replayed rows are kept but excluded.",
     )
 
     @field_validator("cors_origins", mode="before")
