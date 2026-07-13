@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import Position, PositionEvent, Signal
 from .notifications import send_telegram_for_position
+from .signal_scope import apply_signal_scope
 
 
 OPEN_STATES = {"holding", "active", "tp1", "tp2", "tp3"}
@@ -139,13 +140,13 @@ def position_from_signal(signal: Signal) -> Position:
 
 
 async def sync_positions_from_signals(session: AsyncSession, notify_new_since: datetime | None = None) -> dict[str, int]:
+    query = select(Signal).where(
+        Signal.official_trade.is_(True),
+        Signal.entry_price.is_not(None),
+    )
+    query = apply_signal_scope(query)
     signals = (
-        await session.scalars(
-            select(Signal).where(
-                Signal.official_trade.is_(True),
-                Signal.entry_price.is_not(None),
-            )
-        )
+        await session.scalars(query)
     ).all()
     signal_ids = [signal.id for signal in signals]
     existing_rows = (await session.scalars(select(Position).where(Position.signal_id.in_(signal_ids)))).all() if signal_ids else []

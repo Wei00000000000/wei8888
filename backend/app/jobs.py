@@ -18,6 +18,7 @@ from .database import SessionFactory, engine
 from .importer import ROOT, import_legacy_history, import_market_file
 from .models import Signal, SystemLog
 from .positions import sync_positions_from_signals
+from .signal_scope import apply_signal_scope
 
 
 logger = logging.getLogger("wei.worker")
@@ -49,13 +50,13 @@ async def export_active_positions_to_seed() -> int:
         if isinstance(row, dict) and (row.get("signal_id") or row.get("id"))
     }
     async with SessionFactory() as session:
+        query = select(Signal).where(
+            Signal.official_trade.is_(True),
+            Signal.reached_state.in_(ACTIVE_POSITION_STATES),
+        )
+        query = apply_signal_scope(query)
         positions = (
-            await session.scalars(
-                select(Signal).where(
-                    Signal.official_trade.is_(True),
-                    Signal.reached_state.in_(ACTIVE_POSITION_STATES),
-                )
-            )
+            await session.scalars(query)
         ).all()
 
     for signal in positions:

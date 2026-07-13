@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -51,6 +52,10 @@ class Settings(BaseSettings):
     backtest_rate_limit: int = Field(default=2, ge=1, le=30)
     history_rate_limit: int = Field(default=60, ge=10, le=1000)
     notification_rate_limit: int = Field(default=20, ge=1, le=200)
+    own_signal_start_at: datetime | None = Field(
+        default=datetime(2026, 7, 12, 13, 57, tzinfo=timezone.utc),
+        description="Default cutoff for user-owned live signals. Older imported/replayed rows are kept but excluded.",
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod
