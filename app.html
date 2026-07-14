@@ -850,6 +850,7 @@
       lastBookAt: null,
       lastTickAt: null,
       lastPriceAt: null,
+      lastStatsRenderAt: 0,
       lastMarketAt: null,
       lastVolumeAt: null,
       lastContractAt: null,
@@ -867,6 +868,7 @@
       visibleLimitBoost: {signals: 0, stable: 0, quality: 0, contract: 0},
       lastError: "",
       busy: false,
+      priceRefreshing: false,
       currentView: "dashboard",
       visualTf: "5m",
       visualZoom: 1.8,
@@ -997,8 +999,8 @@
     renderAll();
     status("Auto scanner warming up.");
     initialize();
-    setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 5000 : 3000);
-    setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, CLOUD_MODE ? 30000 : 120000);
+    setInterval(() => { if (!document.hidden) refreshPrices(); }, isMobileView() ? 15000 : 10000);
+    setInterval(() => { if (!document.hidden && !autoTimer) loadBook(); }, CLOUD_MODE ? 60000 : 120000);
     setInterval(renderHealth, 5000);
 
     async function initAccessGate() {
@@ -1541,13 +1543,19 @@
       }
     }
     async function refreshPrices() {
+      if (state.priceRefreshing) return;
+      state.priceRefreshing = true;
+      const maxPriceSymbols = isMobileView() ? 90 : 180;
       const symbols = [...new Set([
         ...state.signals.filter(isLivePricedSignal).map(s => clean(s.symbol)),
         ...MAIN_WATCH_SYMBOLS,
         ...(state.volumeAnomalies || []).slice(0, 20).map(row => clean(row.symbol)),
-        ...(state.contractAnomalies || []).slice(0, isMobileView() ? 40 : 100).map(row => clean(row.symbol))
-      ])];
-      if (!symbols.length) return;
+        ...(state.contractAnomalies || []).slice(0, isMobileView() ? 30 : 80).map(row => clean(row.symbol))
+      ].filter(Boolean))].slice(0, maxPriceSymbols);
+      if (!symbols.length) {
+        state.priceRefreshing = false;
+        return;
+      }
       try {
         const data = await apiJson("prices", `symbols=${encodeURIComponent(symbols.join(","))}`);
         const oldStates = new Map(seenStates);
@@ -1562,12 +1570,18 @@
           state.priceBaselineReady = true;
         }
         state.lastPriceAt = new Date();
-        renderStats();
         renderVisibleNumbers();
+        const now = Date.now();
+        if (now - state.lastStatsRenderAt > 15000) {
+          renderStats();
+          state.lastStatsRenderAt = now;
+        }
         renderHealth();
         if (state.currentView === "dashboard") {
-          renderDecisionDashboard();
-          renderWatchDashboard();
+          if (now - state.lastStatsRenderAt < 1000) {
+            renderDecisionDashboard();
+            renderWatchDashboard();
+          }
         } else if (state.currentView === "contract") {
           renderContractTopStats();
           renderContractVisiblePrices();
@@ -1575,6 +1589,8 @@
         if ($("symbolModal").classList.contains("open")) openSymbolModal($("modalSymbol").textContent);
       } catch (err) {
         rememberError(err, "Price update error");
+      } finally {
+        state.priceRefreshing = false;
       }
     }
     function toggleAutoScan() {
