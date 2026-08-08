@@ -1,10 +1,20 @@
+"""
+訊號掃描主腳本 — 由 worker 每 5 分鐘呼叫，或由 CLI 手動執行。
+
+流程概要：
+  1. 建立合約異常雷達（contract_anomalies.json）
+  2. 對高成交量 USDT 永續合約並行掃描 OI / CVD 策略
+  3. 將新訊號與既有 seed_signals.json 合併（entry/SL/TP 不可變）
+  4. 回放 K 線更新持倉狀態（holding → tp1 → sl 等）
+  5. 寫入 seed_signals.json 與 scanner_status.json
+"""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,50 +22,56 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sentiment_scanner.binance import BinanceFuturesClient
-from sentiment_scanner.binance import BINANCE_FAPI, BINANCE_FDATA
-from sentiment_scanner.bingx import BingxFuturesClient
-from sentiment_scanner.bybit import BybitFuturesClient
+from sentiment_scanner.binance import (
+    BinanceFuturesClient,
+    funding_rate_map,
+    normalize_symbols,
+    oi_change_pct,
+)
 from sentiment_scanner.cli import format_signal
-from sentiment_scanner.coinglass import CoinGlassClient
-from sentiment_scanner.market_data import MixedFuturesClient
-from sentiment_scanner.okx import OkxFuturesClient
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 
 
-SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
-CONTRACT_RADAR = ROOT / "sentiment_scanner" / "contract_anomalies.json"
-SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"
+def _load_api_trace():
+    """Optional plugin loader. Returns None when disabled or plugin removed."""
+    if os.getenv("SCANNER_API_TRACE", "").lower() not in {"1", "true", "yes", "on"}:
+        return None
+    try:
+        from sentiment_scanner.plugins.api_trace import maybe_start
+        return maybe_start
+    except ImportError:
+        return None
+
+
+_START_API_TRACE = _load_api_trace()
+# --- 輸出檔案路徑與全域常數 ---
+SEED = ROOT / "sentiment_scanner" / "seed_signals.json"          # 所有訊號快照
+CONTRACT_RADAR = ROOT / "sentiment_scanner" / "contract_anomalies.json"  # 合約雷達
+SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"      # 掃描健康狀態
+# 持倉狀態優先順序：數值越大代表越接近獲利目標
 TARGET_ORDER = {"holding": 0, "tp1": 1, "tp2": 2, "tp3": 3, "ftp": 4, "sl": -1}
-SYMBOL_VOLUME_24H: dict[str, float] = {}
+SYMBOL_VOLUME_24H: dict[str, float] = {}  # 本次掃描的 24h 成交量快取
 
 
 def min_quote_volume() -> float:
+    """最低 24h 報價成交量門檻（USDT），預設 500 萬。"""
     return float(os.getenv("MIN_QUOTE_VOLUME_USDT", "5000000"))
 
 
 def provider_name() -> str:
-    return os.getenv("MARKET_DATA_PROVIDER", "mixed").strip().lower()
+    """回報目前使用的行情資料供應商名稱。"""
+    return "binance"
 
 
-def market_client(timeout: float = 20.0):
-    provider = provider_name()
-    if provider == "binance":
-        return BinanceFuturesClient(timeout=timeout)
-    if provider == "bingx":
-        return BingxFuturesClient(timeout=timeout)
-    if provider == "bybit":
-        return BybitFuturesClient(timeout=timeout)
-    if provider == "okx":
-        return OkxFuturesClient(timeout=timeout)
-    if provider == "mixed":
-        return MixedFuturesClient(timeout=timeout)
-    return MixedFuturesClient(timeout=timeout)
+def market_client(timeout: float = 20.0) -> BinanceFuturesClient:
+    """建立 Binance 永續合約 HTTP 客戶端。"""
+    return BinanceFuturesClient(timeout=timeout)
 
 
 def previous_success_at() -> str | None:
+    """讀取上次成功掃描的時間戳，掃描失敗時用於判斷是否保留舊資料。"""
     try:
-        data = json.loads(SCANNER_STATUS.read_text(encoding="utf-8"))
+        data = json.loads(SCANNER_STATUS.read_text(encoding="utf-8-sig"))
         value = data.get("last_success_at") or data.get("updated_at")
         return str(value) if value else None
     except Exception:
@@ -63,13 +79,15 @@ def previous_success_at() -> str | None:
 
 
 def load_rows() -> list[dict[str, object]]:
+    """從 seed_signals.json 載入既有訊號列。"""
     if not SEED.exists():
         return []
-    data = json.loads(SEED.read_text(encoding="utf-8"))
+    data = json.loads(SEED.read_text(encoding="utf-8-sig"))
     return [row for row in data if isinstance(row, dict)]
 
 
 def signal_id(row: dict[str, object]) -> str:
+    """依 symbol + setup_id + 觸發時間產生穩定 UUID，作為訊號唯一識別碼。"""
     raw = "|".join(
         [
             str(row.get("symbol") or ""),
@@ -81,6 +99,7 @@ def signal_id(row: dict[str, object]) -> str:
 
 
 def raw_number(value: object, default: float = 0.0) -> float:
+    """安全地將任意值轉為 float，失敗時回傳 default。"""
     try:
         if value is None or value == "":
             return default
@@ -90,6 +109,7 @@ def raw_number(value: object, default: float = 0.0) -> float:
 
 
 def metric_value(row: dict[str, object], name: str, default: object = None) -> object:
+    """從訊號列或 snapshot_data 子字典中讀取指標值。"""
     if row.get(name) is not None:
         return row.get(name)
     snapshot = row.get("snapshot_data")
@@ -98,8 +118,13 @@ def metric_value(row: dict[str, object], name: str, default: object = None) -> o
     return default
 
 
+# =============================================================================
+# 訊號分級與標準化
+# =============================================================================
+
+
 def trade_score(row: dict[str, object]) -> float:
-    """Return the strongest normalized confidence score available for a signal."""
+    """取訊號可用的最高信心分數（score / radar_score / oi_percentile / quality_score）。"""
     snapshot = row.get("snapshot_data")
     if not isinstance(snapshot, dict):
         snapshot = {}
@@ -117,49 +142,59 @@ def trade_score(row: dict[str, object]) -> float:
 
 
 def classify_trade_layer(row: dict[str, object]) -> tuple[str, list[str]]:
+    """
+    將原始訊號分為三層：
+      - official_trade：可正式交易（分數≥70、風險合理、流動性足夠）
+      - warning：僅警示，不建議直接下單
+      - filtered_out：硬性條件不符，直接過濾
+    回傳 (層級, 原因列表)。
+    """
     reasons: list[str] = []
     blocks: list[str] = []
     snapshot = row.get("snapshot_data")
     if not isinstance(snapshot, dict):
         snapshot = {}
-    score = trade_score(row)
-    entry = raw_number(row.get("entry_price") or row.get("trigger_price"), 0)
-    sl = raw_number(row.get("sl_price"), 0)
-    risk = abs(entry - sl) / entry * 100 if entry > 0 and sl > 0 else 0
-    volume = raw_number(metric_value(row, "volume_24h", metric_value(row, "quote_volume", 0)), 0)
+    score = trade_score(row)    # score、radar_score、oi_percentile、quality_score最大值
+    entry = raw_number(row.get("entry_price") or row.get("trigger_price"), 0) # 進場價或觸發價
+    sl = raw_number(row.get("sl_price"), 0) # 止損價
+    risk = abs(entry - sl) / entry * 100 if entry > 0 and sl > 0 else 0 # 風險 = 進場價 - 止損價 / 進場價 * 100
+    volume = raw_number(metric_value(row, "volume_24h", metric_value(row, "quote_volume", 0)), 0) # 24h 成交量
     price_move = abs(raw_number(metric_value(row, "price_change_pct", 0), 0))
-    setup = str(row.get("setup_id") or "")
+    setup = str(row.get("setup_id") or "") # ID
+    # --- 分數門檻 ---
     if score < 60:
-        reasons.append("score_below_60_warning_only")
+        reasons.append("score_below_60_warning_only")  # 低於 60 分僅警示
     if 60 <= score < 70 and not any(metric_value(row, key) in (True, "true", 1, "1") for key in ("mtf_5m_confluence", "mtf_15m_confluence", "mtf_5m_oi_confluence", "mtf_15m_oi_confluence")):
-        reasons.append("score_60_69_requires_5m_15m_alignment")
+        reasons.append("score_60_69_requires_5m_15m_alignment")  # 60~69 分需多週期共振
     if score < 70:
-        reasons.append("score_below_official_threshold")
+        reasons.append("score_below_official_threshold")  # 未達正式交易門檻 70 分
+    # --- 進場與風險 ---
     if entry <= 0 or sl <= 0:
-        blocks.append("missing_entry_or_sl")
+        blocks.append("missing_entry_or_sl")  # 缺少進場價或止損，硬性過濾
     elif risk < 0.5 or risk > 5:
-        reasons.append("risk_distance_outside_0_5_to_5_pct")
-    required_volume = min_quote_volume()
+        reasons.append("risk_distance_outside_0_5_to_5_pct")  # 風險距離須在 0.5%~5%
+    required_volume = min_quote_volume()    # 最低 24h 報價成交量門檻（USDT），預設 500 萬。
     if volume <= 0:
         reasons.append("volume_missing_warning_only")
     elif volume < required_volume:
-        reasons.append("volume_below_5m_warning_only")
+        reasons.append("volume_below_5m_warning_only")  # 24h 成交量不足
     if price_move > 5:
-        reasons.append("chasing_price_move_too_large")
+        reasons.append("chasing_price_move_too_large")  # 價格已漲跌超過 5%，避免追高殺低
+    # --- CVD 背離策略需額外確認 ---
     if "cvd_5m" in setup or "divergence" in setup:
         engine = metric_value(row, "entry_engine", {})
         confirmed = isinstance(engine, dict) and (engine.get("formal") or raw_number(engine.get("timing_score"), 0) >= 65)
         if not confirmed:
             reasons.append("cvd_divergence_needs_price_vwap_confirmation")
     if blocks:
-        return "filtered_out", blocks + reasons
+        return "filtered_out", blocks + reasons  # 硬性條件不符
     if reasons:
-        return "warning", reasons
-    return "official_trade", []
+        return "warning", reasons  # 有疑慮但可參考
+    return "official_trade", []  # 通過所有檢查，可正式交易
 
 
 def classify_high_quality(row: dict[str, object]) -> bool:
-    """Classify quality independently so the original strategy is preserved."""
+    """獨立判定高品質訊號：official_trade + 分數≥70 + 風險 0.5~8% + 成交量達標。"""
     if not row.get("official_trade"):
         return False
     entry = raw_number(row.get("entry_price") or row.get("trigger_price"), 0)
@@ -170,6 +205,7 @@ def classify_high_quality(row: dict[str, object]) -> bool:
 
 
 def apply_trade_layer(row: dict[str, object]) -> None:
+    """將 classify_trade_layer 結果寫入訊號列的 trade_layer / official_trade 等欄位。"""
     layer, reasons = classify_trade_layer(row)
     row["raw_signal"] = True
     row["trade_layer"] = layer
@@ -181,12 +217,13 @@ def apply_trade_layer(row: dict[str, object]) -> None:
 
 
 def normalize_row(row: dict[str, object]) -> dict[str, object]:
+    """標準化單筆訊號：補齊 id、時間戳、entry/trigger 價格，並套用交易分層。"""
     row = dict(row)
     triggered_at_ms = row.get("triggered_at_ms")
     triggered_at = row.get("triggered_at")
     if not triggered_at_ms and triggered_at:
         try:
-            parsed = datetime.fromisoformat(str(triggered_at).replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(str(triggered_at).replace("Z", "+00:00"))   # 將 ISO 8601 字串轉換為 datetime 物件
             triggered_at_ms = int(parsed.timestamp() * 1000)
             row["triggered_at_ms"] = triggered_at_ms
         except (TypeError, ValueError):
@@ -219,6 +256,7 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
 
 
 def valid_signal_time(row: dict[str, object]) -> bool:
+    """觸發時間不得晚於偵測時間，過濾時間異常的訊號。"""
     triggered = row.get("triggered_at")
     detected = row.get("detected_at")
     if not triggered or not detected:
@@ -232,10 +270,12 @@ def valid_signal_time(row: dict[str, object]) -> bool:
 
 
 def is_legacy_oi_divergence(row: dict[str, object]) -> bool:
+    """是否為舊版 5m OI 背離策略（已棄用，載入時跳過）。"""
     return str(row.get("setup_id") or "").startswith("oi_5m_")
 
 
 def clean_symbol(symbol: object) -> str:
+    """將幣種標準化為 XXXUSDT 格式。"""
     value = str(symbol or "").strip().upper()
     if value.endswith("USDT"):
         return value
@@ -243,6 +283,7 @@ def clean_symbol(symbol: object) -> str:
 
 
 def iso_ms(timestamp_ms: int) -> str:
+    """毫秒時間戳轉 ISO 8601 UTC 字串。"""
     return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).isoformat()
 
 
@@ -256,6 +297,7 @@ def as_float(value: object) -> float | None:
 
 
 def first_float(row: dict[str, object], names: tuple[str, ...], default: float = 0.0) -> float:
+    """依序嘗試多個欄位名稱，回傳第一個有效的 float。"""
     for name in names:
         value = as_float(row.get(name))
         if value is not None:
@@ -264,6 +306,7 @@ def first_float(row: dict[str, object], names: tuple[str, ...], default: float =
 
 
 def coinglass_symbol(row: dict[str, object]) -> str:
+    """從 CoinGlass 原始列解析並標準化幣種符號。"""
     raw = str(row.get("symbol") or row.get("coin") or row.get("base_asset") or "").strip().upper()
     raw = raw.replace("-", "").replace("_", "").replace("/", "")
     if raw.endswith("USDT"):
@@ -274,6 +317,7 @@ def coinglass_symbol(row: dict[str, object]) -> str:
 
 
 def quote_volume_24h(row: dict[str, object]) -> float:
+    """從多種可能的欄位名稱讀取 24h 報價成交量。"""
     return first_float(
         row,
         (
@@ -289,6 +333,7 @@ def quote_volume_24h(row: dict[str, object]) -> float:
 
 
 def cvd_ratio(row: dict[str, object], suffix: str = "1h") -> float:
+    """計算 CVD（累積成交量差）比率：(多單量 - 空單量) / 總量 × 100。"""
     long_vol = first_float(row, (f"long_volume_usd_{suffix}", f"long_vol_usd_{suffix}", f"long_volume_{suffix}"))
     short_vol = first_float(row, (f"short_volume_usd_{suffix}", f"short_vol_usd_{suffix}", f"short_volume_{suffix}"))
     total = long_vol + short_vol
@@ -297,9 +342,9 @@ def cvd_ratio(row: dict[str, object], suffix: str = "1h") -> float:
     return (long_vol - short_vol) / total * 100.0
 
 
-def ticker_volume_book(min_volume: float) -> tuple[list[str], dict[str, float]]:
-    with market_client(timeout=20) as client:
-        tickers = client.ticker_24hr()
+async def ticker_volume_book(client: BinanceFuturesClient, min_volume: float) -> tuple[list[str], dict[str, float]]:
+    """取得 24h 成交量 ≥ min_volume 的 USDT 永續合約，依成交量降序排列。"""
+    tickers = await client.ticker_24hr()
     rows = [
         item
         for item in tickers
@@ -318,6 +363,7 @@ def ticker_volume_book(min_volume: float) -> tuple[list[str], dict[str, float]]:
 
 
 def apply_volume_gate(row: dict[str, object], volume_book: dict[str, float] | None = None) -> dict[str, object]:
+    """補齊訊號的成交量資料並重新套用交易分層（成交量影響 official_trade 判定）。"""
     symbol = clean_symbol(row.get("symbol"))
     volume = raw_number(metric_value(row, "volume_24h", metric_value(row, "quote_volume", 0)), 0)
     if volume <= 0 and volume_book:
@@ -336,10 +382,26 @@ def apply_volume_gate(row: dict[str, object], volume_book: dict[str, float] | No
 
 
 def clamp(value: float, low: float, high: float) -> float:
+    """將數值限制在 [low, high] 區間內。"""
     return max(low, min(high, value))
 
 
+# =============================================================================
+# 合約雷達與進場引擎
+# =============================================================================
+
+
 def score_contract_market(row: dict[str, object]) -> tuple[int, str, str, str, list[str]]:
+    """
+    依 OI 變化、CVD、價格、資金費率、多空比、清算量計算合約市場評分。
+    回傳 (分數, 方向 bias, 種類 kind, 市場標籤, 加分原因列表)。
+ 
+    評分邏輯範例：
+      OI↑ + CVD↑ → 多頭建倉 (+40)
+      OI↑ + CVD↓ → 空頭建倉 (-40)
+      OI↓ + CVD↑ → 空頭回補 (+16)
+      OI↓ + CVD↓ → 多頭出場 (-16)
+    """
     oi = first_float(row, ("open_interest_change_percent_1h", "open_interest_change_percent_15m", "open_interest_change_percent_4h"))
     price = first_float(row, ("price_change_percent_1h", "price_change_percent_15m", "price_change_percent_24h"))
     price24 = first_float(row, ("price_change_percent_24h",))
@@ -432,6 +494,7 @@ def score_contract_market(row: dict[str, object]) -> tuple[int, str, str, str, l
 
 
 def contract_quality_score(row: dict[str, object], trigger: str, radar_score: int, min_volume: float) -> tuple[int, list[str]]:
+    """依 OI/CVD/價格/流動性/費率/觸發強度等條件計算品質分（最高 6 分）。"""
     checks: list[str] = []
     if abs(first_float(row, ("open_interest_change_percent_1h", "open_interest_change_percent_15m", "open_interest_change_percent_4h", "oi_change_1h"))) >= 8:
         checks.append("OI強")
@@ -449,6 +512,7 @@ def contract_quality_score(row: dict[str, object], trigger: str, radar_score: in
 
 
 def build_contract_radar(coinglass_rows: list[dict[str, object]], min_volume: float) -> list[dict[str, object]]:
+    """從 CoinGlass 原始資料建立合約異常雷達列，取前 160 名。"""
     rows: list[dict[str, object]] = []
     for item in coinglass_rows:
         symbol = coinglass_symbol(item)
@@ -499,6 +563,7 @@ def build_contract_radar(coinglass_rows: list[dict[str, object]], min_volume: fl
 
 
 def funding_map(rows: list[dict[str, object]]) -> dict[str, float]:
+    """從 premium index 資料彙整各幣種平均資金費率。"""
     book: dict[str, float] = {}
     for row in rows:
         symbol = clean_symbol(row.get("symbol"))
@@ -520,12 +585,13 @@ def funding_map(rows: list[dict[str, object]]) -> dict[str, float]:
 
 def build_contract_radar_from_binance_tickers(
     tickers: list[dict[str, object]],
-    funding_rows: list[dict[str, object]],
+    funding_by_symbol: dict[str, float],
     min_volume: float,
     short_changes: dict[str, dict[str, float]] | None = None,
     market_details: dict[str, dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
-    funding = funding_map(funding_rows)
+    """用 Binance 24h ticker + 短週期 K 線變化 + 持倉細節建立合約雷達。"""
+    funding = funding_by_symbol
     short_changes = short_changes or {}
     market_details = market_details or {}
     rows: list[dict[str, object]] = []
@@ -560,7 +626,7 @@ def build_contract_radar_from_binance_tickers(
             score += round(clamp(oi_1h * 2.0, -18, 18))
         if cvd_1h is not None:
             score += round(clamp(cvd_1h * 0.7, -15, 15))
-        # Crowded ratios are contrarian inputs; top-position ratio has a smaller trend-following weight.
+        # 擁擠的多空比作為反向指標；大戶持倉比則帶有較小的順勢權重
         if retail_ratio is not None:
             score += -6 if retail_ratio >= 1.5 else 6 if retail_ratio <= 0.67 else 0
         if top_position_ratio is not None:
@@ -614,7 +680,7 @@ def build_contract_radar_from_binance_tickers(
                 "top_position_long_short_ratio_1h": detail.get("top_position_long_short_ratio_1h"),
                 "long_liquidation_1h": detail.get("long_liquidation_usd_1h"),
                 "short_liquidation_1h": detail.get("short_liquidation_usd_1h"),
-                "reasons": ["Binance高成交量", "CoinGlass資金費率"] if fr else ["Binance高成交量"],
+                "reasons": ["Binance高成交量", "Binance資金費率"] if fr else ["Binance高成交量"],
                 "updated_at": now,
                 "triggered_at_ms": int(short.get("last_completed_at_ms") or observed_at_ms)
                 if trigger in {"price_5m", "price_15m"}
@@ -625,6 +691,7 @@ def build_contract_radar_from_binance_tickers(
 
 
 def candidate_symbols_from_tickers(tickers: list[dict[str, object]], min_volume: float, limit: int = 180) -> list[str]:
+    """從 ticker 中篩選高成交量候選幣種，供雷達 K 線分析使用。"""
     ranked = sorted(
         (
             item
@@ -637,10 +704,10 @@ def candidate_symbols_from_tickers(tickers: list[dict[str, object]], min_volume:
     return [str(item.get("symbol")) for item in ranked[:limit]]
 
 
-def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[str, float]]:
-    def load(symbol: str) -> tuple[str, dict[str, float]]:
-        with market_client(timeout=12) as client:
-            rows = client.klines(symbol, interval="5m", limit=14)
+async def short_kline_changes(client: BinanceFuturesClient, symbols: list[str]) -> dict[str, dict[str, float]]:
+    """並行載入各幣 5m K 線，計算 5m / 15m / 1h 價格變化百分比。"""
+    async def load(symbol: str) -> tuple[str, dict[str, float]]:
+        rows = await client.klines(symbol, interval="5m", limit=14)
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         rows = [row for row in rows if row.close_time <= now_ms]
         if len(rows) < 13:
@@ -659,15 +726,13 @@ def short_kline_changes(symbols: list[str], workers: int = 8) -> dict[str, dict[
         return symbol, changes
 
     book: dict[str, dict[str, float]] = {}
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(load, symbol): symbol for symbol in symbols}
-        for future in as_completed(futures):
-            try:
-                symbol, changes = future.result()
-            except Exception:
-                continue
-            if changes:
-                book[symbol] = changes
+    results = await asyncio.gather(*(load(symbol) for symbol in symbols), return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        symbol, changes = result
+        if changes:
+            book[symbol] = changes
     return book
 
 
@@ -680,6 +745,7 @@ def _kline_value(kline: object, name: str, default: float = 0.0) -> float:
 
 
 def _swing_points(klines: list[object], field: str, lookback: int = 2) -> list[tuple[int, float]]:
+    """偵測局部高低點（swing high/low），用於結構分析。"""
     points: list[tuple[int, float]] = []
     if len(klines) < lookback * 2 + 3:
         return points
@@ -695,6 +761,7 @@ def _swing_points(klines: list[object], field: str, lookback: int = 2) -> list[t
 
 
 def _rolling_vwap(klines: list[object], window: int) -> float | None:
+    """計算指定窗口的滾動 VWAP（成交量加權平均價）。"""
     sample = klines[-window:]
     numerator = 0.0
     denominator = 0.0
@@ -710,6 +777,10 @@ def _rolling_vwap(klines: list[object], window: int) -> float | None:
 
 
 def _structure_snapshot(klines: list[object], side: str) -> dict[str, object]:
+    """
+    分析 K 線結構：BOS（突破結構）、流動性掃蕩、VWAP 位置。
+    回傳 timing_score（0~100）供進場引擎判定 formal 等級。
+    """
     if len(klines) < 24:
         return {"ready": False, "reason": "kline_insufficient"}
     last = klines[-1]
@@ -778,27 +849,34 @@ def _structure_snapshot(klines: list[object], side: str) -> dict[str, object]:
     }
 
 
-def load_entry_engine_book(symbols: list[str], workers: int = 8, limit: int = 80) -> dict[str, dict[str, list[object]]]:
-    def load(symbol: str) -> tuple[str, dict[str, list[object]]]:
-        with market_client(timeout=14) as client:
-            return symbol, {
-                "5m": client.klines(symbol, interval="5m", limit=limit),
-                "15m": client.klines(symbol, interval="15m", limit=max(40, limit // 2)),
-            }
+async def load_entry_engine_book(
+    client: BinanceFuturesClient,
+    symbols: list[str],
+    limit: int = 80,
+) -> dict[str, dict[str, list[object]]]:
+    """並行載入候選幣的 5m / 15m K 線，供進場引擎使用。"""
+    async def load(symbol: str) -> tuple[str, dict[str, list[object]]]:
+        klines_5m, klines_15m = await asyncio.gather(
+            client.klines(symbol, interval="5m", limit=limit),
+            client.klines(symbol, interval="15m", limit=max(40, limit // 2)),
+        )
+        return symbol, {"5m": klines_5m, "15m": klines_15m}
 
     book: dict[str, dict[str, list[object]]] = {}
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(load, symbol): symbol for symbol in symbols}
-        for future in as_completed(futures):
-            try:
-                symbol, data = future.result()
-            except Exception:
-                continue
-            book[symbol] = data
+    results = await asyncio.gather(*(load(symbol) for symbol in symbols), return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        symbol, data = result
+        book[symbol] = data
     return book
 
 
 def contract_entry_engine(row: dict[str, object], kline_book: dict[str, dict[str, list[object]]]) -> dict[str, object]:
+    """
+    合約訊號進場引擎：綜合 5m/15m 結構與 VWAP 判定是否 formal（可正式進場）。
+    timing_score ≥ 65 且 VWAP 方向正確 → formal=True。
+    """
     symbol = clean_symbol(row.get("symbol"))
     side = str(row.get("bias") or "")
     data = kline_book.get(symbol) or {}
@@ -813,7 +891,7 @@ def contract_entry_engine(row: dict[str, object], kline_book: dict[str, dict[str
     entry = as_float(snap_5m.get("rolling_vwap")) or as_float(row.get("trigger_price")) or as_float(row.get("price"))
     close = as_float(snap_5m.get("close")) or entry
     if entry and close:
-        # If price already pulled away, keep the locked entry near current executable price.
+        # 若現價已偏離 VWAP 過遠，改用現價作為可執行進場價
         if abs(close - entry) / max(entry, 1e-12) > float(os.getenv("ENTRY_ENGINE_MAX_VWAP_DISTANCE", "0.018")):
             entry = close
     return {
@@ -841,36 +919,39 @@ def contract_entry_engine(row: dict[str, object], kline_book: dict[str, dict[str
     }
 
 
-def prefetch_scan_data(symbols: list[str], lookback: int, divergence_lookback: int) -> None:
-    if provider_name() != "binance":
-        return
-    requests: list[tuple[str, str, dict[str, object]]] = []
-    for symbol in symbols:
-        for interval, limit in (("15m", lookback), ("5m", divergence_lookback)):
-            requests.extend(
-                [
-                    (BINANCE_FAPI, "/fapi/v1/klines", {"symbol": symbol, "interval": interval, "limit": limit}),
-                    (BINANCE_FDATA, "/openInterestHist", {"symbol": symbol, "period": interval, "limit": min(limit, 500)}),
-                    (BINANCE_FDATA, "/takerlongshortRatio", {"symbol": symbol, "period": interval, "limit": min(limit, 500)}),
-                ]
-            )
-    with market_client(timeout=60) as client:
-        client.prefetch(requests)
+async def prefetch_scan_data(*_: object) -> None:
+    """預留的資料預取 hook（目前為空實作）。"""
+    return None
 
 
 def latest_ratio(rows: list[dict[str, object]]) -> float | None:
+    """從多空比歷史列取最新一筆 longShortRatio。"""
     if not rows:
         return None
     return as_float(rows[-1].get("longShortRatio"))
 
 
-def binance_positioning_details(symbols: list[str], workers: int = 8) -> dict[str, dict[str, object]]:
-    def load(symbol: str) -> tuple[str, dict[str, object]]:
-        with market_client(timeout=12) as client:
-            taker = client.taker_buy_sell_volume(symbol, period="1h", limit=1)
-            retail = client.global_long_short_account_ratio(symbol, period="1h", limit=1)
-            top_account = client.top_long_short_account_ratio(symbol, period="1h", limit=1)
-            top_position = client.top_long_short_position_ratio(symbol, period="1h", limit=1)
+async def binance_positioning_details(
+    client: BinanceFuturesClient,
+    symbols: list[str],
+) -> dict[str, dict[str, object]]:
+    """並行抓取各幣的 CVD、散戶/大戶多空比、OI 變化等持倉細節。"""
+    async def load(symbol: str) -> tuple[str, dict[str, object]]:
+        (
+            taker,
+            retail,
+            top_account,
+            top_position,
+            oi_1h,
+            oi_15m,
+        ) = await asyncio.gather(
+            client.taker_buy_sell_volume(symbol, period="1h", limit=1),
+            client.global_long_short_account_ratio(symbol, period="1h", limit=1),
+            client.top_long_short_account_ratio(symbol, period="1h", limit=1),
+            client.top_long_short_position_ratio(symbol, period="1h", limit=1),
+            client.open_interest_hist(symbol, period="1h", limit=2),
+            client.open_interest_hist(symbol, period="15m", limit=2),
+        )
         cvd = None
         if taker:
             total = taker[-1].buy_volume + taker[-1].sell_volume
@@ -881,98 +962,45 @@ def binance_positioning_details(symbols: list[str], workers: int = 8) -> dict[st
             "long_short_ratio_1h": latest_ratio(retail),
             "top_account_long_short_ratio_1h": latest_ratio(top_account),
             "top_position_long_short_ratio_1h": latest_ratio(top_position),
+            "open_interest_change_percent_1h": oi_change_pct(oi_1h),
+            "open_interest_change_percent_15m": oi_change_pct(oi_15m),
+            "open_interest_usd": oi_1h[-1].open_interest_value if oi_1h else None,
         }
 
     book: dict[str, dict[str, object]] = {}
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(load, symbol): symbol for symbol in symbols}
-        for future in as_completed(futures):
-            try:
-                symbol, detail = future.result()
-            except Exception:
-                continue
-            book[symbol] = detail
+    results = await asyncio.gather(*(load(symbol) for symbol in symbols), return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        symbol, detail = result
+        book[symbol] = detail
     return book
 
 
-def enrich_coinglass_details(
-    client: CoinGlassClient,
-    symbols: list[str],
-    details: dict[str, dict[str, object]],
-) -> None:
-    try:
-        liquidations = client.liquidation_coin_list("Binance")
-    except Exception as exc:
-        print(f"WARN CoinGlass liquidation skipped: {exc}")
-        liquidations = []
-    for row in liquidations:
-        symbol = clean_symbol(row.get("symbol"))
-        if symbol in details:
-            details[symbol].update(row)
-
-    for symbol in symbols:
-        coin = symbol.removesuffix("USDT")
-        try:
-            rows = client.open_interest_exchange(coin)
-        except Exception as exc:
-            print(f"WARN CoinGlass OI skipped for {symbol}: {exc}")
-            continue
-        aggregate = next((row for row in rows if str(row.get("exchange")) == "All"), None)
-        if aggregate is None and rows:
-            aggregate = rows[0]
-        if aggregate:
-            details.setdefault(symbol, {}).update(aggregate)
-
-
-def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dict[str, object]], dict[str, object]]:
-    with market_client(timeout=20) as client:
-        tickers = client.ticker_24hr()
-        actual_provider = str(getattr(client, "last_provider", provider_name()))
+async def build_live_contract_radar(
+    client: BinanceFuturesClient,
+    min_volume: float,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """組裝即時合約雷達：ticker + 短週期 K 線 + 持倉細節 + 資金費率。"""
+    tickers, premium_rows = await asyncio.gather(client.ticker_24hr(), client.premium_index())
+    actual_provider = str(getattr(client, "last_provider", provider_name()))
     kline_limit = int(os.getenv("CONTRACT_KLINE_CANDIDATES", "120"))
     detail_limit = int(os.getenv("CONTRACT_DETAIL_CANDIDATES", "20"))
     candidates = candidate_symbols_from_tickers(tickers, min_volume, limit=kline_limit)
     detail_symbols = candidates[:detail_limit]
-    prefetch: list[tuple[str, str, dict[str, object]]] = [
-        (BINANCE_FAPI, "/fapi/v1/klines", {"symbol": symbol, "interval": "5m", "limit": 14})
-        for symbol in candidates
-    ]
-    for symbol in detail_symbols:
-        prefetch.extend(
-            (BINANCE_FDATA, path, {"symbol": symbol, "period": "1h", "limit": 1})
-            for path in (
-                "/takerlongshortRatio",
-                "/globalLongShortAccountRatio",
-                "/topLongShortAccountRatio",
-                "/topLongShortPositionRatio",
-            )
-        )
-    with market_client(timeout=60) as client:
-        client.prefetch(prefetch)
-    changes = short_kline_changes(candidates, workers=workers)
-    details = binance_positioning_details(detail_symbols, workers=workers)
-
-    funding_rows: list[dict[str, object]] = []
-    cg_calls = 0
-    try:
-        cg = CoinGlassClient(timeout=20, max_requests=int(os.getenv("COINGLASS_REQUEST_BUDGET", "27")))
-        try:
-            funding_rows = cg.funding_rates()
-        except Exception as exc:
-            print(f"WARN CoinGlass funding skipped: {exc}")
-        enrich_coinglass_details(cg, detail_symbols, details)
-        cg_calls = cg.request_count
-    except Exception as exc:
-        print(f"WARN CoinGlass enrichment skipped: {exc}")
-
+    changes, details = await asyncio.gather(
+        short_kline_changes(client, candidates),
+        binance_positioning_details(client, detail_symbols),
+    )
+    funding_by_symbol = funding_rate_map(premium_rows)
     rows = build_contract_radar_from_binance_tickers(
         tickers,
-        funding_rows,
+        funding_by_symbol,
         min_volume,
         changes,
         details,
     )
     return rows, {
-        "coinglass_calls": cg_calls,
         "detail_symbols": len(detail_symbols),
         "kline_symbols": len(candidates),
         "market_data_provider": provider_name(),
@@ -982,10 +1010,11 @@ def build_live_contract_radar(min_volume: float, workers: int) -> tuple[list[dic
 
 
 def preserve_previous_detail(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """本次掃描缺少 OI/CVD 等細節時，從上一版雷達資料補齊，避免欄位消失。"""
     if not CONTRACT_RADAR.exists():
         return rows
     try:
-        previous_data = json.loads(CONTRACT_RADAR.read_text(encoding="utf-8"))
+        previous_data = json.loads(CONTRACT_RADAR.read_text(encoding="utf-8-sig"))
         previous_rows = previous_data.get("rows", []) if isinstance(previous_data, dict) else []
     except Exception:
         return rows
@@ -1012,6 +1041,7 @@ def preserve_previous_detail(rows: list[dict[str, object]]) -> list[dict[str, ob
 
 
 def is_active_position(row: dict[str, object]) -> bool:
+    """判斷訊號是否為進行中持倉（holding 或 tp1/tp2/tp3 且 status=active）。"""
     state = str(row.get("reached_state") or "holding")
     status = str(row.get("status") or "active")
     if state == "holding":
@@ -1020,10 +1050,12 @@ def is_active_position(row: dict[str, object]) -> bool:
 
 
 def position_key(row: dict[str, object]) -> tuple[str, str]:
+    """持倉去重鍵：(幣種, 訊號類型)，用於限制同幣同方向最大持倉數。"""
     return clean_symbol(row.get("symbol")), str(row.get("signal_type") or "")
 
 
 def active_position_counts(rows: list[dict[str, object]]) -> dict[tuple[str, str], int]:
+    """統計各 (幣種, 方向) 的進行中持倉數量。"""
     counts: dict[tuple[str, str], int] = {}
     for row in rows:
         if is_active_position(row):
@@ -1033,8 +1065,9 @@ def active_position_counts(rows: list[dict[str, object]]) -> dict[tuple[str, str
 
 
 def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None:
+    """合約訊號冷卻期內的回傳鍵，用於避免短時間重複開倉。"""
     setup = str(row.get("setup_id") or "")
-    if "coinglass_contract" not in setup:
+    if "binance_contract" not in setup and "coinglass_contract" not in setup:
         return None
     if str(row.get("status") or "active") != "active":
         return None
@@ -1048,7 +1081,16 @@ def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None
     return clean_symbol(row.get("symbol")), str(row.get("signal_type") or "")
 
 
-def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: list[dict[str, object]], config: ScannerConfig) -> list[dict[str, object]]:
+async def signals_from_contract_radar(
+    client: BinanceFuturesClient,
+    radar_rows: list[dict[str, object]],
+    existing: list[dict[str, object]],
+    config: ScannerConfig,
+) -> list[dict[str, object]]:
+    """
+    從合約雷達高分列產生正式交易訊號。
+    需通過進場引擎 formal 判定，並受同幣同方向持倉上限限制。
+    """
     active_counts = active_position_counts(existing)
     max_same_side = int(os.getenv("MAX_ACTIVE_PER_SYMBOL_SIDE", "2"))
     rows: list[dict[str, object]] = []
@@ -1059,7 +1101,11 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
         if str(row.get("bias") or "neutral") in {"long", "short"} and str(row.get("trigger") or "watch") != "watch"
     ]
     entry_limit = int(os.getenv("ENTRY_ENGINE_CANDIDATES", "60"))
-    entry_book = load_entry_engine_book(entry_candidates[:entry_limit], workers=int(os.getenv("ENTRY_ENGINE_WORKERS", "6"))) if entry_candidates else {}
+    entry_book = (
+        await load_entry_engine_book(client, entry_candidates[:entry_limit])
+        if entry_candidates
+        else {}
+    )
     for row in radar_rows:
         bias = str(row.get("bias") or "neutral")
         trigger = str(row.get("trigger") or "watch")
@@ -1101,7 +1147,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "symbol": symbol,
                     "timeframe": "15M",
                     "signal_type": signal_type,
-                    "setup_id": f"coinglass_contract_{bias}_{trigger}",
+                    "setup_id": f"binance_contract_{bias}_{trigger}",
                     "triggered_at_ms": triggered_at_ms,
                     "triggered_at": iso_ms(triggered_at_ms),
                     "trigger_price": price,
@@ -1113,7 +1159,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "tp3_price": tp3,
                     "ftp_price": ftp,
                     "risk": risk,
-                    "sl_source": "coinglass_risk_pct",
+                    "sl_source": "binance_risk_pct",
                     "oi_percentile": min(100.0, max(0.0, 88.0 + abs(float(row.get("score") or 0)) / 8)),
                     "oi_change_pct": row.get("oi_change_1h"),
                     "price_change_pct": row.get("price_change_15m") or row.get("price_change_1h"),
@@ -1122,7 +1168,7 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
                     "taker_buy_ratio": None,
                     "oi_value": 0,
                     "oi_value_usdt": row.get("oi_usd"),
-                    "source": "coinglass_contract_scan",
+                    "source": "binance_contract_scan",
                     "snapshot_data": {
                         "contract_radar": True,
                         "entry_engine": engine,
@@ -1145,11 +1191,18 @@ def signals_from_contract_radar(radar_rows: list[dict[str, object]], existing: l
     return rows
 
 
+# =============================================================================
+# 持倉狀態管理（K 線回放）
+# =============================================================================
+
+
 def target_order(value: object) -> int:
+    """將持倉狀態字串轉為數值優先順序，供比較先後。"""
     return TARGET_ORDER.get(str(value or "holding"), 0)
 
 
 def hit_price_for_state(row: dict[str, object], state: str) -> float | None:
+    """依狀態名稱（sl/tp1/tp2/tp3/ftp）回傳對應目標價。"""
     field = {
         "sl": "sl_price",
         "tp1": "tp1_price",
@@ -1161,6 +1214,7 @@ def hit_price_for_state(row: dict[str, object], state: str) -> float | None:
 
 
 def state_from_price(row: dict[str, object], price: float) -> str:
+    """依當前價格即時判斷應處於哪個持倉狀態。"""
     bullish = row.get("signal_type") == "reversal_bullish"
 
     def hit(value: object) -> bool:
@@ -1177,12 +1231,21 @@ def state_from_price(row: dict[str, object], price: float) -> str:
 
 
 def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[str, float | None, str | None, str]:
+    """
+    依時間順序回放 K 線 OHLC，重建持倉狀態演進。
+
+    規則：
+      - 從觸發時間起逐根 K 線檢查
+      - 止損優先於獲利目標
+      - 達 tp2 後止損移至進場價（保本）
+    回傳 (當前狀態, 觸及價, 觸及時間, 歷史最高狀態)。
+    """
     bullish = row.get("signal_type") == "reversal_bullish"
     trigger_ms = int(row.get("triggered_at_ms") or 0)
     entry = as_float(row.get("entry_price")) or as_float(row.get("trigger_price"))
     original_stop = as_float(row.get("sl_price"))
-    # Always rebuild chronologically from the trigger. Starting from the stored TP
-    # would incorrectly apply a moved stop before that TP was actually reached.
+    # 必須從觸發點依時間順序重建；若從已儲存的 TP 狀態開始，
+    # 會錯誤地在該 TP 實際觸及前就套用移動止損。
     current = "holding"
     max_reached = "holding"
     hit_price = None
@@ -1195,6 +1258,7 @@ def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[s
         low = float(getattr(kline, "low"))
         timestamp = iso_ms(int(getattr(kline, "open_time")))
 
+        # tp2 達成後止損上移至進場價（保本止損）
         stop = entry if target_order(max_reached) >= target_order("tp2") else original_stop
         if stop is not None and (low <= stop if bullish else high >= stop):
             return "sl", stop, timestamp, max_reached
@@ -1217,19 +1281,13 @@ def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[s
     return current, hit_price, hit_at, max_reached
 
 
-def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
-    max_replay_age_hours = float(os.getenv("STATE_REPLAY_MAX_AGE_HOURS", "48"))
-    now_ms = datetime.now(timezone.utc).timestamp() * 1000
-    active_rows = []
-    for row in rows:
-        if not is_active_position(row):
-            continue
-        triggered_ms = int(row.get("triggered_at_ms") or 0)
-        age_hours = (now_ms - triggered_ms) / 3_600_000 if triggered_ms else 0
-        if age_hours > max_replay_age_hours:
-            row["state_replay_skipped"] = "older_than_replay_window"
-            continue
-        active_rows.append(row)
+async def update_existing_states(client: BinanceFuturesClient, rows: list[dict[str, object]]) -> dict[str, int]:
+    """
+    對所有進行中持倉回放 K 線，更新 reached_state / current_price / status。
+    若行情源連續失敗，超過閾值後標記為 invalid 並關閉。
+    回傳 {checked, changed, closed} 統計。
+    """
+    active_rows = [row for row in rows if is_active_position(row)]
     earliest_by_pair: dict[tuple[str, str], int] = {}
     for row in active_rows:
         pair = (clean_symbol(row.get("symbol")), str(row.get("timeframe") or "15M").lower())
@@ -1239,37 +1297,25 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
     pairs = sorted(earliest_by_pair)
     if not pairs:
         return {"checked": 0, "changed": 0, "closed": 0}
-    if provider_name() == "binance":
-        with market_client(timeout=60) as client:
-            client.prefetch(
-                [
-                    (
-                        BINANCE_FAPI,
-                        "/fapi/v1/klines",
-                        {"symbol": symbol, "interval": interval, "limit": 1500, "startTime": earliest_by_pair[(symbol, interval)]},
-                    )
-                    for symbol, interval in pairs
-                ]
-            )
 
-    def load(pair: tuple[str, str]) -> tuple[tuple[str, str], list[object]]:
+    replay_workers = max(1, int(os.getenv("STATE_REPLAY_CONCURRENCY", "4")))
+    replay_sem = asyncio.Semaphore(replay_workers)
+
+    async def load(pair: tuple[str, str]) -> tuple[tuple[str, str], list[object]]:
         symbol, interval = pair
-        with market_client(timeout=15) as client:
-            return pair, client.klines_since(symbol, interval=interval, start_time=earliest_by_pair[pair])
+        async with replay_sem:
+            klines = await client.klines_since(symbol, interval=interval, start_time=earliest_by_pair[pair])
+        return pair, klines
 
+    results = await asyncio.gather(*(load(pair) for pair in pairs), return_exceptions=True)
     histories: dict[tuple[str, str], list[object]] = {}
-    replay_workers = int(os.getenv("STATE_REPLAY_WORKERS", "3" if provider_name() in {"okx", "mixed"} else "8"))
-    with ThreadPoolExecutor(max_workers=min(replay_workers, max(1, len(pairs)))) as executor:
-        futures = {executor.submit(load, pair): pair for pair in pairs}
-        for future in as_completed(futures):
-            pair = futures[future]
-            try:
-                key, klines = future.result()
-            except Exception as exc:
-                message = f"WARN state replay skipped for {pair[0]} {pair[1]}: {exc}"
-                print(message.encode("ascii", "backslashreplace").decode("ascii"))
-                continue
-            histories[key] = klines
+    for pair, result in zip(pairs, results):
+        if isinstance(result, Exception):
+            message = f"WARN state replay skipped for {pair[0]} {pair[1]}: {result}"
+            print(message.encode("ascii", "backslashreplace").decode("ascii"))
+            continue
+        key, klines = result
+        histories[key] = klines
 
     changed = 0
     closed = 0
@@ -1280,7 +1326,16 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
             failures = int(row.get("state_replay_failures") or 0) + 1
             row["state_replay_failures"] = failures
             changed += 1
-            row["state_resolution"] = "state_replay_unavailable_preserved"
+            triggered_ms = int(row.get("triggered_at_ms") or 0)
+            age_hours = (datetime.now(timezone.utc).timestamp() * 1000 - triggered_ms) / 3_600_000 if triggered_ms else 0
+            threshold = 1 if age_hours >= 24 else 3
+            if failures >= threshold:
+                row["reached_state"] = "invalid"
+                row["status"] = "closed"
+                row["hit_at"] = datetime.now(timezone.utc).isoformat()
+                row["state_resolution"] = "market_unavailable"
+                row["invalid_reason"] = "symbol_missing_from_primary_market_sources"
+                closed += 1
             continue
         row_changed = False
         if row.get("state_replay_failures"):
@@ -1313,24 +1368,7 @@ def update_existing_states(rows: list[dict[str, object]]) -> dict[str, int]:
     return {"checked": len(active_rows), "changed": changed, "closed": closed}
 
 
-def restore_market_unavailable_closures(rows: list[dict[str, object]]) -> dict[str, int]:
-    restored = 0
-    for row in rows:
-        if row.get("state_resolution") != "market_unavailable":
-            continue
-        if str(row.get("status") or "").lower() != "closed":
-            continue
-        row["status"] = "active"
-        row["reached_state"] = str(row.get("max_reached_state") or "holding")
-        if row["reached_state"] in {"sl", "ftp", "invalid"}:
-            row["reached_state"] = "holding"
-        row["hit_at"] = None
-        row["state_resolution"] = "restored_after_market_unavailable_guard"
-        row["invalid_reason"] = None
-        restored += 1
-    return {"restored": restored}
-
-
+# --- 訊號不可變欄位：一旦建立，entry/SL/TP 等不得修改 ---
 LOCKED_SIGNAL_FIELDS = {
     "entry_price",
     "trigger_price",
@@ -1348,6 +1386,7 @@ LOCKED_SIGNAL_FIELDS = {
 }
 
 
+# 合併舊訊號時允許覆寫的動態欄位（價格、狀態、快照等）
 LIVE_UPDATE_FIELDS = {
     "current_price",
     "price",
@@ -1367,6 +1406,7 @@ LIVE_UPDATE_FIELDS = {
 
 
 def merge_locked_signal(old: dict[str, object], new: dict[str, object]) -> dict[str, object]:
+    """合併新掃描結果到既有訊號：只更新動態欄位，鎖定 entry/SL/TP。"""
     merged = dict(old)
     for field in LIVE_UPDATE_FIELDS:
         if field in new and field not in LOCKED_SIGNAL_FIELDS:
@@ -1375,7 +1415,10 @@ def merge_locked_signal(old: dict[str, object], new: dict[str, object]) -> dict[
 
 
 def lock_signal_to_latest_price(row: dict[str, object], latest_price: float) -> dict[str, object]:
-    """Lock a newly formalized trade to the executable ticker price."""
+    """
+    將新 formal 訊號的進場價鎖定到最新 ticker 價格。
+    依原風險比例重新計算 SL / TP1~3 / FTP。
+    """
     if not row.get("official_trade") or latest_price <= 0:
         return row
     previous_entry = as_float(row.get("entry_price") or row.get("trigger_price"))
@@ -1407,24 +1450,28 @@ def lock_signal_to_latest_price(row: dict[str, object], latest_price: float) -> 
     return row
 
 
-def lock_new_official_entries(found: list[dict[str, object]], existing_ids: set[str]) -> int:
+async def lock_new_official_entries(
+    client: BinanceFuturesClient,
+    found: list[dict[str, object]],
+    existing_ids: set[str],
+) -> int:
+    """對本次新產生的 official_trade 訊號，用即時 ticker 價格鎖定進場價。回傳鎖定筆數。"""
     candidates = [
         row
         for row in found
         if str(row.get("id") or signal_id(row)) not in existing_ids and row.get("official_trade")
     ]
-    symbols = sorted({clean_symbol(row.get("symbol")) for row in candidates})
+    symbols = normalize_symbols({clean_symbol(row.get("symbol")) for row in candidates})
     if not symbols:
         return 0
     try:
-        with market_client(timeout=20) as client:
-            latest_prices = client.ticker_price(symbols)
+        latest_prices = await client.ticker_price(symbols)
     except Exception as exc:
         print(f"WARN latest entry prices unavailable; keeping candle prices: {exc}")
         return 0
     locked = 0
     for row in candidates:
-        price = as_float(latest_prices.get(clean_symbol(row.get("symbol"))))
+        price = as_float(latest_prices.get(f"{clean_symbol(row.get('symbol'))}USDT"))
         if price is None or price <= 0:
             continue
         lock_signal_to_latest_price(row, price)
@@ -1433,6 +1480,7 @@ def lock_new_official_entries(found: list[dict[str, object]], existing_ids: set[
 
 
 def validate_state_consistency(rows: list[dict[str, object]]) -> dict[str, int]:
+    """修正狀態不一致：sl/ftp 應為 closed；tp2 後應有保本止損。"""
     changed = 0
     closed = 0
     for row in rows:
@@ -1451,7 +1499,17 @@ def validate_state_consistency(rows: list[dict[str, object]]) -> dict[str, int]:
     return {"checked": len(rows), "changed": changed, "closed": closed}
 
 
+# =============================================================================
+# 單幣掃描與主流程
+# =============================================================================
+
+
 def format_cvd_divergence_signal(symbol: str, snapshots: list[object], config: ScannerConfig) -> dict[str, object] | None:
+    """
+    5m CVD 背離策略：價格與 CVD 方向相反且 CVD 變化達歷史百分位門檻時產生訊號。
+      - 價跌 + CVD 漲 → 底背離，做多
+      - 價漲 + CVD 跌 → 頂背離，做空
+    """
     window = int(os.getenv("CVD_DIVERGENCE_WINDOW", "3"))
     if len(snapshots) <= window:
         return None
@@ -1541,6 +1599,10 @@ def format_cvd_divergence_signal(symbol: str, snapshots: list[object], config: S
 
 
 def apply_5m_confluence(row: dict[str, object], snapshot: object) -> dict[str, object]:
+    """
+    檢查 15m 主訊號是否與 5m OI/價格方向一致（多週期共振）。
+    寫入 mtf_5m_confluence / mtf_5m_oi_confluence 等欄位。
+    """
     signal_type = str(row.get("signal_type") or "")
     oi_change = float(getattr(snapshot, "oi_change_pct"))
     price_change = float(getattr(snapshot, "price_change_pct"))
@@ -1576,35 +1638,50 @@ def apply_5m_confluence(row: dict[str, object], snapshot: object) -> dict[str, o
     return row
 
 
-def scan_symbol(symbol: str, config: ScannerConfig, divergence_config: ScannerConfig) -> list[dict[str, object]]:
+async def scan_symbol(
+    client: BinanceFuturesClient,
+    symbol: str,
+    config: ScannerConfig,
+    divergence_config: ScannerConfig,
+) -> list[dict[str, object]]:
+    """
+    掃描單一幣種，可能產生最多兩種訊號：
+      1. 15m OI 策略（SentimentScanner.latest_signal）
+      2. 5m CVD 背離（format_cvd_divergence_signal）
+    15m 訊號預設要求 5m OI 共振（REQUIRE_5M_OI_CONFLUENCE）。
+    """
     rows: list[dict[str, object]] = []
-    with market_client(timeout=20) as client:
-        scanner = SentimentScanner(client, config)
-        signal = scanner.latest_signal(symbol)
+    scanner = SentimentScanner(client, config)
+    signal = await scanner.latest_signal(symbol)
 
-        divergence_scanner = SentimentScanner(client, divergence_config)
-        klines, oi_points, taker_points = divergence_scanner._load(symbol)
-        snapshots = divergence_scanner._snapshots(symbol, klines, oi_points, taker_points)
-        if signal is not None:
-            row = normalize_row(format_signal(signal))
-            if snapshots:
-                row = apply_5m_confluence(row, snapshots[-1])
-            if os.getenv("REQUIRE_5M_OI_CONFLUENCE", "true").lower() == "true" and not row.get("mtf_5m_oi_confluence"):
-                row = None
-            if row is not None:
-                rows.append(row)
+    divergence_scanner = SentimentScanner(client, divergence_config)
+    klines, oi_points, taker_points = await divergence_scanner._load(symbol)
+    snapshots = divergence_scanner._snapshots(symbol, klines, oi_points, taker_points)
+    if signal is not None:
+        row = normalize_row(format_signal(signal))
         if snapshots:
-            row = format_cvd_divergence_signal(symbol, snapshots, divergence_config)
-            if row is not None:
-                rows.append(row)
+            row = apply_5m_confluence(row, snapshots[-1])
+        if os.getenv("REQUIRE_5M_OI_CONFLUENCE", "true").lower() == "true" and not row.get("mtf_5m_oi_confluence"):
+            row = None
+        if row is not None:
+            rows.append(row)
+    if snapshots:
+        row = format_cvd_divergence_signal(symbol, snapshots, divergence_config)
+        if row is not None:
+            rows.append(row)
     return rows
 
 
-def resolve_symbols() -> list[str]:
+async def resolve_symbols(client: BinanceFuturesClient) -> list[str]:
+    """
+    決定本次掃描的幣種清單。
+    優先從 Binance 24h ticker 篩選高成交量幣；失敗時退回 seed 既有幣種。
+    SCAN_TOP>0 時只取前 N 名。
+    """
     top = int(os.getenv("SCAN_TOP", "0") or "0")
     min_volume = min_quote_volume()
     try:
-        symbols, volumes = ticker_volume_book(min_volume)
+        symbols, volumes = await ticker_volume_book(client, min_volume)
         SYMBOL_VOLUME_24H.clear()
         SYMBOL_VOLUME_24H.update(volumes)
         return symbols[:top] if top > 0 else symbols
@@ -1617,13 +1694,16 @@ def resolve_symbols() -> list[str]:
         raise
 
 
-def main() -> None:
+async def main_async() -> None:
+    """掃描主流程：雷達 → 並行掃描 → 合併 → 狀態回放 → 寫檔。"""
+    # --- 1. 載入並標準化既有訊號（排除舊版 5m OI 背離） ---
     existing = [
         row
         for raw in load_rows()
         if valid_signal_time(row := normalize_row(raw)) and not is_legacy_oi_divergence(row)
     ]
     min_volume = min_quote_volume()
+    # --- 2. 策略參數（可由環境變數覆寫） ---
     config = ScannerConfig(
         lookback_limit=int(os.getenv("LOOKBACK_LIMIT", "500")),
         oi_percentile_threshold=float(os.getenv("OI_PERCENTILE", "99")),
@@ -1633,7 +1713,7 @@ def main() -> None:
         eval_window_hours=float(os.getenv("EVAL_HOURS", "6")),
     )
     divergence_config = ScannerConfig(
-        interval="5m",
+        interval="5m",  # CVD 背離策略使用 5 分鐘 K 線
         lookback_limit=int(os.getenv("DIVERGENCE_LOOKBACK_LIMIT", "500")),
         oi_percentile_threshold=float(os.getenv("DIVERGENCE_CVD_PERCENTILE", "95")),
         atr_risk_multiple=float(os.getenv("DIVERGENCE_ATR_MULTIPLE", os.getenv("ATR_MULTIPLE", "2.5"))),
@@ -1642,114 +1722,155 @@ def main() -> None:
     workers = int(os.getenv("SCAN_WORKERS", "8"))
     contract_radar: list[dict[str, object]] = []
     radar_meta: dict[str, object] = {}
-    try:
-        contract_radar, radar_meta = build_live_contract_radar(min_volume, workers)
-        contract_radar = preserve_previous_detail(contract_radar)
-        CONTRACT_RADAR.write_text(
-            json.dumps({"rows": contract_radar, "updated_at": datetime.now(timezone.utc).isoformat(), "min_volume_usdt": min_volume, **radar_meta}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        print(f"contract_rows={len(contract_radar)} coinglass_calls={radar_meta.get('coinglass_calls', 0)}")
-    except Exception as exc:
-        print(f"WARN contract radar skipped; keeping previous valid data: {exc}")
-
-    symbols = resolve_symbols()
-    prefetch_scan_data(symbols, config.lookback_limit, divergence_config.lookback_limit)
-    found: list[dict[str, object]] = []
-    errors: list[str] = []
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(scan_symbol, symbol, config, divergence_config): symbol for symbol in symbols}
-        for future in as_completed(futures):
-            symbol = futures[future]
+    trace = _START_API_TRACE(ROOT) if _START_API_TRACE else None
+    symbols: list[str] = []
+    async with BinanceFuturesClient(timeout=60) as client:
+        if trace:
+            trace.attach(client)
+            trace.set_phase("init")
+        try:
+            if trace:
+                trace.set_phase("contract_radar")
+            # --- 3. 建立合約異常雷達 ---
             try:
-                rows = future.result()
+                contract_radar, radar_meta = await build_live_contract_radar(client, min_volume)
+                contract_radar = preserve_previous_detail(contract_radar)
+                CONTRACT_RADAR.write_text(
+                    json.dumps({"rows": contract_radar, "updated_at": datetime.now(timezone.utc).isoformat(), "min_volume_usdt": min_volume, **radar_meta}, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                print(f"contract_rows={len(contract_radar)}")
             except Exception as exc:
-                errors.append(f"{symbol}: {exc}")
-                continue
-            found.extend(apply_volume_gate(row, SYMBOL_VOLUME_24H) for row in rows)
-    if contract_radar:
-        contract_signals = signals_from_contract_radar(contract_radar, existing + found, config)
-        found.extend(apply_volume_gate(row, SYMBOL_VOLUME_24H) for row in contract_signals)
-        print(f"coinglass_contract_signals={len(contract_signals)}")
+                print(f"WARN contract radar skipped; keeping previous valid data: {exc}")
 
-    by_id = {str(row.get("id") or signal_id(row)): row for row in existing}
-    locked_entries = lock_new_official_entries(found, set(by_id))
-    print(f"latest_entry_prices_locked={locked_entries}")
-    max_same_side = int(os.getenv("MAX_ACTIVE_PER_SYMBOL_SIDE", "2"))
-    active_counts = active_position_counts(existing)
-    new_count = 0
-    for row in found:
-        row_id = str(row.get("id") or signal_id(row))
-        if row_id in by_id:
-            by_id[row_id] = merge_locked_signal(by_id[row_id], row)
-            continue
-        key = position_key(row)
-        if active_counts.get(key, 0) >= max_same_side:
-            continue
-        new_count += 1
-        by_id[row_id] = normalize_row(row)
-        if is_active_position(row):
-            active_counts[key] = active_counts.get(key, 0) + 1
-    rows_for_state = list(by_id.values())
-    restored = restore_market_unavailable_closures(rows_for_state)
-    print(f"restored_unavailable_closures={restored['restored']}")
-    state_audit = update_existing_states(rows_for_state)
-    print(f"state_audit checked={state_audit['checked']} changed={state_audit['changed']} closed={state_audit['closed']}")
-    state_consistency = validate_state_consistency(rows_for_state)
-    print(
-        f"state_consistency checked={state_consistency['checked']} "
-        f"changed={state_consistency['changed']} closed={state_consistency['closed']}"
-    )
+            # --- 4. 解析掃描幣種並並行掃描（Semaphore 限制並發數） ---
+            if trace:
+                trace.set_phase("resolve_symbols")
+            symbols = await resolve_symbols(client)
+            if trace:
+                trace.set_phase("prefetch")
+            await prefetch_scan_data()
+            if trace:
+                trace.set_phase("parallel_scan")
+            found: list[dict[str, object]] = []
+            errors: list[str] = []
+            sem = asyncio.Semaphore(max(1, workers))
 
-    rows = sorted(
-        rows_for_state,
-        key=lambda row: str(row.get("triggered_at") or row.get("detected_at") or ""),
-        reverse=True,
-    )
-    max_rows = int(os.getenv("MAX_SEED_ROWS", "0"))
-    allowed_errors = int(os.getenv("MAX_SCAN_ERRORS", str(max(5, int(len(symbols) * 0.05)))))
-    scan_ok = bool(found) and len(errors) <= allowed_errors
-    previous_success = previous_success_at()
-    data_preserved = not scan_ok and bool(previous_success)
-    status_ok = scan_ok or data_preserved
-    if scan_ok:
-        rows_to_save = rows[:max_rows] if max_rows > 0 else rows
-        SEED.write_text(json.dumps(rows_to_save, ensure_ascii=False, indent=2), encoding="utf-8")
-    else:
-        print("WARN scan failed; keeping previous signal data")
-    status_time = datetime.now(timezone.utc).isoformat()
-    SCANNER_STATUS.write_text(
-        json.dumps(
-            {
-                "ok": status_ok,
-                "scan_ok": scan_ok,
-                "data_preserved": data_preserved,
-                "data_stale": data_preserved,
-                "updated_at": status_time,
-                "last_attempt_at": status_time,
-                "last_success_at": status_time if scan_ok else previous_success,
-                "market_data_provider": provider_name(),
-                "symbols_scanned": len(symbols),
-                "signals_found": len(found),
-                "new_signals": new_count,
-                "errors": errors[:20],
-                "error_count": len(errors),
-                "allowed_errors": allowed_errors,
-                "state_audit": state_audit,
-                "state_consistency": state_consistency,
-                "restored_unavailable_closures": restored,
-                "min_volume_usdt": min_volume,
-                **radar_meta,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    saved_count = min(len(rows), max_rows) if max_rows > 0 else len(rows)
-    print(f"symbols={len(symbols)} found={len(found)} new={new_count} saved={saved_count} errors={len(errors)}")
-    for error in errors[:20]:
-        print(f"ERROR {error}")
+            async def bounded_scan(symbol: str) -> list[dict[str, object]]:
+                async with sem:
+                    return await scan_symbol(client, symbol, config, divergence_config)
+
+            scan_results = await asyncio.gather(*(bounded_scan(symbol) for symbol in symbols), return_exceptions=True)
+            for symbol, result in zip(symbols, scan_results):
+                if isinstance(result, Exception):
+                    errors.append(f"{symbol}: {result}")
+                    continue
+                found.extend(apply_volume_gate(row, SYMBOL_VOLUME_24H) for row in result)
+
+            # --- 5. 從合約雷達產生額外訊號 ---
+            if trace:
+                trace.set_phase("contract_signals")
+            if contract_radar:
+                contract_signals = await signals_from_contract_radar(client, contract_radar, existing + found, config)
+                found.extend(apply_volume_gate(row, SYMBOL_VOLUME_24H) for row in contract_signals)
+                print(f"binance_contract_signals={len(contract_signals)}")
+
+            # --- 6. 合併新舊訊號（by_id 去重，限制同幣同方向持倉數） ---
+            if trace:
+                trace.set_phase("merge_signals")
+            by_id = {str(row.get("id") or signal_id(row)): row for row in existing}
+            locked_entries = await lock_new_official_entries(client, found, set(by_id))
+            print(f"latest_entry_prices_locked={locked_entries}")
+            max_same_side = int(os.getenv("MAX_ACTIVE_PER_SYMBOL_SIDE", "2"))
+            active_counts = active_position_counts(existing)
+            new_count = 0
+            for row in found:
+                row_id = str(row.get("id") or signal_id(row))
+                if row_id in by_id:
+                    by_id[row_id] = merge_locked_signal(by_id[row_id], row)
+                    continue
+                key = position_key(row)
+                if active_counts.get(key, 0) >= max_same_side:
+                    continue
+                new_count += 1
+                by_id[row_id] = normalize_row(row)
+                if is_active_position(row):
+                    active_counts[key] = active_counts.get(key, 0) + 1
+            rows_for_state = list(by_id.values())
+            # --- 7. 回放 K 線更新持倉狀態並做一致性檢查 ---
+            if trace:
+                trace.set_phase("state_replay")
+            state_audit = await update_existing_states(client, rows_for_state)
+            print(f"state_audit checked={state_audit['checked']} changed={state_audit['changed']} closed={state_audit['closed']}")
+            state_consistency = validate_state_consistency(rows_for_state)
+            print(
+                f"state_consistency checked={state_consistency['checked']} "
+                f"changed={state_consistency['changed']} closed={state_consistency['closed']}"
+            )
+
+            rows = sorted(
+                rows_for_state,
+                key=lambda row: str(row.get("triggered_at") or row.get("detected_at") or ""),
+                reverse=True,
+            )
+            # --- 8. 寫入 seed_signals.json（掃描失敗則保留舊資料） ---
+            max_rows = int(os.getenv("MAX_SEED_ROWS", "0"))
+            allowed_errors = int(os.getenv("MAX_SCAN_ERRORS", str(max(5, int(len(symbols) * 0.05)))))
+            scan_ok = bool(found) and len(errors) <= allowed_errors
+            previous_success = previous_success_at()
+            data_preserved = not scan_ok and bool(previous_success)
+            status_ok = scan_ok or data_preserved
+            if scan_ok:
+                rows_to_save = rows[:max_rows] if max_rows > 0 else rows
+                SEED.write_text(json.dumps(rows_to_save, ensure_ascii=False, indent=2), encoding="utf-8")
+            else:
+                print("WARN scan failed; keeping previous signal data")
+            # --- 9. 寫入 scanner_status.json 健康報告 ---
+            status_time = datetime.now(timezone.utc).isoformat()
+            SCANNER_STATUS.write_text(
+                json.dumps(
+                    {
+                        "ok": status_ok,
+                        "scan_ok": scan_ok,
+                        "data_preserved": data_preserved,
+                        "data_stale": data_preserved,
+                        "updated_at": status_time,
+                        "last_attempt_at": status_time,
+                        "last_success_at": status_time if scan_ok else previous_success,
+                        "market_data_provider": provider_name(),
+                        "symbols_scanned": len(symbols),
+                        "signals_found": len(found),
+                        "new_signals": new_count,
+                        "errors": errors[:20],
+                        "error_count": len(errors),
+                        "allowed_errors": allowed_errors,
+                        "state_audit": state_audit,
+                        "state_consistency": state_consistency,
+                        "min_volume_usdt": min_volume,
+                        **radar_meta,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            saved_count = min(len(rows), max_rows) if max_rows > 0 else len(rows)
+            print(f"symbols={len(symbols)} found={len(found)} new={new_count} saved={saved_count} errors={len(errors)}")
+            for error in errors[:20]:
+                print(f"ERROR {error}")
+        finally:
+            if trace:
+                trace.finish(
+                    scan_ok=locals().get("scan_ok"),
+                    symbols_scanned=len(symbols),
+                    signals_found=len(locals().get("found", [])),
+                    error_count=len(locals().get("errors", [])),
+                )
+
+
+def main() -> None:
+    """同步入口：供 worker subprocess 或 `python scripts/update_seed_signals.py` 呼叫。"""
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":

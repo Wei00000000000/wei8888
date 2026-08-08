@@ -1,26 +1,24 @@
 from __future__ import annotations
 
+import asyncio
 import json
-import os
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from shutil import copyfile
+from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import BinanceFuturesClient
-from sentiment_scanner.bingx import BingxFuturesClient
-from sentiment_scanner.bybit import BybitFuturesClient
-from sentiment_scanner.market_data import MixedFuturesClient
-from sentiment_scanner.okx import OkxFuturesClient
+from sentiment_scanner.market_data import market_client
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 APP_HTML = ROOT / "sentiment_scanner" / "app.html"
 SEED = ROOT / "sentiment_scanner" / "seed_signals.json"
 CONTRACT_RADAR = ROOT / "sentiment_scanner" / "contract_anomalies.json"
 SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"
+SCANNER_API_TRACE = ROOT / "sentiment_scanner" / "scanner_api_trace.json"
 BRAND_IMAGE = ROOT / "sentiment_scanner" / "brand-hero.png"
 OUT = ROOT / "site"
 MAIN_SYMBOLS = [
@@ -31,23 +29,6 @@ MAIN_SYMBOLS = [
 ]
 
 
-def provider_name() -> str:
-    return os.getenv("MARKET_DATA_PROVIDER", "mixed").strip().lower()
-
-
-def market_client(timeout: float = 20.0):
-    provider = provider_name()
-    if provider == "binance":
-        return BinanceFuturesClient(timeout=timeout)
-    if provider == "bingx":
-        return BingxFuturesClient(timeout=timeout)
-    if provider == "bybit":
-        return BybitFuturesClient(timeout=timeout)
-    if provider == "okx":
-        return OkxFuturesClient(timeout=timeout)
-    if provider == "mixed":
-        return MixedFuturesClient(timeout=timeout)
-    return MixedFuturesClient(timeout=timeout)
 SECTOR_KEYWORDS = [
     ("Layer 1", ("layer-1", "smart-contract-platform")),
     ("DeFi", ("decentralized-finance", "defi")),
@@ -133,45 +114,46 @@ def fallback_market(symbol: str, rows: list[dict[str, object]]) -> dict[str, obj
     }
 
 
-def live_market(symbol: str) -> dict[str, object]:
+async def live_market(client: BinanceFuturesClient, symbol: str) -> dict[str, object]:
     config = ScannerConfig(lookback_limit=500, oi_percentile_threshold=99, oi_change_min_pct=3)
-    with market_client() as client:
-        scanner = SentimentScanner(client, config)
-        klines, oi_points, taker_points = scanner._load(symbol)
-        snapshots = scanner._snapshots(symbol, klines, oi_points, taker_points)
-        if not snapshots:
-            return {"symbol": symbol, "error": "no snapshot"}
-        snapshot = snapshots[-1]
-        signal = scanner._signal_from_snapshot(snapshot)
-        return {
-            "symbol": symbol,
-            "timestamp_ms": snapshot.timestamp,
-            "price": snapshot.price,
-            "atr": snapshot.atr,
-            "oi_value": snapshot.oi_value,
-            "oi_value_usdt": snapshot.oi_value_usdt,
-            "oi_change_pct": snapshot.oi_change_pct,
-            "oi_percentile": snapshot.oi_percentile,
-            "price_change_pct": snapshot.price_change_pct,
-            "taker_buy_ratio": snapshot.taker_buy_ratio,
-            "signal_type": signal.signal_type if signal else None,
-            "setup_id": signal.setup_id if signal else None,
-        }
+    scanner = SentimentScanner(client, config)
+    klines, oi_points, taker_points = await scanner._load(symbol)
+    snapshots = scanner._snapshots(symbol, klines, oi_points, taker_points)
+    if not snapshots:
+        return {"symbol": symbol, "error": "no snapshot"}
+    snapshot = snapshots[-1]
+    signal = scanner._signal_from_snapshot(snapshot)
+    return {
+        "symbol": symbol,
+        "timestamp_ms": snapshot.timestamp,
+        "price": snapshot.price,
+        "atr": snapshot.atr,
+        "oi_value": snapshot.oi_value,
+        "oi_value_usdt": snapshot.oi_value_usdt,
+        "oi_change_pct": snapshot.oi_change_pct,
+        "oi_percentile": snapshot.oi_percentile,
+        "price_change_pct": snapshot.price_change_pct,
+        "taker_buy_ratio": snapshot.taker_buy_ratio,
+        "signal_type": signal.signal_type if signal else None,
+        "setup_id": signal.setup_id if signal else None,
+    }
 
 
-def build_markets(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+async def build_markets(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]:
     markets: dict[str, dict[str, object]] = {}
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(live_market, symbol): symbol for symbol in MAIN_SYMBOLS}
-        for future in as_completed(futures):
-            symbol = futures[future]
-            try:
-                row = future.result()
-            except Exception as exc:
-                row = {"symbol": symbol, "error": str(exc)}
-            if row.get("error"):
-                row = fallback_market(symbol, seed_rows)
-            markets[symbol] = row
+    async with market_client(timeout=30) as client:
+        results = await asyncio.gather(
+            *(live_market(client, symbol) for symbol in MAIN_SYMBOLS),
+            return_exceptions=True,
+        )
+    for symbol, result in zip(MAIN_SYMBOLS, results):
+        if isinstance(result, Exception):
+            row = {"symbol": symbol, "error": str(result)}
+        else:
+            row = result
+        if row.get("error"):
+            row = fallback_market(symbol, seed_rows)
+        markets[symbol] = row
     return [markets[symbol] for symbol in MAIN_SYMBOLS if symbol in markets]
 
 
@@ -248,10 +230,10 @@ def signal_tags(symbol: str, seed_rows: list[dict[str, object]]) -> list[str]:
     return tags
 
 
-def build_volume_anomalies(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+async def build_volume_anomalies(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]:
     try:
-        with market_client(timeout=25) as client:
-            tickers = client.ticker_24hr()
+        async with market_client(timeout=25) as client:
+            tickers = await client.ticker_24hr()
     except Exception:
         return []
 
@@ -282,16 +264,16 @@ def build_volume_anomalies(seed_rows: list[dict[str, object]]) -> list[dict[str,
     return sorted(rows, key=lambda row: row["anomaly_score"], reverse=True)[:40]
 
 
-def main() -> None:
+async def main_async() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "data").mkdir(parents=True, exist_ok=True)
     (OUT / "data" / "history").mkdir(parents=True, exist_ok=True)
     seed_rows = load_seed_rows()
     quick_rows = build_quick_rows(seed_rows)
     contract_radar = load_contract_radar()
-    markets = build_markets(seed_rows)
+    markets = await build_markets(seed_rows)
     sector_flows = build_sector_flows()
-    volume_anomalies = build_volume_anomalies(seed_rows)
+    volume_anomalies = await build_volume_anomalies(seed_rows)
     (OUT / "index.html").write_text(APP_HTML.read_text(encoding="utf-8"), encoding="utf-8")
     if BRAND_IMAGE.exists():
         copyfile(BRAND_IMAGE, OUT / "brand-hero.png")
@@ -334,6 +316,14 @@ def main() -> None:
         json.dumps(scanner_status, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+    manifest_extra: dict[str, str] = {}
+    if SCANNER_API_TRACE.exists():
+        trace_payload = json.loads(SCANNER_API_TRACE.read_text(encoding="utf-8"))
+        (OUT / "data" / "scanner_api_trace.json").write_text(
+            json.dumps(trace_payload, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        manifest_extra["scanner_api_trace"] = "scanner_api_trace.json"
     (OUT / "data" / "manifest.json").write_text(
         json.dumps(
             {
@@ -347,6 +337,7 @@ def main() -> None:
                 "volume_anomalies": "volume_anomalies.json",
                 "contract_anomalies": "contract_anomalies.json",
                 "scanner_status": "scanner_status.json",
+                **manifest_extra,
             },
             ensure_ascii=False,
             separators=(",", ":"),
@@ -355,6 +346,10 @@ def main() -> None:
     )
     print(f"Exported GitHub Pages site to {OUT}")
     print(f"Signals: {len(seed_rows)} Quick: {len(quick_rows)} Markets: {len(markets)} Sectors: {len(sector_flows)} Volume anomalies: {len(volume_anomalies)} Contract radar: {len(contract_radar.get('rows') or [])}")
+
+
+def main() -> None:
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":

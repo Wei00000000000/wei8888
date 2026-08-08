@@ -25,6 +25,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_FILES = {
     "api-config.js",
     "app.html",
+    "binance-api-test.html",
+    "scanner-api-trace.html",
     "brand-hero.png",
     "icon-192.png",
     "icon-512.png",
@@ -82,6 +84,13 @@ app.include_router(market.router, prefix=settings.api_prefix)
 app.include_router(backtest.router, prefix=settings.api_prefix)
 app.include_router(notifications.router, prefix=settings.api_prefix)
 app.include_router(system.router, prefix=settings.api_prefix)
+
+try:
+    from sentiment_scanner.plugins.api_trace.router import router as api_trace_router
+
+    app.include_router(api_trace_router, prefix=settings.api_prefix)
+except ImportError:
+    pass
 
 
 @app.get("/", include_in_schema=False)

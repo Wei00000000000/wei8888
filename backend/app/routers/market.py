@@ -9,7 +9,6 @@ from time import monotonic
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +16,7 @@ from ..database import get_session
 from ..models import MarketSnapshot
 from ..schemas import MarketResponse
 from ..security import User
-from sentiment_scanner.market_data import MixedFuturesClient
+from sentiment_scanner.market_data import market_client
 
 
 router = APIRouter(prefix="/market", tags=["market"])
@@ -99,13 +98,13 @@ def build_sector_flows(rows: list[MarketResponse]) -> list[dict[str, object]]:
     return sorted(result, key=lambda item: float(item["volume_24h"]), reverse=True)
 
 
-def fetch_live_tickers() -> list[MarketResponse]:
+async def fetch_live_tickers() -> list[MarketResponse]:
     global _live_ticker_cache
     cached_at, cached_rows = _live_ticker_cache
     if cached_rows and monotonic() - cached_at < LIVE_TICKER_TTL_SECONDS:
         return cached_rows
-    with MixedFuturesClient(timeout=12) as client:
-        payload = client.ticker_24hr()
+    async with market_client(timeout=12) as client:
+        payload = await client.ticker_24hr()
     observed_at = datetime.now(timezone.utc)
     rows = []
     for item in payload if isinstance(payload, list) else []:
@@ -115,7 +114,7 @@ def fetch_live_tickers() -> list[MarketResponse]:
                 continue
             rows.append(MarketResponse(
                 symbol=str(item.get("symbol") or "").upper().replace("USDT", ""),
-                source=str(item.get("source") or "mixed-live"),
+                source="binance-live",
                 price=price,
                 change_24h_pct=float(item.get("priceChangePercent") or item.get("price_change_pct") or 0),
                 quote_volume_24h=float(item.get("quoteVolume") or item.get("quote_volume") or 0),
@@ -130,7 +129,7 @@ def fetch_live_tickers() -> list[MarketResponse]:
 
 async def dashboard_market_rows(_user: User, session: Session) -> list[MarketResponse]:
     try:
-        live_rows = await run_in_threadpool(fetch_live_tickers)
+        live_rows = await fetch_live_tickers()
         if any(float(row.quote_volume_24h or 0) > 0 for row in live_rows):
             return live_rows
     except Exception:

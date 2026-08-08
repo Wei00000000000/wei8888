@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -27,9 +26,9 @@ class Settings(BaseSettings):
     admin_token: str = ""
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
-    public_site_url: str = "https://wei00000000000.github.io/wei8888/"
+    public_site_url: str = "https://ycw13976.github.io/wei8888/"
     cors_origins: Annotated[list[str], NoDecode] = [
-        "https://wei00000000000.github.io",
+        "https://ycw13976.github.io",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
     ]
@@ -52,10 +51,6 @@ class Settings(BaseSettings):
     backtest_rate_limit: int = Field(default=2, ge=1, le=30)
     history_rate_limit: int = Field(default=60, ge=10, le=1000)
     notification_rate_limit: int = Field(default=20, ge=1, le=200)
-    own_signal_start_at: datetime | None = Field(
-        default=datetime(2026, 6, 30, 7, 55, tzinfo=timezone.utc),
-        description="Default cutoff for strategy-generated signals. Older imported/replayed rows are kept but excluded.",
-    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import csv
 import json
 from datetime import datetime, timezone
@@ -12,6 +13,10 @@ from .scanner import EvaluatedSignal, ScannerConfig, SentimentScanner, Signal
 
 
 def main() -> None:
+    asyncio.run(run_cli())
+
+
+async def run_cli() -> None:
     parser = argparse.ArgumentParser(description="15M OI percentile sentiment scanner for Binance USD-M futures.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -34,13 +39,13 @@ def main() -> None:
         eval_window_hours=args.eval_hours,
     )
 
-    with BinanceFuturesClient() as client:
-        symbols = resolve_symbols(client, args.symbols, args.top)
+    async with BinanceFuturesClient() as client:
+        symbols = await resolve_symbols(client, args.symbols, args.top)
         scanner = SentimentScanner(client, config)
         if args.command == "scan":
-            results = run_scan(scanner, symbols)
+            results = await run_scan(scanner, symbols)
         else:
-            results = run_backtest(scanner, symbols)
+            results = await run_backtest(scanner, symbols)
 
     write_outputs(results, args.output_json, args.output_csv)
     print_summary(results)
@@ -59,17 +64,17 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--output-csv", default="", help="Optional CSV output path.")
 
 
-def resolve_symbols(client: BinanceFuturesClient, symbols_arg: str, top: int) -> list[str]:
+async def resolve_symbols(client: BinanceFuturesClient, symbols_arg: str, top: int) -> list[str]:
     if top > 0:
-        return client.top_symbols_by_volume(limit=top)
+        return await client.top_symbols_by_volume(limit=top)
     return normalize_symbols(symbols_arg.split(","))
 
 
-def run_scan(scanner: SentimentScanner, symbols: Iterable[str]) -> list[dict[str, object]]:
+async def run_scan(scanner: SentimentScanner, symbols: Iterable[str]) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for symbol in symbols:
         try:
-            signal = scanner.latest_signal(symbol)
+            signal = await scanner.latest_signal(symbol)
         except Exception as exc:
             rows.append({"symbol": symbol, "error": str(exc)})
             continue
@@ -78,11 +83,11 @@ def run_scan(scanner: SentimentScanner, symbols: Iterable[str]) -> list[dict[str
     return rows
 
 
-def run_backtest(scanner: SentimentScanner, symbols: Iterable[str]) -> list[dict[str, object]]:
+async def run_backtest(scanner: SentimentScanner, symbols: Iterable[str]) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for symbol in symbols:
         try:
-            evaluated = scanner.backtest(symbol)
+            evaluated = await scanner.backtest(symbol)
         except Exception as exc:
             rows.append({"symbol": symbol, "error": str(exc)})
             continue

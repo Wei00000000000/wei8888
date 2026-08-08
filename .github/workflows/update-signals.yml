@@ -45,13 +45,8 @@ jobs:
           SCAN_FALLBACK_LIMIT: "120"
           MIN_QUOTE_VOLUME_USDT: "5000000"
           MARKET_DATA_PROVIDER: "binance"
-          MARKET_DATA_ALLOW_BYBIT_FALLBACK: "true"
           CONTRACT_KLINE_CANDIDATES: "120"
           CONTRACT_DETAIL_CANDIDATES: "20"
-          COINGLASS_REQUEST_BUDGET: "27"
-          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
-          BINANCE_PROXY_URL: "https://wei-signal-trigger.qop880421.workers.dev"
-          BINANCE_PROXY_TOKEN: ${{ secrets.BINANCE_PROXY_TOKEN }}
         run: |
           for attempt in 1 2; do
             python scripts/update_seed_signals.py && exit 0

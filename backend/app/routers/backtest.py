@@ -26,9 +26,8 @@ async def summary(
     strategy: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> BacktestSummary:
-    return BacktestSummary(**await backtest_summary(session, strategy, date_from, date_to, include_legacy))
+    return BacktestSummary(**await backtest_summary(session, strategy, date_from, date_to))
 
 
 @router.get("/summaries", response_model=list[BacktestSummary])
@@ -37,9 +36,8 @@ async def summaries(
     session: Session,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> list[BacktestSummary]:
-    return [BacktestSummary(**row) for row in await all_strategy_summaries(session, date_from, date_to, include_legacy)]
+    return [BacktestSummary(**row) for row in await all_strategy_summaries(session, date_from, date_to)]
 
 
 @router.get("/trades", response_model=SignalPage)
@@ -51,9 +49,8 @@ async def trades(
     strategy: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> SignalPage:
-    base = filtered_signals(strategy, date_from, date_to, include_legacy)
+    base = filtered_signals(strategy, date_from, date_to)
     count_query = base.with_only_columns(func.count(Signal.id)).order_by(None)
     total = int((await session.scalar(count_query)) or 0)
     rows = (

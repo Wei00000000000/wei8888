@@ -39,16 +39,9 @@ class PositionHistoryTest(unittest.IsolatedAsyncioTestCase):
                 )
                 await session.commit()
 
-    async def test_legacy_signal_is_hidden_by_default(self) -> None:
+    async def test_official_signal_backfills_position_history(self) -> None:
         async with SessionFactory() as session:
             rows = await merged_position_rows(session, symbol="ICNT")
-
-        row = next((item for item in rows if item.signal_id == self.signal_id), None)
-        self.assertIsNone(row)
-
-    async def test_legacy_signal_can_be_requested_for_audit(self) -> None:
-        async with SessionFactory() as session:
-            rows = await merged_position_rows(session, symbol="ICNT", include_legacy=True)
 
         row = next((item for item in rows if item.signal_id == self.signal_id), None)
         self.assertIsNotNone(row)

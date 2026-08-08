@@ -35,8 +35,7 @@ def format_taipei_time(value: datetime) -> str:
 
 
 def position_message(position: Position, message_type: str = "NEW_POSITION") -> str:
-    direction = "做多" if position.side == "long" else "做空"
-    score = position.score if position.score is not None else "-"
+    direction = "LONG" if position.side == "long" else "SHORT"
     lines = [
         "Wei 策略情報室",
         f"類型：{message_type}",
@@ -44,13 +43,13 @@ def position_message(position: Position, message_type: str = "NEW_POSITION") -> 
         f"方向：{direction}",
         f"週期：{position.timeframe}",
         f"策略：{position.strategy_name}",
-        f"分數：{score}",
-        f"成立時間：{format_taipei_time(position.entry_time)}",
         f"Entry：{format_price(position.entry_price)}",
         f"SL：{format_price(position.stop_loss)}",
         "TP1/TP2/TP3/FTP："
         f"{format_price(position.take_profit_1)} / {format_price(position.take_profit_2)} / "
         f"{format_price(position.take_profit_3)} / {format_price(position.take_profit_final)}",
+        f"Score：{position.score if position.score is not None else '-'}",
+        f"成立時間：{format_taipei_time(position.entry_time)}",
     ]
     return "\n".join(lines)
 
@@ -66,11 +65,6 @@ async def create_notification_log(
     dedupe_key = notification_dedupe_key(position, message_type)
     existing = await session.scalar(select(NotificationLog).where(NotificationLog.dedupe_key == dedupe_key))
     if existing is not None:
-        if existing.sent_status != "sent":
-            existing.message_text = message_text or position_message(position, message_type)
-            existing.telegram_chat_id = settings.telegram_chat_id or None
-            existing.error_message = error_message
-            await session.flush()
         return existing
     log = NotificationLog(
         signal_id=position.signal_id,

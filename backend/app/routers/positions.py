@@ -17,7 +17,6 @@ from ..models import Position, Signal
 from ..positions import position_from_signal
 from ..schemas import PageMeta, PositionDetail, PositionPage, PositionResponse
 from ..security import User
-from ..signal_scope import position_scope_filter, signal_scope_filter
 
 
 router = APIRouter(prefix="/positions", tags=["positions"])
@@ -31,12 +30,8 @@ def position_filters(
     status: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> list:
     filters = []
-    scope = position_scope_filter(include_legacy=include_legacy)
-    if scope is not None:
-        filters.append(scope)
     if symbol:
         filters.append(Position.symbol == symbol.upper().replace("USDT", ""))
     if side:
@@ -58,12 +53,8 @@ def signal_filters(
     timeframe: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> list:
     filters = [Signal.official_trade.is_(True), Signal.entry_price.is_not(None)]
-    scope = signal_scope_filter(include_legacy=include_legacy)
-    if scope is not None:
-        filters.append(scope)
     if symbol:
         filters.append(Signal.symbol == symbol.upper().replace("USDT", ""))
     if side:
@@ -86,7 +77,6 @@ async def merged_position_rows(
     status: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> list[Position]:
     """Return persisted positions plus official signals projected as positions.
 
@@ -96,15 +86,13 @@ async def merged_position_rows(
     """
     persisted = (
         await session.scalars(
-            select(Position).where(*position_filters(symbol, side, timeframe, status, date_from, date_to, include_legacy))
+            select(Position).where(*position_filters(symbol, side, timeframe, status, date_from, date_to))
         )
     ).all()
     rows_by_signal = {row.signal_id: row for row in persisted}
     rows_by_id = {row.id: row for row in persisted if not row.signal_id}
 
-    signals = (
-        await session.scalars(select(Signal).where(*signal_filters(symbol, side, timeframe, date_from, date_to, include_legacy)))
-    ).all()
+    signals = (await session.scalars(select(Signal).where(*signal_filters(symbol, side, timeframe, date_from, date_to)))).all()
     wanted_status = status.upper() if status else None
     for signal in signals:
         if signal.id in rows_by_signal:
@@ -121,14 +109,10 @@ async def merged_position_rows(
 
 @router.get("/open", response_model=list[PositionResponse])
 async def open_positions(_user: User, session: Session) -> list[PositionResponse]:
-    filters = [Position.status == "OPEN"]
-    scope = position_scope_filter()
-    if scope is not None:
-        filters.append(scope)
     rows = (
         await session.scalars(
             select(Position)
-            .where(*filters)
+            .where(Position.status == "OPEN")
             .order_by(Position.entry_time.desc(), Position.id.desc())
             .limit(500)
         )
@@ -149,7 +133,6 @@ async def position_history(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     sort: Annotated[str, Query(pattern="^(asc|desc)$")] = "desc",
-    include_legacy: bool = False,
 ) -> PositionPage:
     rows = await merged_position_rows(
         session,
@@ -159,7 +142,6 @@ async def position_history(
         status=status,
         date_from=date_from,
         date_to=date_to,
-        include_legacy=include_legacy,
     )
     reverse = sort != "asc"
     rows.sort(key=lambda row: (row.entry_time, row.id), reverse=reverse)
@@ -182,7 +164,6 @@ async def export_positions_csv(
     status: Annotated[str | None, Query(max_length=24)] = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> Response:
     rows = await merged_position_rows(
         session,
@@ -192,7 +173,6 @@ async def export_positions_csv(
         status=status,
         date_from=date_from,
         date_to=date_to,
-        include_legacy=include_legacy,
     )
     rows.sort(key=lambda row: (row.entry_time, row.id), reverse=True)
     rows = rows[:5000]

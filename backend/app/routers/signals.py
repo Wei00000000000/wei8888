@@ -12,7 +12,6 @@ from ..database import get_session
 from ..models import Signal
 from ..schemas import PageMeta, SignalPage, SignalResponse
 from ..security import User
-from ..signal_scope import apply_signal_scope, signal_scope_filter
 
 
 router = APIRouter(prefix="/signals", tags=["signals"])
@@ -20,19 +19,20 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.get("/positions", response_model=list[SignalResponse])
-async def active_positions(_user: User, session: Session, include_legacy: bool = False) -> list[SignalResponse]:
+async def active_positions(_user: User, session: Session) -> list[SignalResponse]:
     active_status = func.lower(func.coalesce(Signal.raw_payload["status"].as_string(), "active")) == "active"
-    query = select(Signal).where(
-        Signal.official_trade.is_(True),
-        or_(
-            Signal.reached_state.in_(("holding", "active", "warning")),
-            and_(Signal.reached_state.in_(("tp1", "tp2", "tp3")), active_status),
-        ),
-    )
-    query = apply_signal_scope(query, include_legacy=include_legacy)
     rows = (
         await session.scalars(
-            query.order_by(Signal.triggered_at.desc(), Signal.id.desc()).limit(500)
+            select(Signal)
+            .where(
+                Signal.official_trade.is_(True),
+                or_(
+                    Signal.reached_state.in_(("holding", "active", "warning")),
+                    and_(Signal.reached_state.in_(("tp1", "tp2", "tp3")), active_status),
+                ),
+            )
+            .order_by(Signal.triggered_at.desc(), Signal.id.desc())
+            .limit(500)
         )
     ).all()
     return [SignalResponse.model_validate(row) for row in rows]
@@ -50,12 +50,8 @@ async def list_signals(
     official_only: bool = False,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> SignalPage:
     filters = []
-    scope = signal_scope_filter(include_legacy=include_legacy)
-    if scope is not None:
-        filters.append(scope)
     if symbol:
         filters.append(Signal.symbol == symbol.upper().replace("USDT", ""))
     if strategy:

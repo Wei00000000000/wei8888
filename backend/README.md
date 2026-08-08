@@ -26,7 +26,7 @@ Copy names from `backend/.env.example` into Zeabur. Never commit real values.
 - `JWT_SECRET` random 32+ character secret
 - `APP_PASSWORD_HASH` generated with `python backend/scripts/hash_password.py`
 - `ADMIN_TOKEN` a different random 32+ character secret
-- `CORS_ORIGINS=https://wei00000000000.github.io`
+- `CORS_ORIGINS=https://ycw13976.github.io`
 - `ALLOWED_HOSTS` set to the exact Zeabur API hostname
 - `COOKIE_SECURE=true`
 - `COOKIE_SAMESITE=none`

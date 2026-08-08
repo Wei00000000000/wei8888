@@ -62,7 +62,9 @@
         if (!response.ok) throw new Error(data.detail || "登入失敗");
         sessionStorage.setItem("wei_cloud_access_token", data.access_token || "");
         sessionStorage.setItem("wei_csrf_token", data.csrf_token || "");
-        location.href = "app.html";
+        const next = new URLSearchParams(location.search).get("next") || "";
+        const target = next && !next.includes("://") ? decodeURIComponent(next) : "app.html";
+        location.href = target.startsWith("/") ? target : target || "app.html";
       } catch (err) {
         error.textContent = err.message || "登入失敗";
       } finally {

@@ -8,7 +8,6 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import Signal
-from .signal_scope import apply_signal_scope
 
 
 WIN_STATES = ("tp1", "tp2", "tp3", "ftp")
@@ -16,14 +15,8 @@ PARTIAL_STATES = ("tp1", "tp2", "tp3")
 KNOWN_STRATEGIES = ("sentiment_oi", "stable_dog", "contract_anomaly", "high_quality")
 
 
-def filtered_signals(
-    strategy: str | None,
-    date_from: datetime | None,
-    date_to: datetime | None,
-    include_legacy: bool = False,
-) -> Select:
+def filtered_signals(strategy: str | None, date_from: datetime | None, date_to: datetime | None) -> Select:
     query = select(Signal).where(Signal.official_trade.is_(True))
-    query = apply_signal_scope(query, include_legacy=include_legacy)
     if strategy:
         query = query.where(Signal.strategy == strategy)
     if date_from:
@@ -38,9 +31,8 @@ async def backtest_summary(
     strategy: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> dict[str, float | int | str | None]:
-    rows = (await session.scalars(filtered_signals(strategy, date_from, date_to, include_legacy))).all()
+    rows = (await session.scalars(filtered_signals(strategy, date_from, date_to))).all()
     return summarize_signals(rows, strategy)
 
 
@@ -48,9 +40,8 @@ async def all_strategy_summaries(
     session: AsyncSession,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
-    include_legacy: bool = False,
 ) -> list[dict[str, float | int | str | None]]:
-    rows = (await session.scalars(filtered_signals(None, date_from, date_to, include_legacy))).all()
+    rows = (await session.scalars(filtered_signals(None, date_from, date_to))).all()
     groups = {
         None: rows,
         "sentiment_oi": [row for row in rows if row.strategy == "sentiment_oi"],

@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scanner API Trace</title>
+  <script src="api-config.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060a0f;
+      --panel: #0e151d;
+      --panel-2: #121d28;
+      --line: rgba(255,255,255,.08);
+      --text: #eef5ff;
+      --muted: #8fa0b6;
+      --ok: #00e0a4;
+      --err: #ff5577;
+      --warn: #ffb13b;
+      --accent: #b36bff;
+      --mono: "Cascadia Code", "Consolas", monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { padding: 20px 24px; border-bottom: 1px solid var(--line); }
+    h1 { margin: 0 0 6px; font-size: 1.3rem; }
+    .sub { color: var(--muted); font-size: .9rem; }
+    main { padding: 20px 24px 48px; max-width: 1440px; margin: 0 auto; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    button, select, input {
+      border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2);
+      color: var(--text); padding: 8px 12px; font: inherit; cursor: pointer;
+    }
+    button.primary { background: linear-gradient(135deg, #7c3aed, #b36bff); border-color: transparent; font-weight: 600; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); margin-bottom: 16px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    .card .k { color: var(--muted); font-size: .78rem; }
+    .card .v { font-size: 1.25rem; font-weight: 700; margin-top: 4px; }
+    .ok { color: var(--ok); } .err { color: var(--err); } .warn { color: var(--warn); }
+    table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); position: sticky; top: 0; background: var(--panel); }
+    .mono { font-family: var(--mono); font-size: .76rem; word-break: break-all; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+    .badge.ok { background: rgba(0,224,164,.15); color: var(--ok); }
+    .badge.err { background: rgba(255,85,119,.15); color: var(--err); }
+    .phase-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .phase { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: .8rem; }
+    .detail pre { margin: 0; padding: 10px; max-height: 280px; overflow: auto; font-family: var(--mono); font-size: .74rem; white-space: pre-wrap; }
+    .detail { display: none; }
+    .detail.open { display: table-row; }
+    .empty { color: var(--muted); padding: 40px; text-align: center; }
+    .filter { min-width: 180px; }
+    a { color: #9ecbff; }
+    .banner { margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); font-size: .88rem; }
+    .banner.warn { border-color: rgba(255,177,59,.35); color: var(--warn); }
+    .banner.ok { border-color: rgba(0,224,164,.25); color: var(--ok); }
+    .banner.ban { border-color: rgba(255,85,119,.4); color: #ff9aaa; background: rgba(255,85,119,.08); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Scanner API Trace</h1>
+    <p class="sub">顯示 worker 每 5 分鐘掃描時實際呼叫的 Binance API。需啟用 <code>SCANNER_API_TRACE=1</code>。此頁為獨立測試外掛，不影響主程式。</p>
+  </header>
+  <main>
+    <div id="statusBanner" class="banner hidden"></div>
+    <div id="banBanner" class="banner ban hidden"></div>
+    <div class="toolbar">
+      <button class="primary" id="refreshBtn">重新載入</button>
+      <button type="button" id="downloadBtn" title="下載目前畫面上的 trace JSON">下載 JSON</button>
+      <label><input type="checkbox" id="richestMode"> 顯示歷史請求數最多快照</label>
+      <label><input type="checkbox" id="autoRefresh" checked> 每 30 秒自動更新</label>
+      <select id="phaseFilter" class="filter"><option value="">全部階段</option></select>
+      <select id="pathFilter" class="filter"><option value="">全部端點</option></select>
+      <input id="search" class="filter" placeholder="搜尋 URL / symbol">
+    </div>
+    <div id="summary" class="grid"></div>
+    <div id="phases" class="phase-bar"></div>
+    <div class="card" style="padding:0; overflow:auto">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>階段</th>
+            <th>端點</th>
+            <th>請求 URL</th>
+            <th>狀態</th>
+            <th>延遲</th>
+            <th>筆數</th>
+            <th>資料摘要</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty hidden" id="empty">尚無 trace 資料。請確認 worker 已設定 <code>SCANNER_API_TRACE=1</code>，並等待下一輪掃描（約 5 分鐘）後重新整理。</div>
+    </div>
+  </main>
+  <script>
+    const API_BASE = window.WEI_API_BASE || "/api/v1";
+    const USE_API = location.protocol.startsWith("http");
+    let traceData = null;
+    let timer = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    async function loadTrace() {
+      const errors = [];
+      const mode = $("richestMode").checked ? "richest" : "latest";
+      if (USE_API) {
+        try {
+          const res = await fetch(`${API_BASE}/market/api-trace?mode=${mode}`, { credentials: "include" });
+          if (res.status === 401) {
+            throw new Error("需要登入。請先開啟 login.html 登入，再回到此頁重新整理。");
+          }
+          const payload = await res.json();
+          if (payload.ok) return payload;
+          errors.push(payload.error || `API 回傳 ok=false (${res.status})`);
+        } catch (err) {
+          errors.push(err.message || String(err));
+        }
+      }
+      try {
+        const res = await fetch(`data/scanner_api_trace.json?ts=${Date.now()}`);
+        if (!res.ok) throw new Error(`data/scanner_api_trace.json (${res.status})`);
+        return await res.json();
+      } catch (err) {
+        errors.push(err.message || String(err));
+      }
+      throw new Error(errors.join(" · "));
+    }
+
+    function fmtMs(v) { return Number.isFinite(v) ? `${v} ms` : "—"; }
+    function shortTime(v) {
+      if (!v) return "—";
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString();
+    }
+
+    function inferBanStatus(data) {
+      if (data.ban_status) return data.ban_status;
+      const reqs = data.requests || [];
+      const count418 = reqs.filter((r) => r.status === 418).length;
+      if (!count418) return null;
+      let last418 = null;
+      for (let i = reqs.length - 1; i >= 0; i--) {
+        if (reqs[i].status === 418) {
+          last418 = reqs[i].at;
+          break;
+        }
+      }
+      const pauseSec = 600;
+      let untilUtc = null;
+      let remaining = 0;
+      let active = false;
+      if (last418) {
+        const until = new Date(last418);
+        if (!Number.isNaN(until.getTime())) {
+          until.setSeconds(until.getSeconds() + pauseSec);
+          untilUtc = until.toISOString();
+          remaining = Math.max(0, Math.floor((until.getTime() - Date.now()) / 1000));
+          active = remaining > 0;
+        }
+      }
+      return {
+        has_418: true,
+        status_418_count: count418,
+        status_429_count: reqs.filter((r) => r.status === 429).length,
+        last_418_at: last418,
+        scanner_pause_until_utc: untilUtc,
+        scanner_pause_remaining_seconds: remaining,
+        scanner_pause_active: active,
+        pause_seconds_after_418: pauseSec,
+        note: "（本機估算，與 worker 上 .binance_cooldown.json 可能略有差異）",
+      };
+    }
+
+    function renderBanBanner(data) {
+      const el = $("banBanner");
+      const b = inferBanStatus(data);
+      if (!b || !b.has_418) {
+        el.classList.add("hidden");
+        el.textContent = "";
+        return;
+      }
+      el.classList.remove("hidden");
+      const parts = [
+        `HTTP 418 共 ${b.status_418_count} 次`,
+        b.status_429_count ? `、429 共 ${b.status_429_count} 次` : "",
+        b.last_418_at ? `；最近 418：${shortTime(b.last_418_at)}` : "",
+      ];
+      if (b.scanner_pause_active && b.scanner_pause_until_utc) {
+        parts.push(
+          `。Scanner 暫停發請求至 ${shortTime(b.scanner_pause_until_utc)}（剩餘約 ${b.scanner_pause_remaining_seconds} 秒）`
+        );
+      } else if (b.scanner_pause_until_utc) {
+        parts.push(`。暫停截止：${shortTime(b.scanner_pause_until_utc)}（已過期或快照較舊，請重新載入）`);
+      } else if (b.last_418_at) {
+        parts.push(`。依最近 418 + ${b.pause_seconds_after_418 || 600}s 估算暫停中（請重新載入以更新）`);
+      }
+      if (b.note) parts.push(` ${b.note}`);
+      el.textContent = parts.join("");
+    }
+
+    function renderStatusBanner(data) {
+      const el = $("statusBanner");
+      const rank = data.snapshot_rank;
+      const rankNote = rank
+        ? `最新寫入 ${rank.latest_requests ?? "—"} 筆 @ ${shortTime(rank.latest_stored_at)}；歷史最多 ${rank.richest_requests ?? "—"} 筆 @ ${shortTime(rank.richest_stored_at)}`
+        : "";
+      if (data.partial || data.complete === false) {
+        el.className = "banner warn";
+        el.textContent = `進行中或未完成快照（phase=${data.current_phase || "—"}，已記錄 ${(data.summary || {}).total_requests || 0} 筆 HTTP）${rankNote}。若 worker 逾時，此為終止前最後寫入。更新：${shortTime(data.snapshot_at || data.stored_at)} · run ${data.run_id || "—"}`;
+        el.classList.remove("hidden");
+        return;
+      }
+      el.className = "banner ok";
+      el.textContent = `完整快照${rankNote} · ${shortTime(data.finished_at || data.stored_at)} · run ${data.run_id || "—"}`;
+      el.classList.remove("hidden");
+    }
+
+    function renderSummary(data) {
+      const s = data.summary || {};
+      const scan = data.scan || {};
+      $("summary").innerHTML = [
+        ["總請求數", s.total_requests || 0, ""],
+        ["成功 / 失敗", `${s.success_count || 0} / ${s.error_count || 0}`, s.error_count ? "err" : "ok"],
+        ["總 API 耗時", fmtMs(s.total_api_ms), ""],
+        ["掃描總耗時", fmtMs(data.duration_ms), ""],
+        ["平均延遲", fmtMs(s.avg_latency_ms), ""],
+        ["總資料筆數", s.total_records || 0, ""],
+        ["掃描幣種", scan.symbols_scanned ?? "—", ""],
+        ["訊號數", scan.signals_found ?? "—", ""],
+      ].map(([k, v, cls]) => `<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v}</div></div>`).join("");
+      const b = inferBanStatus(data);
+      if (b && b.has_418) {
+        const banCard = b.scanner_pause_active
+          ? `<div class="card"><div class="k">418 暫停至 (UTC)</div><div class="v err">${escapeHtml(shortTime(b.scanner_pause_until_utc))}</div></div>`
+          : `<div class="card"><div class="k">418 次數</div><div class="v err">${b.status_418_count}</div></div>`;
+        $("summary").insertAdjacentHTML("beforeend", banCard);
+      }
+    }
+
+    function renderPhases(data) {
+      $("phases").innerHTML = (data.phases || []).map((p) =>
+        `<div class="phase"><strong>${p.name}</strong><br>${fmtMs(p.duration_ms)} · ${shortTime(p.started_at)}</div>`
+      ).join("");
+    }
+
+    function summarizeRow(row) {
+      const summary = row.data_summary;
+      if (!summary) return row.error || "—";
+      if (summary.type === "array") return `${summary.count} 筆`;
+      if (summary.type === "object") return `物件 · ${(summary.keys || []).slice(0, 4).join(", ")}`;
+      return summary.value || summary.type || "—";
+    }
+
+    function buildFilters(requests) {
+      const phases = [...new Set(requests.map((r) => r.phase).filter(Boolean))];
+      const paths = [...new Set(requests.map((r) => r.path).filter(Boolean))];
+      const phaseSel = $("phaseFilter");
+      const pathSel = $("pathFilter");
+      const phaseVal = phaseSel.value;
+      const pathVal = pathSel.value;
+      phaseSel.innerHTML = `<option value="">全部階段</option>${phases.map((p) => `<option value="${p}">${p}</option>`).join("")}`;
+      pathSel.innerHTML = `<option value="">全部端點</option>${paths.map((p) => `<option value="${p}">${p}</option>`).join("")}`;
+      phaseSel.value = phaseVal;
+      pathSel.value = pathVal;
+    }
+
+    function filteredRequests(data) {
+      const q = $("search").value.trim().toLowerCase();
+      const phase = $("phaseFilter").value;
+      const path = $("pathFilter").value;
+      return (data.requests || []).filter((row) => {
+        if (phase && row.phase !== phase) return false;
+        if (path && row.path !== path) return false;
+        if (q) {
+          const hay = `${row.url || ""} ${JSON.stringify(row.params || {})}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderTable(data) {
+      const rows = filteredRequests(data);
+      buildFilters(data.requests || []);
+      $("empty").classList.toggle("hidden", rows.length > 0);
+      $("rows").innerHTML = rows.map((row, i) => {
+        const ok = !row.error;
+        return `<tr>
+          <td><button data-toggle="${i}" style="width:28px">▸</button></td>
+          <td>${row.phase || "—"}</td>
+          <td class="mono">${row.path || "—"}</td>
+          <td class="mono">${row.url || "—"}</td>
+          <td><span class="badge ${ok ? "ok" : "err"}">${ok ? row.status : "ERR"}</span></td>
+          <td>${fmtMs(row.duration_ms)}</td>
+          <td>${row.record_count ?? "—"}</td>
+          <td>${summarizeRow(row)}</td>
+        </tr>
+        <tr class="detail" id="detail-${i}"><td colspan="8"><pre>${escapeHtml(JSON.stringify(row, null, 2))}</pre></td></tr>`;
+      }).join("");
+      $("rows").querySelectorAll("[data-toggle]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const row = document.getElementById(`detail-${btn.dataset.toggle}`);
+          row.classList.toggle("open");
+          btn.textContent = row.classList.contains("open") ? "▾" : "▸";
+        });
+      });
+    }
+
+    function escapeHtml(text) {
+      return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    }
+
+    function tracePayloadForExport(data) {
+      const copy = { ...data };
+      for (const key of ["ok", "source", "stored_at", "snapshot_rank"]) {
+        delete copy[key];
+      }
+      return copy;
+    }
+
+    function downloadTraceJson() {
+      if (!traceData) {
+        alert("尚無資料，請先重新載入。");
+        return;
+      }
+      const payload = tracePayloadForExport(traceData);
+      const stamp = (traceData.finished_at || traceData.snapshot_at || traceData.started_at || "")
+        .replace(/[:.]/g, "-")
+        .slice(0, 19);
+      const name = `scanner_api_trace_${traceData.run_id || stamp || "export"}.json`;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function refresh() {
+      try {
+        traceData = await loadTrace();
+        document.title = `Scanner API Trace · ${shortTime(traceData.finished_at || traceData.snapshot_at || traceData.started_at)}`;
+        renderStatusBanner(traceData);
+        renderBanBanner(traceData);
+        renderSummary(traceData);
+        renderPhases(traceData);
+        renderTable(traceData);
+      } catch (err) {
+        $("summary").innerHTML = `<div class="card" style="grid-column:1/-1"><div class="k">狀態</div><div class="v err">${escapeHtml(err.message)}</div></div>`;
+        $("phases").innerHTML = "";
+        $("rows").innerHTML = "";
+        $("banBanner").classList.add("hidden");
+        $("empty").classList.remove("hidden");
+      }
+    }
+
+    function setupAutoRefresh() {
+      clearInterval(timer);
+      if ($("autoRefresh").checked) timer = setInterval(refresh, 30000);
+    }
+
+    $("refreshBtn").addEventListener("click", refresh);
+    $("downloadBtn").addEventListener("click", downloadTraceJson);
+    $("richestMode").addEventListener("change", refresh);
+    $("autoRefresh").addEventListener("change", setupAutoRefresh);
+    ["phaseFilter", "pathFilter", "search"].forEach((id) => {
+      $(id).addEventListener("input", () => traceData && renderTable(traceData));
+      $(id).addEventListener("change", () => traceData && renderTable(traceData));
+    });
+
+    refresh();
+    setupAutoRefresh();
+  </script>
+</body>
+</html>

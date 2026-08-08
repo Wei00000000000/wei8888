@@ -93,15 +93,15 @@ class SentimentScanner:
         self.client = client
         self.config = config or ScannerConfig()
 
-    def latest_signal(self, symbol: str) -> Signal | None:
-        klines, oi_points, taker_points = self._load(symbol)
+    async def latest_signal(self, symbol: str) -> Signal | None:
+        klines, oi_points, taker_points = await self._load(symbol)
         snapshots = self._snapshots(symbol, klines, oi_points, taker_points)
         if not snapshots:
             return None
         return self._signal_from_snapshot(snapshots[-1])
 
-    def backtest(self, symbol: str) -> list[EvaluatedSignal]:
-        klines, oi_points, taker_points = self._load(symbol)
+    async def backtest(self, symbol: str) -> list[EvaluatedSignal]:
+        klines, oi_points, taker_points = await self._load(symbol)
         snapshots = self._snapshots(symbol, klines, oi_points, taker_points)
         kline_by_time = {kline.open_time: kline for kline in klines}
         signals: list[EvaluatedSignal] = []
@@ -119,15 +119,15 @@ class SentimentScanner:
             signals.append(self._evaluate_signal(signal, kline_by_time))
         return signals
 
-    def _load(
+    async def _load(
         self, symbol: str
     ) -> tuple[list[Kline], list[OpenInterestPoint], list[TakerPoint]]:
-        klines = self.client.klines(symbol, interval=self.config.interval, limit=self.config.lookback_limit)
-        oi_points = self.client.open_interest_hist(
+        klines = await self.client.klines(symbol, interval=self.config.interval, limit=self.config.lookback_limit)
+        oi_points = await self.client.open_interest_hist(
             symbol, period=self.config.interval, limit=min(self.config.lookback_limit, 500)
         )
         try:
-            taker_points = self.client.taker_buy_sell_volume(
+            taker_points = await self.client.taker_buy_sell_volume(
                 symbol, period=self.config.interval, limit=min(self.config.lookback_limit, 500)
             )
         except Exception:
