@@ -1,4 +1,4 @@
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 COPY index.html app.html login.html scanner-api-trace.html api-config.js sw.js manifest.webmanifest icon.svg icon-192.png icon-512.png brand-hero.png /usr/share/nginx/html/
 COPY data/ /usr/share/nginx/html/data/
 EXPOSE 8080
