@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sentiment_scanner.binance import BinanceFuturesClient
+from sentiment_scanner.bybit_okx import BybitOkxFuturesClient
 from sentiment_scanner.market_data import market_client
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 APP_HTML = ROOT / "sentiment_scanner" / "app.html"
@@ -114,7 +114,7 @@ def fallback_market(symbol: str, rows: list[dict[str, object]]) -> dict[str, obj
     }
 
 
-async def live_market(client: BinanceFuturesClient, symbol: str) -> dict[str, object]:
+async def live_market(client: BybitOkxFuturesClient, symbol: str) -> dict[str, object]:
     config = ScannerConfig(lookback_limit=500, oi_percentile_threshold=99, oi_change_min_pct=3)
     scanner = SentimentScanner(client, config)
     klines, oi_points, taker_points = await scanner._load(symbol)
