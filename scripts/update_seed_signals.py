@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from sentiment_scanner.binance import funding_rate_map, normalize_symbols, oi_change_pct
-from sentiment_scanner.bybit_okx import BybitOkxFuturesClient
+from sentiment_scanner.market_data import AsyncOkxFuturesClient
 from sentiment_scanner.cli import format_signal
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 
@@ -56,12 +56,12 @@ def min_quote_volume() -> float:
 
 def provider_name() -> str:
     """回報目前使用的行情資料供應商名稱。"""
-    return "bybit+okx"
+    return "okx"
 
 
-def market_client(timeout: float = 20.0) -> BybitOkxFuturesClient:
+def market_client(timeout: float = 20.0) -> AsyncOkxFuturesClient:
     """建立 Bybit 主行情、OKX 價格驗證的永續合約客戶端。"""
-    return BybitOkxFuturesClient(timeout=timeout)
+    return AsyncOkxFuturesClient(timeout=timeout)
 
 
 def previous_success_at() -> str | None:
