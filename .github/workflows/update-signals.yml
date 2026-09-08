@@ -1,15 +1,15 @@
 name: Update live signals
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
+  # GitHub-hosted runners are blocked by Binance (HTTP 451).
+  # The Zeabur worker is the only 24/7 scanner; this remains an explicit manual fallback.
   workflow_dispatch:
     inputs:
-      run_backup_scan:
-        description: "Run the scanner now"
+      run_manual_emergency_scan:
+        description: "Run the emergency scanner despite GitHub runner restrictions"
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write
@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   update:
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_backup_scan == true) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_manual_emergency_scan == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -51,40 +51,21 @@ jobs:
           MARKET_DATA_PROVIDER: "binance"
           CONTRACT_KLINE_CANDIDATES: "120"
           CONTRACT_DETAIL_CANDIDATES: "20"
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          for attempt in 1 2; do
-            python scripts/update_seed_signals.py && exit 0
-            echo "Scan attempt ${attempt} failed; retrying shortly"
-            sleep 20
-          done
-          exit 1
+        run: python scripts/update_seed_signals.py
       - name: Export website data
         run: python scripts/export_github_pages.py
-      - name: Commit updated signals
+      - name: Commit updated website data
         env:
           GIT_TERMINAL_PROMPT: "0"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config pull.rebase true
           rm -rf data
           cp -r site/data ./data
-          cp -f site/sentiment_scanner/seed_signals.json sentiment_scanner/seed_signals.json
-          cp -f site/sentiment_scanner/contract_anomalies.json sentiment_scanner/contract_anomalies.json
-          cp -f site/sentiment_scanner/scanner_status.json sentiment_scanner/scanner_status.json
-          git add sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json data
+          git add data sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json
           if git diff --cached --quiet; then
             echo "No signal updates"
           else
             git commit -m "Update live sentiment signals"
-            for attempt in 1 2 3; do
-              git fetch origin main
-              git rebase -X theirs origin/main
-              git push && exit 0
-              echo "Push attempt ${attempt} failed; retrying after rebase"
-              sleep 5
-            done
-            exit 1
+            git push
           fi
