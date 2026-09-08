@@ -22,12 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sentiment_scanner.binance import (
-    BinanceFuturesClient,
-    funding_rate_map,
-    normalize_symbols,
-    oi_change_pct,
-)
+from sentiment_scanner.binance import funding_rate_map, normalize_symbols, oi_change_pct
+from sentiment_scanner.bybit_okx import BybitOkxFuturesClient
 from sentiment_scanner.cli import format_signal
 from sentiment_scanner.scanner import ScannerConfig, SentimentScanner
 
@@ -60,12 +56,12 @@ def min_quote_volume() -> float:
 
 def provider_name() -> str:
     """回報目前使用的行情資料供應商名稱。"""
-    return "binance"
+    return "bybit+okx"
 
 
-def market_client(timeout: float = 20.0) -> BinanceFuturesClient:
-    """建立 Binance 永續合約 HTTP 客戶端。"""
-    return BinanceFuturesClient(timeout=timeout)
+def market_client(timeout: float = 20.0) -> BybitOkxFuturesClient:
+    """建立 Bybit 主行情、OKX 價格驗證的永續合約客戶端。"""
+    return BybitOkxFuturesClient(timeout=timeout)
 
 
 def previous_success_at() -> str | None:
@@ -342,7 +338,7 @@ def cvd_ratio(row: dict[str, object], suffix: str = "1h") -> float:
     return (long_vol - short_vol) / total * 100.0
 
 
-async def ticker_volume_book(client: BinanceFuturesClient, min_volume: float) -> tuple[list[str], dict[str, float]]:
+async def ticker_volume_book(client: BybitOkxFuturesClient, min_volume: float) -> tuple[list[str], dict[str, float]]:
     """取得 24h 成交量 ≥ min_volume 的 USDT 永續合約，依成交量降序排列。"""
     tickers = await client.ticker_24hr()
     rows = [
@@ -583,14 +579,14 @@ def funding_map(rows: list[dict[str, object]]) -> dict[str, float]:
     return book
 
 
-def build_contract_radar_from_binance_tickers(
+def build_contract_radar_from_market_tickers(
     tickers: list[dict[str, object]],
     funding_by_symbol: dict[str, float],
     min_volume: float,
     short_changes: dict[str, dict[str, float]] | None = None,
     market_details: dict[str, dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
-    """用 Binance 24h ticker + 短週期 K 線變化 + 持倉細節建立合約雷達。"""
+    """用 Bybit 24h ticker、OKX 驗證、短週期 K 線與持倉細節建立合約雷達。"""
     funding = funding_by_symbol
     short_changes = short_changes or {}
     market_details = market_details or {}
@@ -680,7 +676,7 @@ def build_contract_radar_from_binance_tickers(
                 "top_position_long_short_ratio_1h": detail.get("top_position_long_short_ratio_1h"),
                 "long_liquidation_1h": detail.get("long_liquidation_usd_1h"),
                 "short_liquidation_1h": detail.get("short_liquidation_usd_1h"),
-                "reasons": ["Binance高成交量", "Binance資金費率"] if fr else ["Binance高成交量"],
+                "reasons": ["Bybit高成交量", "Bybit資金費率", "OKX價格驗證"] if fr else ["Bybit高成交量", "OKX價格驗證"],
                 "updated_at": now,
                 "triggered_at_ms": int(short.get("last_completed_at_ms") or observed_at_ms)
                 if trigger in {"price_5m", "price_15m"}
@@ -704,7 +700,7 @@ def candidate_symbols_from_tickers(tickers: list[dict[str, object]], min_volume:
     return [str(item.get("symbol")) for item in ranked[:limit]]
 
 
-async def short_kline_changes(client: BinanceFuturesClient, symbols: list[str]) -> dict[str, dict[str, float]]:
+async def short_kline_changes(client: BybitOkxFuturesClient, symbols: list[str]) -> dict[str, dict[str, float]]:
     """並行載入各幣 5m K 線，計算 5m / 15m / 1h 價格變化百分比。"""
     async def load(symbol: str) -> tuple[str, dict[str, float]]:
         rows = await client.klines(symbol, interval="5m", limit=14)
@@ -850,7 +846,7 @@ def _structure_snapshot(klines: list[object], side: str) -> dict[str, object]:
 
 
 async def load_entry_engine_book(
-    client: BinanceFuturesClient,
+    client: BybitOkxFuturesClient,
     symbols: list[str],
     limit: int = 80,
 ) -> dict[str, dict[str, list[object]]]:
@@ -931,8 +927,8 @@ def latest_ratio(rows: list[dict[str, object]]) -> float | None:
     return as_float(rows[-1].get("longShortRatio"))
 
 
-async def binance_positioning_details(
-    client: BinanceFuturesClient,
+async def market_positioning_details(
+    client: BybitOkxFuturesClient,
     symbols: list[str],
 ) -> dict[str, dict[str, object]]:
     """並行抓取各幣的 CVD、散戶/大戶多空比、OI 變化等持倉細節。"""
@@ -978,7 +974,7 @@ async def binance_positioning_details(
 
 
 async def build_live_contract_radar(
-    client: BinanceFuturesClient,
+    client: BybitOkxFuturesClient,
     min_volume: float,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     """組裝即時合約雷達：ticker + 短週期 K 線 + 持倉細節 + 資金費率。"""
@@ -990,10 +986,10 @@ async def build_live_contract_radar(
     detail_symbols = candidates[:detail_limit]
     changes, details = await asyncio.gather(
         short_kline_changes(client, candidates),
-        binance_positioning_details(client, detail_symbols),
+        market_positioning_details(client, detail_symbols),
     )
     funding_by_symbol = funding_rate_map(premium_rows)
-    rows = build_contract_radar_from_binance_tickers(
+    rows = build_contract_radar_from_market_tickers(
         tickers,
         funding_by_symbol,
         min_volume,
@@ -1067,7 +1063,7 @@ def active_position_counts(rows: list[dict[str, object]]) -> dict[tuple[str, str
 def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None:
     """合約訊號冷卻期內的回傳鍵，用於避免短時間重複開倉。"""
     setup = str(row.get("setup_id") or "")
-    if "binance_contract" not in setup and "coinglass_contract" not in setup:
+    if "market_contract" not in setup and "coinglass_contract" not in setup:
         return None
     if str(row.get("status") or "active") != "active":
         return None
@@ -1082,7 +1078,7 @@ def recent_active_contract_key(row: dict[str, object]) -> tuple[str, str] | None
 
 
 async def signals_from_contract_radar(
-    client: BinanceFuturesClient,
+    client: BybitOkxFuturesClient,
     radar_rows: list[dict[str, object]],
     existing: list[dict[str, object]],
     config: ScannerConfig,
@@ -1147,7 +1143,7 @@ async def signals_from_contract_radar(
                     "symbol": symbol,
                     "timeframe": "15M",
                     "signal_type": signal_type,
-                    "setup_id": f"binance_contract_{bias}_{trigger}",
+                    "setup_id": f"market_contract_{bias}_{trigger}",
                     "triggered_at_ms": triggered_at_ms,
                     "triggered_at": iso_ms(triggered_at_ms),
                     "trigger_price": price,
@@ -1159,7 +1155,7 @@ async def signals_from_contract_radar(
                     "tp3_price": tp3,
                     "ftp_price": ftp,
                     "risk": risk,
-                    "sl_source": "binance_risk_pct",
+                    "sl_source": "market_risk_pct",
                     "oi_percentile": min(100.0, max(0.0, 88.0 + abs(float(row.get("score") or 0)) / 8)),
                     "oi_change_pct": row.get("oi_change_1h"),
                     "price_change_pct": row.get("price_change_15m") or row.get("price_change_1h"),
@@ -1168,7 +1164,7 @@ async def signals_from_contract_radar(
                     "taker_buy_ratio": None,
                     "oi_value": 0,
                     "oi_value_usdt": row.get("oi_usd"),
-                    "source": "binance_contract_scan",
+                    "source": "bybit_okx_contract_scan",
                     "snapshot_data": {
                         "contract_radar": True,
                         "entry_engine": engine,
@@ -1281,7 +1277,7 @@ def replay_signal_state(row: dict[str, object], klines: list[object]) -> tuple[s
     return current, hit_price, hit_at, max_reached
 
 
-async def update_existing_states(client: BinanceFuturesClient, rows: list[dict[str, object]]) -> dict[str, int]:
+async def update_existing_states(client: BybitOkxFuturesClient, rows: list[dict[str, object]]) -> dict[str, int]:
     """
     對所有進行中持倉回放 K 線，更新 reached_state / current_price / status。
     若行情源連續失敗，超過閾值後標記為 invalid 並關閉。
@@ -1451,7 +1447,7 @@ def lock_signal_to_latest_price(row: dict[str, object], latest_price: float) -> 
 
 
 async def lock_new_official_entries(
-    client: BinanceFuturesClient,
+    client: BybitOkxFuturesClient,
     found: list[dict[str, object]],
     existing_ids: set[str],
 ) -> int:
@@ -1639,7 +1635,7 @@ def apply_5m_confluence(row: dict[str, object], snapshot: object) -> dict[str, o
 
 
 async def scan_symbol(
-    client: BinanceFuturesClient,
+    client: BybitOkxFuturesClient,
     symbol: str,
     config: ScannerConfig,
     divergence_config: ScannerConfig,
@@ -1672,10 +1668,10 @@ async def scan_symbol(
     return rows
 
 
-async def resolve_symbols(client: BinanceFuturesClient) -> list[str]:
+async def resolve_symbols(client: BybitOkxFuturesClient) -> list[str]:
     """
     決定本次掃描的幣種清單。
-    優先從 Binance 24h ticker 篩選高成交量幣；失敗時退回 seed 既有幣種。
+    優先從 Bybit 24h ticker 篩選高成交量幣；失敗時退回 seed 既有幣種。
     SCAN_TOP>0 時只取前 N 名。
     """
     top = int(os.getenv("SCAN_TOP", "0") or "0")
@@ -1724,7 +1720,7 @@ async def main_async() -> None:
     radar_meta: dict[str, object] = {}
     trace = _START_API_TRACE(ROOT) if _START_API_TRACE else None
     symbols: list[str] = []
-    async with BinanceFuturesClient(timeout=60) as client:
+    async with market_client(timeout=60) as client:
         if trace:
             trace.attach(client)
             trace.set_phase("init")
@@ -1773,7 +1769,7 @@ async def main_async() -> None:
             if contract_radar:
                 contract_signals = await signals_from_contract_radar(client, contract_radar, existing + found, config)
                 found.extend(apply_volume_gate(row, SYMBOL_VOLUME_24H) for row in contract_signals)
-                print(f"binance_contract_signals={len(contract_signals)}")
+                print(f"market_contract_signals={len(contract_signals)}")
 
             # --- 6. 合併新舊訊號（by_id 去重，限制同幣同方向持倉數） ---
             if trace:
