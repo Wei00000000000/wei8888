@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from time import time
 
-from .binance import BinanceFuturesClient, Kline, OpenInterestPoint, TakerPoint
+from .binance import Kline, OpenInterestPoint, TakerPoint
 from .indicators import atr, percentile_rank
 
 
@@ -89,7 +89,7 @@ class EvaluatedSignal:
 
 
 class SentimentScanner:
-    def __init__(self, client: BinanceFuturesClient, config: ScannerConfig | None = None) -> None:
+    def __init__(self, client: object, config: ScannerConfig | None = None) -> None:
         self.client = client
         self.config = config or ScannerConfig()
 
