@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from shutil import copyfile
 from urllib.request import Request, urlopen
@@ -21,6 +22,8 @@ SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"
 SCANNER_API_TRACE = ROOT / "sentiment_scanner" / "scanner_api_trace.json"
 BRAND_IMAGE = ROOT / "sentiment_scanner" / "brand-hero.png"
 OUT = ROOT / "site"
+PROTECTED_HISTORY_START_AT = "2026-09-09T00:00:00+08:00"
+
 MAIN_SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
     "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "TONUSDT",
@@ -49,12 +52,34 @@ SECTOR_SYMBOLS = {
 }
 
 
+def parse_time(value: object) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+def protected_history_cutoff() -> datetime:
+    return datetime.fromisoformat(PROTECTED_HISTORY_START_AT.replace("Z", "+00:00"))
+
+
+def signal_time(row: dict[str, object]) -> datetime | None:
+    return parse_time(row.get("triggered_at") or row.get("established_at") or row.get("detected_at"))
+
+
+def keep_protected_history(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    cutoff = protected_history_cutoff()
+    return [row for row in rows if (started := signal_time(row)) and started >= cutoff]
+
+
 def load_seed_rows() -> list[dict[str, object]]:
     if SEED.exists():
         rows = json.loads(SEED.read_text(encoding="utf-8") or "[]")
         if rows:
-            return [row for row in rows if isinstance(row, dict)]
-    return load_exported_history_rows()
+            return keep_protected_history([row for row in rows if isinstance(row, dict)])
+    return keep_protected_history(load_exported_history_rows())
 
 
 def load_exported_history_rows() -> list[dict[str, object]]:
@@ -107,6 +132,90 @@ def build_quick_rows(seed_rows: list[dict[str, object]], recent_limit: int = 800
             continue
         seen.add(key)
         rows.append(row)
+    return rows
+
+
+def as_float(value: object, default: float = 0.0) -> float:
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def signal_side(row: dict[str, object]) -> str:
+    return "long" if row.get("signal_type") == "reversal_bullish" else "short"
+
+
+def signal_position_status(row: dict[str, object]) -> str:
+    state = str(row.get("reached_state") or "holding")
+    status = str(row.get("status") or "active")
+    if state in {"sl", "ftp"} or status == "closed":
+        return "CLOSED"
+    return "OPEN"
+
+
+def signal_pnl_pct(row: dict[str, object]) -> float:
+    entry = as_float(row.get("entry_price") or row.get("trigger_price"))
+    sl = as_float(row.get("sl_price"))
+    if entry <= 0 or sl <= 0:
+        return 0.0
+    risk_pct = abs(entry - sl) / entry * 100
+    state = str(row.get("reached_state") or "holding")
+    if state == "sl":
+        return -risk_pct
+    if state == "tp1":
+        return risk_pct
+    if state == "tp2":
+        return risk_pct * 1.7
+    if state == "tp3":
+        return risk_pct * 2.3
+    if state == "ftp":
+        return risk_pct * 3.3
+    return 0.0
+
+
+def build_positions(seed_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for row in seed_rows:
+        entry = as_float(row.get("entry_price") or row.get("trigger_price"))
+        if not row.get("symbol") or entry <= 0:
+            continue
+        state = str(row.get("reached_state") or "holding")
+        exit_price = ""
+        if state == "sl":
+            exit_price = row.get("sl_price")
+        elif state == "ftp":
+            exit_price = row.get("ftp_price")
+        elif state == "tp3":
+            exit_price = row.get("tp3_price")
+        elif state == "tp2":
+            exit_price = row.get("tp2_price")
+        elif state == "tp1":
+            exit_price = row.get("tp1_price")
+        rows.append(
+            {
+                "id": row.get("id") or row.get("signal_id") or signal_identity(row),
+                "signal_id": row.get("signal_id") or row.get("id") or signal_identity(row),
+                "symbol": str(row.get("symbol") or "").replace("USDT", ""),
+                "side": signal_side(row),
+                "timeframe": row.get("timeframe") or row.get("interval") or "-",
+                "strategy_name": row.get("setup_id") or row.get("strategy_name") or "signal",
+                "status": signal_position_status(row),
+                "entry_price": entry,
+                "stop_loss": row.get("active_sl_price") or row.get("sl_price"),
+                "take_profit_1": row.get("tp1_price"),
+                "take_profit_2": row.get("tp2_price"),
+                "take_profit_3": row.get("tp3_price"),
+                "take_profit_final": row.get("ftp_price"),
+                "exit_price": exit_price if signal_position_status(row) == "CLOSED" else "",
+                "pnl_percent": signal_pnl_pct(row),
+                "entry_time": row.get("triggered_at") or row.get("established_at") or row.get("detected_at"),
+                "exit_time": row.get("hit_at") if signal_position_status(row) == "CLOSED" else "",
+                "reached_state": state,
+            }
+        )
     return rows
 
 
@@ -296,6 +405,7 @@ async def main_async() -> None:
     (OUT / "data" / "history").mkdir(parents=True, exist_ok=True)
     seed_rows = load_seed_rows()
     quick_rows = build_quick_rows(seed_rows)
+    positions = build_positions(seed_rows)
     contract_radar = load_contract_radar()
     markets = await build_markets(seed_rows)
     sector_flows = build_sector_flows()
@@ -309,6 +419,10 @@ async def main_async() -> None:
     )
     (OUT / "data" / "active_signals.json").write_text(
         json.dumps({"rows": quick_rows, "total": len(seed_rows), "quick": len(quick_rows)}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    (OUT / "data" / "positions.json").write_text(
+        json.dumps({"rows": positions, "total": len(positions), "history_start_at": PROTECTED_HISTORY_START_AT}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     chunk_size = 500
@@ -354,6 +468,8 @@ async def main_async() -> None:
         json.dumps(
             {
                 "active_signals": "active_signals.json",
+                "positions": "positions.json",
+                "history_start_at": PROTECTED_HISTORY_START_AT,
                 "history_chunks": history_chunks,
                 "signal_chunks": history_chunks,
                 "total_signals": len(seed_rows),
