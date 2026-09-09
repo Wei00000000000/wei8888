@@ -1862,6 +1862,7 @@ async def main_async() -> None:
                 f"changed={state_consistency['changed']} closed={state_consistency['closed']}"
             )
 
+            rows_for_state = keep_current_history(rows_for_state)
             rows = sorted(
                 rows_for_state,
                 key=lambda row: str(row.get("triggered_at") or row.get("detected_at") or ""),
