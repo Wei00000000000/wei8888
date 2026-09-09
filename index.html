@@ -467,9 +467,147 @@
     .tabs-line { gap:10px; border:0; padding:5px; width:fit-content; max-width:100%; overflow:auto; background:rgba(8,13,30,.6); border-radius:12px; } .tabs-line span { padding:8px 12px; white-space:nowrap; border-radius:8px; } .tabs-line span.active { border:0; background:rgba(89,107,255,.25); color:#fff; }
     @media (max-width:960px) { .top-inner { padding:10px 16px; flex-wrap:wrap; } .main { padding:18px 16px 60px; } .brand { min-width:auto; } .brand-hero { min-height:180px; padding:28px 22px; } .nav { order:3; width:100%; justify-content:flex-start; overflow:auto; flex-wrap:nowrap; } }
     @media (max-width:560px) { .top-actions { min-width:auto; } .brand-sub,.brand-hero::after { display:none; } .brand-hero h2 { font-size:32px; } .round-btn:nth-child(2),.round-btn:nth-child(4) { display:none; } }
+  
+    /* 3D technology redesign */
+    .tech-canvas-3d {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -3;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 12%, rgba(0, 226, 255, .12), transparent 30%),
+        radial-gradient(circle at 86% 28%, rgba(0, 255, 164, .10), transparent 28%),
+        linear-gradient(180deg, #030610 0%, #060b18 48%, #02040a 100%);
+    }
+    body {
+      background:
+        linear-gradient(rgba(69, 211, 255, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(69, 211, 255, .035) 1px, transparent 1px),
+        radial-gradient(circle at 50% 0%, rgba(0, 230, 255, .10), transparent 32%),
+        #02040a !important;
+      background-size: 42px 42px, 42px 42px, auto, auto !important;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: auto -15vw -26vh -15vw;
+      height: 52vh;
+      z-index: -2;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(0, 229, 255, .22) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 255, .16) 1px, transparent 1px);
+      background-size: 54px 54px;
+      transform: perspective(620px) rotateX(64deg);
+      transform-origin: center bottom;
+      filter: drop-shadow(0 0 18px rgba(0, 229, 255, .20));
+      opacity: .78;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(255,255,255,.035), transparent 14%, transparent 86%, rgba(255,255,255,.035));
+      mix-blend-mode: screen;
+    }
+    .top {
+      background: rgba(3, 8, 18, .76) !important;
+      border-bottom: 1px solid rgba(67, 219, 255, .24) !important;
+      box-shadow: 0 18px 50px rgba(0,0,0,.32), inset 0 -1px 0 rgba(255,255,255,.04);
+    }
+    .nav {
+      background: rgba(5, 12, 26, .74);
+      border: 1px solid rgba(87, 214, 255, .18);
+      border-radius: 999px;
+      padding: 4px;
+      box-shadow: inset 0 0 22px rgba(0, 210, 255, .08);
+    }
+    .nav button {
+      border-radius: 999px !important;
+      color: #b8d9ee !important;
+      background: transparent !important;
+    }
+    .nav button.active {
+      background: linear-gradient(135deg, rgba(0, 225, 255, .22), rgba(0, 255, 164, .18)) !important;
+      color: #f5fdff !important;
+      border-color: rgba(121, 233, 255, .55) !important;
+      box-shadow: 0 0 24px rgba(0, 225, 255, .24), inset 0 0 18px rgba(255,255,255,.06);
+    }
+    .panel, .brand-hero, .radar-strip, .backtest-panel, .decision-panel, .signal-card, .terminal-card, .watch-stat {
+      border-color: rgba(89, 221, 255, .18) !important;
+      background: linear-gradient(145deg, rgba(7, 17, 34, .88), rgba(3, 8, 18, .78)) !important;
+      box-shadow: 0 22px 70px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.055);
+    }
+    .brand-hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 174px;
+      transform-style: preserve-3d;
+    }
+    .brand-hero::before {
+      content: "";
+      position: absolute;
+      width: 340px;
+      height: 340px;
+      right: clamp(12px, 6vw, 92px);
+      top: 50%;
+      transform: translateY(-50%) rotateX(58deg) rotateZ(42deg);
+      border: 1px solid rgba(91, 231, 255, .26);
+      background:
+        linear-gradient(90deg, rgba(0, 225, 255, .20) 1px, transparent 1px),
+        linear-gradient(rgba(0, 225, 255, .16) 1px, transparent 1px);
+      background-size: 24px 24px;
+      box-shadow: 0 0 60px rgba(0, 225, 255, .20);
+      opacity: .72;
+    }
+    .brand-hero::after {
+      content: "OI/CVD";
+      position: absolute;
+      right: clamp(32px, 9vw, 150px);
+      top: 50%;
+      transform: translateY(-50%) translateZ(30px);
+      color: rgba(202, 250, 255, .16);
+      font: 800 clamp(44px, 9vw, 112px)/1 var(--mono);
+      letter-spacing: .04em;
+    }
+    .signal-hub-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      border: 1px solid rgba(82, 219, 255, .18);
+      background: rgba(5, 14, 29, .62);
+      box-shadow: inset 0 0 24px rgba(0, 229, 255, .07);
+    }
+    .signal-hub-line span.active {
+      background: linear-gradient(135deg, rgba(0, 225, 255, .22), rgba(0, 255, 164, .15));
+      border-color: rgba(108, 229, 255, .45);
+      box-shadow: 0 0 20px rgba(0, 225, 255, .18);
+    }
+    .view#signals, .view#contract, .view#quality {
+      margin-top: 18px;
+    }
+    .section-title, .watch-title, .brand-title {
+      text-shadow: 0 0 24px rgba(0, 225, 255, .18);
+    }
+    .btn.primary, .pill.accent {
+      background: linear-gradient(135deg, rgba(0, 225, 255, .24), rgba(0, 255, 164, .20)) !important;
+      border-color: rgba(115, 234, 255, .52) !important;
+      box-shadow: 0 0 22px rgba(0, 225, 255, .18);
+    }
+    @media (max-width: 760px) {
+      .brand-hero::before { width: 220px; height: 220px; right: -72px; opacity: .46; }
+      .brand-hero::after { right: 16px; font-size: 44px; opacity: .7; }
+      .nav { width: 100%; justify-content: center; }
+    }
+
   </style>
 </head>
 <body>
+  <canvas id="techCanvas3d" class="tech-canvas-3d" aria-hidden="true"></canvas>
   <div class="gate" id="loginGate">
     <section class="gate-card">
       <div class="kicker">Private Access</div>
@@ -493,10 +631,7 @@
         </div>
       </div>
       <nav class="nav">
-        <button class="active" data-view="dashboard">儀表板</button>
-        <button data-view="signals">數據交易訊號</button>
-        <button data-view="contract">合約異常雷達</button>
-        <button data-view="quality">高品質訊號</button>
+        <button class="active" data-view="dashboard">3D 訊號中樞</button>
         <button data-view="positions">倉位歷史</button>
         <button data-view="review">交易檢討</button>
       </nav>
@@ -555,7 +690,7 @@
         <section class="decision-panel"><div class="kicker">策略績效</div><div class="watch-stats" id="decisionPerformance"></div></section>
         <section class="decision-panel"><div class="kicker">交易檢討摘要</div><div class="decision-list" id="decisionReview"></div></section>
       </div>
-      <div class="tabs-line"><span class="active">儀表板</span><span>數據交易訊號</span><span>高品質訊號</span><span>合約異常雷達</span></div>
+      <div class="tabs-line signal-hub-line"><span class="active">數據交易訊號</span><span class="active">合約異常雷達</span><span class="active">高品質訊號</span></div>
       <div class="section-head">
         <div><span class="watch-title">板塊資金流動</span><span class="watch-sub" id="sectorMeta">等待更新</span></div>
       </div>
@@ -1703,6 +1838,8 @@
         renderVolumeAnomalies();
         renderWatchDashboard();
         renderSignals();
+        renderContractRadar();
+        renderHighQuality();
       } else if (state.currentView === "signals") renderSignals();
       else if (state.currentView === "quality") renderHighQuality();
       else if (state.currentView === "stable") renderStable();
@@ -4585,10 +4722,13 @@
       return `<div class="watch-stat"><div class="watch-stat-label">${cleanText(label)}</div><div class="watch-stat-value">${cleanText(value)}</div><div class="subline">${cleanText(subline)}</div></div>`;
     }
     function setView(view) {
-      if (view === "stable") view = "dashboard";
+      if (view === "stable" || view === "signals" || view === "contract" || view === "quality") view = "dashboard";
       state.currentView = view;
       document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-      document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === view));
+      document.querySelectorAll(".view").forEach(v => {
+        const mergedSignalHub = view === "dashboard" && ["dashboard", "signals", "contract", "quality"].includes(v.id);
+        v.classList.toggle("active", mergedSignalHub || v.id === view);
+      });
       renderStats();
       renderCurrentView();
       renderHealth();
@@ -4673,6 +4813,78 @@
         navigator.serviceWorker.register("./sw.js").catch(() => {});
       });
     }
+  </script>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("techCanvas3d");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d", { alpha: true });
+      const points = [];
+      let width = 0;
+      let height = 0;
+      let angle = 0;
+      function resize() {
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * ratio);
+        canvas.height = Math.floor(height * ratio);
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        points.length = 0;
+        const count = Math.max(56, Math.min(120, Math.round(width / 12)));
+        for (let i = 0; i < count; i++) {
+          points.push({
+            x: (Math.random() - .5) * 720,
+            y: (Math.random() - .5) * 360,
+            z: (Math.random() - .5) * 720,
+            r: Math.random() * 1.5 + .5
+          });
+        }
+      }
+      function project(p) {
+        const ca = Math.cos(angle);
+        const sa = Math.sin(angle);
+        const x = p.x * ca - p.z * sa;
+        const z = p.x * sa + p.z * ca + 920;
+        const scale = 520 / z;
+        return { x: width / 2 + x * scale, y: height * .36 + p.y * scale, z, scale };
+      }
+      function frame() {
+        angle += 0.0022;
+        ctx.clearRect(0, 0, width, height);
+        const projected = points.map(project).filter(p => p.z > 120);
+        for (let i = 0; i < projected.length; i++) {
+          const a = projected[i];
+          for (let j = i + 1; j < projected.length; j++) {
+            const b = projected[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 105) {
+              ctx.strokeStyle = `rgba(74, 225, 255, ${(1 - dist / 105) * .14})`;
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y);
+              ctx.lineTo(b.x, b.y);
+              ctx.stroke();
+            }
+          }
+        }
+        for (const p of projected) {
+          ctx.fillStyle = `rgba(164, 255, 236, ${Math.min(.58, .16 + p.scale)})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, Math.max(.7, p.scale * 2.2), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        requestAnimationFrame(frame);
+      }
+      window.addEventListener("resize", resize, { passive: true });
+      resize();
+      frame();
+    })();
   </script>
 </body>
 </html>
