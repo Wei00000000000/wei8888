@@ -946,6 +946,7 @@
         </div>
       </div>
       <div class="watch-stats" id="positionStats"></div>
+      <div class="table-wrap position-stat-table"><table><thead><tr><th>統計項目</th><th>全部</th><th>多單</th><th>空單</th></tr></thead><tbody id="positionStatsRows"></tbody></table></div>
       <div class="table-wrap"><table><thead><tr><th>幣種</th><th>方向</th><th>週期</th><th>策略</th><th>狀態</th><th>Entry</th><th>SL</th><th>TP</th><th>Exit</th><th>PnL</th><th>進場</th></tr></thead><tbody id="positionRows"></tbody></table></div>
       <div class="section-head">
         <div><div class="kicker">Telegram</div><h2 class="section-title">通知測試與紀錄</h2></div>
@@ -1288,8 +1289,9 @@
     async function loadPositions() {
       if (state.positionsLoading) return;
       if (!CLOUD_MODE) {
-        state.positions = [];
-        state.positionMeta = {total: 0};
+        state.positions = buildStaticPositions();
+        state.positionMeta = {total: state.positions.length, source: "signals"};
+        state.positionsLoadedAt = Date.now();
         renderPositions();
         return;
       }
@@ -1314,6 +1316,68 @@
       } finally {
         state.positionsLoading = false;
       }
+    }
+
+    function positionTimeValue(value) {
+      const time = Date.parse(String(value || "").replace("Z", "+00:00"));
+      return Number.isFinite(time) ? time : 0;
+    }
+
+    function positionSideFromSignal(signal) {
+      return signal.signal_type === "reversal_bullish" ? "long" : "short";
+    }
+
+    function signalToPosition(signal) {
+      const side = positionSideFromSignal(signal);
+      const reached = displayState(signal);
+      const active = isOpenSignal(signal) || isPartialActiveSignal(signal);
+      const closed = ["sl", "ftp"].includes(reached) || signal.status === "closed";
+      const exitPrice = reached === "sl" ? signal.sl_price
+        : reached === "ftp" ? signal.ftp_price
+        : reached === "tp3" ? signal.tp3_price
+        : reached === "tp2" ? signal.tp2_price
+        : reached === "tp1" ? signal.tp1_price
+        : signal.hit_price;
+      return {
+        id: signal.id || signal.signal_id || signalKey(signal),
+        signal_id: signal.signal_id || signal.id || signalKey(signal),
+        symbol: clean(signal.symbol),
+        side,
+        timeframe: signal.timeframe || signal.interval || "-",
+        strategy_name: signal.setup_id || signal.strategy_name || "signal",
+        status: closed ? "CLOSED" : active ? "OPEN" : "OPEN",
+        entry_price: entryPrice(signal),
+        stop_loss: signal.active_sl_price || signal.sl_price,
+        take_profit_1: signal.tp1_price,
+        take_profit_2: signal.tp2_price,
+        take_profit_3: signal.tp3_price,
+        take_profit_final: signal.ftp_price,
+        exit_price: closed ? exitPrice : "",
+        pnl_percent: pnlPct(signal, active),
+        entry_time: signal.triggered_at || signal.established_at || signal.detected_at,
+        exit_time: closed ? (signal.hit_at || signal.updated_at || signal.detected_at) : "",
+        reached_state: reached,
+        raw_signal: signal
+      };
+    }
+
+    function buildStaticPositions() {
+      const from = $("positionDateFrom")?.value ? Date.parse(dateStartIso($("positionDateFrom").value)) : 0;
+      const to = $("positionDateTo")?.value ? Date.parse(dateEndIso($("positionDateTo").value)) : Infinity;
+      const symbol = clean($("positionSearch")?.value || "");
+      const status = $("positionStatus")?.value || "";
+      const side = $("positionSide")?.value || "";
+      return sortSignals(state.signals || [])
+        .filter(signal => signal && signal.symbol && Number.isFinite(Number(entryPrice(signal))))
+        .map(signalToPosition)
+        .filter(row => {
+          const time = positionTimeValue(row.entry_time);
+          if (time < from || time > to) return false;
+          if (symbol && !clean(row.symbol).includes(symbol)) return false;
+          if (status && row.status !== status) return false;
+          if (side && row.side !== side) return false;
+          return true;
+        });
     }
 
     function dateStartIso(day) {
@@ -1855,17 +1919,42 @@
 
     function renderPositions() {
       if (!$("positionRows")) return;
+      if (!CLOUD_MODE) {
+        state.positions = buildStaticPositions();
+        state.positionMeta = {total: state.positions.length, source: "signals"};
+      }
       const rows = state.positions || [];
       const total = Number(state.positionMeta?.total || rows.length);
       const open = rows.filter(row => row.status === "OPEN").length;
       const closed = rows.filter(row => row.status === "CLOSED").length;
       const pnl = rows.reduce((sum, row) => sum + (Number(row.pnl_percent) || 0), 0);
+      const longRows = rows.filter(row => row.side === "long");
+      const shortRows = rows.filter(row => row.side === "short");
+      const summarizePositions = list => {
+        const wins = list.filter(row => Number(row.pnl_percent) > 0).length;
+        const losses = list.filter(row => Number(row.pnl_percent) < 0).length;
+        const totalPnl = list.reduce((sum, row) => sum + (Number(row.pnl_percent) || 0), 0);
+        return {count: list.length, wins, losses, winRate: list.length ? wins / list.length * 100 : 0, pnl: totalPnl};
+      };
+      const allStats = summarizePositions(rows);
+      const longStats = summarizePositions(longRows);
+      const shortStats = summarizePositions(shortRows);
       $("positionStats").innerHTML = [
-        statCard("查詢筆數", `${rows.length}/${total}`, "目前頁面"),
+        statCard("交易紀錄", `${rows.length}/${total}`, state.positionMeta?.source === "signals" ? "由訊號自動建立" : "目前頁面"),
         statCard("OPEN", open, "仍在追蹤"),
         statCard("CLOSED", closed, "已結案"),
-        statCard("頁面累積盈虧", signed(pnl), "目前查詢頁")
+        statCard("累積盈虧", signed(pnl), "目前查詢")
       ].join("");
+      if ($("positionStatsRows")) {
+        const statLine = (label, pick) => `<tr><td>${label}</td><td>${pick(allStats)}</td><td>${pick(longStats)}</td><td>${pick(shortStats)}</td></tr>`;
+        $("positionStatsRows").innerHTML = [
+          statLine("交易筆數", s => s.count),
+          statLine("獲利筆數", s => s.wins),
+          statLine("虧損筆數", s => s.losses),
+          statLine("勝率", s => `${fmt(s.winRate, 1)}%`),
+          statLine("累積盈虧", s => `<span class="${numClass(s.pnl)}">${signed(s.pnl)}</span>`)
+        ].join("");
+      }
       $("positionRows").innerHTML = rows.map(row => {
         const side = row.side === "long" ? "多" : "空";
         const tp = [row.take_profit_1, row.take_profit_2, row.take_profit_3, row.take_profit_final].filter(v => v !== null && v !== undefined).map(v => fmt(v, 6)).join(" / ");
