@@ -1,6 +1,9 @@
 name: Update live signals
 
 on:
+  push:
+    paths:
+      - ".github/trigger-live-scan"
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
