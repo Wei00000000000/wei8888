@@ -605,8 +605,10 @@
       </div>
       <nav class="nav">
         <button class="active" data-view="dashboard">3D 訊號中樞</button>
+        <button data-view="positionList">持倉列表</button>
         <button data-view="positions">倉位歷史</button>
         <button data-view="review">交易檢討</button>
+        <button data-view="harmonic">和諧訊號</button>
       </nav>
       <div class="top-actions">
         <button class="round-btn" id="bellBtn" title="通知">🔔<span id="bellBadge" class="badge"></span></button>
@@ -901,6 +903,23 @@
       <div class="review-grid" id="reviewCards"></div>
     </section>
 
+    <section id="positionList" class="view">
+      <section class="radar-strip">
+        <div class="kicker">Open Position Board</div>
+        <h2>持倉列表</h2>
+        <div class="subline">只顯示目前 OPEN 的交易訊號，和完整倉位歷史分開，方便即時追蹤。</div>
+      </section>
+      <div class="section-head">
+        <h2 class="section-title">目前持倉 <span id="openPositionCount" class="section-count">(0)</span></h2>
+        <div class="section-actions">
+          <input id="openPositionSearch" placeholder="搜尋幣種，例如 BTC">
+          <select id="openPositionSide"><option value="">全部方向</option><option value="long">多</option><option value="short">空</option></select>
+          <button class="btn primary" id="openPositionRefresh">更新持倉</button>
+        </div>
+      </div>
+      <div class="watch-stats" id="openPositionStats"></div>
+      <div class="table-wrap"><table><thead><tr><th>幣種</th><th>方向</th><th>週期</th><th>策略</th><th>狀態</th><th>Entry</th><th>SL</th><th>TP</th><th>目前PnL</th><th>進場</th></tr></thead><tbody id="openPositionRows"></tbody></table></div>
+    </section>
     <section id="positions" class="view">
       <div class="section-head">
         <div>
@@ -926,6 +945,25 @@
         <div class="section-actions"><button class="btn primary" id="notificationTest">測試 Telegram</button><button class="btn" id="notificationRefresh">更新紀錄</button></div>
       </div>
       <div class="review-grid" id="notificationLogs"></div>
+    </section>
+
+    <section id="harmonic" class="view">
+      <section class="radar-strip">
+        <div class="kicker">Harmonic Pattern Desk</div>
+        <h2>和諧訊號</h2>
+        <div class="subline">預留和諧型態訊號頁：之後可接入 Gartley、Bat、Crab、Deep Crab、Shark、5-0 等型態。</div>
+      </section>
+      <div class="watch-stats" id="harmonicStats">
+        <div class="watch-stat"><div class="watch-stat-label">資料狀態</div><div class="watch-stat-value">待接入</div><div class="subline">尚未連接和諧型態資料源</div></div>
+        <div class="watch-stat"><div class="watch-stat-label">型態</div><div class="watch-stat-value">0</div><div class="subline">等待策略模組</div></div>
+        <div class="watch-stat"><div class="watch-stat-label">正式訊號</div><div class="watch-stat-value">0</div><div class="subline">PRZ 成立後顯示</div></div>
+      </div>
+      <div class="terminal-grid" id="harmonicCards">
+        <article class="terminal-card">
+          <div class="terminal-head"><span>和諧訊號模組</span><span class="pill warn">準備中</span></div>
+          <div class="subline">這個頁面已獨立建立，下一步可以把你的 Pine 和諧策略輸出的型態、PRZ、Entry、SL、TP 接進來。</div>
+        </article>
+      </div>
     </section>
 
   </main>
@@ -1081,6 +1119,9 @@
     $("stableLoadMore").addEventListener("click", () => showMore("stable", renderStable));
     $("qualityLoadMore").addEventListener("click", () => showMore("quality", renderHighQuality));
     $("loadFullReview").addEventListener("click", () => loadFullHistoryFor("SL 完整診斷", renderReview));
+    $("openPositionRefresh").addEventListener("click", renderPositionList);
+    $("openPositionSearch").addEventListener("input", () => debounceAction("openPositions", renderPositionList, 250));
+    $("openPositionSide").addEventListener("change", renderPositionList);
     $("positionRefresh").addEventListener("click", loadPositions);
     $("positionSearch").addEventListener("input", () => debounceAction("positions", loadPositions, 400));
     $("positionDateFrom").addEventListener("change", loadPositions);
@@ -1881,6 +1922,11 @@
       else if (state.currentView === "quality") renderHighQuality();
       else if (state.currentView === "stable") renderStable();
       else if (state.currentView === "contract") renderContractRadar();
+      else if (state.currentView === "positionList") {
+        renderPositionList();
+        const stalePositions = !state.positionsLoadedAt || Date.now() - state.positionsLoadedAt > 60000;
+        if (CLOUD_MODE && stalePositions) loadPositions();
+      }
       else if (state.currentView === "positions") {
         renderPositions();
         renderNotificationLogs();
@@ -1888,6 +1934,50 @@
         if (CLOUD_MODE && stalePositions) loadPositions();
       }
       else if (state.currentView === "review") renderReview();
+      else if (state.currentView === "harmonic") renderHarmonic();
+    }
+
+    function renderPositionList() {
+      if (!$("openPositionRows")) return;
+      const source = CLOUD_MODE && state.positions?.length ? state.positions : buildStaticPositions();
+      const query = clean($("openPositionSearch")?.value || "");
+      const sideFilter = $("openPositionSide")?.value || "";
+      const rows = source
+        .filter(row => row.status === "OPEN")
+        .filter(row => !query || clean(row.symbol).includes(query))
+        .filter(row => !sideFilter || row.side === sideFilter);
+      const longRows = rows.filter(row => row.side === "long");
+      const shortRows = rows.filter(row => row.side === "short");
+      const pnl = rows.reduce((sum, row) => sum + (Number(row.pnl_percent) || 0), 0);
+      const avgPnl = rows.length ? pnl / rows.length : 0;
+      $("openPositionCount").textContent = `(${rows.length})`;
+      $("openPositionStats").innerHTML = [
+        statCard("OPEN 持倉", rows.length, "目前追蹤中"),
+        statCard("多單 / 空單", `${longRows.length} / ${shortRows.length}`, "方向分布"),
+        statCard("浮動盈虧", signed(pnl), "目前查詢合計"),
+        statCard("平均盈虧", signed(avgPnl), "每筆平均")
+      ].join("");
+      $("openPositionRows").innerHTML = rows.map(row => {
+        const side = row.side === "long" ? "多" : "空";
+        const tp = [row.take_profit_1, row.take_profit_2, row.take_profit_3, row.take_profit_final].filter(v => v !== null && v !== undefined && v !== "").map(v => fmt(v, 6)).join(" / ");
+        return `<tr data-position-id="${row.id}">
+          <td><button class="link-btn" data-position-detail="${row.id}">${clean(row.symbol)}</button></td>
+          <td class="${row.side === "long" ? "bull-text" : "bear-text"}">${side}</td>
+          <td>${row.timeframe}</td>
+          <td>${cleanStrategyName(row.strategy_name)}</td>
+          <td><span class="pill warn">${row.status}</span></td>
+          <td>${fmt(row.entry_price, 6)}</td>
+          <td>${fmt(row.stop_loss, 6)}</td>
+          <td>${tp}</td>
+          <td class="${numClass(row.pnl_percent)}">${signed(row.pnl_percent)}</td>
+          <td>${shortTime(row.entry_time)}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="10" class="empty">目前沒有 OPEN 持倉。</td></tr>`;
+      document.querySelectorAll("#positionList [data-position-detail]").forEach(btn => btn.addEventListener("click", () => openPositionDetail(btn.dataset.positionDetail)));
+    }
+
+    function renderHarmonic() {
+      if (!$("harmonicStats")) return;
     }
 
     function renderPositions() {
