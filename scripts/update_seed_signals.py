@@ -78,8 +78,12 @@ def load_rows() -> list[dict[str, object]]:
     """從 seed_signals.json 載入既有訊號列。"""
     if not SEED.exists():
         return load_exported_history_rows()
-    data = json.loads(SEED.read_text(encoding="utf-8-sig") or "[]")
-    if not data:
+    try:
+        data = json.loads(SEED.read_text(encoding="utf-8-sig") or "[]")
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"WARN invalid seed file; recovering from exported history: {exc}")
+        return load_exported_history_rows()
+    if not isinstance(data, list) or not data:
         return load_exported_history_rows()
     return [row for row in data if isinstance(row, dict)]
 
