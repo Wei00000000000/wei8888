@@ -77,9 +77,37 @@ def previous_success_at() -> str | None:
 def load_rows() -> list[dict[str, object]]:
     """從 seed_signals.json 載入既有訊號列。"""
     if not SEED.exists():
-        return []
-    data = json.loads(SEED.read_text(encoding="utf-8-sig"))
+        return load_exported_history_rows()
+    data = json.loads(SEED.read_text(encoding="utf-8-sig") or "[]")
+    if not data:
+        return load_exported_history_rows()
     return [row for row in data if isinstance(row, dict)]
+
+
+def load_exported_history_rows() -> list[dict[str, object]]:
+    """seed 遺失或變空時，從 GitHub Pages 匯出的歷史 chunks 救回訊號。"""
+    data_root = ROOT / "data"
+    manifest_path = data_root / "manifest.json"
+    chunk_names: list[str] = []
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+            chunk_names = [str(name) for name in (manifest.get("history_chunks") or manifest.get("signal_chunks") or [])]
+        except Exception:
+            chunk_names = []
+    if not chunk_names:
+        chunk_names = [str(path.relative_to(data_root)) for path in sorted((data_root / "history").glob("signals-*.json"))]
+    rows: list[dict[str, object]] = []
+    for name in chunk_names:
+        try:
+            payload = json.loads((data_root / name).read_text(encoding="utf-8-sig"))
+            chunk_rows = payload.get("rows") if isinstance(payload, dict) else payload
+            rows.extend(row for row in chunk_rows if isinstance(row, dict))
+        except Exception:
+            continue
+    if rows:
+        print(f"recovered_seed_rows_from_export={len(rows)}")
+    return rows
 
 
 def signal_id(row: dict[str, object]) -> str:

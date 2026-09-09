@@ -50,10 +50,36 @@ SECTOR_SYMBOLS = {
 
 
 def load_seed_rows() -> list[dict[str, object]]:
-    if not SEED.exists():
-        return []
-    rows = json.loads(SEED.read_text(encoding="utf-8"))
-    return [row for row in rows if isinstance(row, dict)]
+    if SEED.exists():
+        rows = json.loads(SEED.read_text(encoding="utf-8") or "[]")
+        if rows:
+            return [row for row in rows if isinstance(row, dict)]
+    return load_exported_history_rows()
+
+
+def load_exported_history_rows() -> list[dict[str, object]]:
+    data_root = ROOT / "data"
+    manifest_path = data_root / "manifest.json"
+    chunk_names: list[str] = []
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            chunk_names = [str(name) for name in (manifest.get("history_chunks") or manifest.get("signal_chunks") or [])]
+        except Exception:
+            chunk_names = []
+    if not chunk_names:
+        chunk_names = [str(path.relative_to(data_root)) for path in sorted((data_root / "history").glob("signals-*.json"))]
+    rows: list[dict[str, object]] = []
+    for name in chunk_names:
+        try:
+            payload = json.loads((data_root / name).read_text(encoding="utf-8"))
+            chunk_rows = payload.get("rows") if isinstance(payload, dict) else payload
+            rows.extend(row for row in chunk_rows if isinstance(row, dict))
+        except Exception:
+            continue
+    if rows:
+        print(f"Recovered {len(rows)} signals from exported history")
+    return rows
 
 
 def signal_identity(row: dict[str, object]) -> str:

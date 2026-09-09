@@ -30,24 +30,24 @@ jobs:
           cache: "pip"
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
-      - name: Scan Bybit futures and validate with OKX
+      - name: Scan OKX futures
         env:
-          SCAN_TOP: "20"
-          SCAN_WORKERS: "3"
-          OI_PERCENTILE: "99"
-          OI_CHANGE_MIN_PCT: "3"
-          OI_CHANGE_STRONG_PCT: "5"
-          REQUIRE_5M_OI_CONFLUENCE: "true"
-          MAX_SCAN_ERRORS: "5"
+          SCAN_TOP: "80"
+          SCAN_WORKERS: "4"
+          OI_PERCENTILE: "96"
+          OI_CHANGE_MIN_PCT: "1.5"
+          OI_CHANGE_STRONG_PCT: "3"
+          REQUIRE_5M_OI_CONFLUENCE: "false"
+          MAX_SCAN_ERRORS: "20"
           STATE_REPLAY_WORKERS: "3"
-          DIVERGENCE_CVD_PERCENTILE: "95"
+          DIVERGENCE_CVD_PERCENTILE: "90"
           MAX_SEED_ROWS: "0"
           MAX_ACTIVE_PER_SYMBOL_SIDE: "2"
           SCAN_FALLBACK_LIMIT: "20"
           MIN_QUOTE_VOLUME_USDT: "5000000"
-          MARKET_DATA_PROVIDER: "bybit+okx"
-          CONTRACT_KLINE_CANDIDATES: "20"
-          CONTRACT_DETAIL_CANDIDATES: "12"
+          MARKET_DATA_PROVIDER: "okx"
+          CONTRACT_KLINE_CANDIDATES: "40"
+          CONTRACT_DETAIL_CANDIDATES: "20"
         run: python scripts/update_seed_signals.py
       - name: Export website data
         run: python scripts/export_github_pages.py
