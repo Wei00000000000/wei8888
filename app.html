@@ -577,6 +577,56 @@
       .nav { width: 100%; justify-content: center; }
     }
 
+      /* Position signal cards */
+    .open-position-feed { display: grid; gap: 22px; margin-top: 18px; }
+    .position-signal-card {
+      position: relative; overflow: hidden; min-height: 420px; padding: clamp(22px, 4vw, 42px);
+      border: 1px solid rgba(89, 221, 255, .22); border-radius: 18px;
+      background:
+        radial-gradient(circle at 20% 15%, rgba(0, 255, 164, .10), transparent 28%),
+        radial-gradient(circle at 84% 24%, rgba(0, 180, 255, .10), transparent 30%),
+        linear-gradient(145deg, rgba(4, 12, 28, .94), rgba(2, 6, 16, .90));
+      box-shadow: 0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .position-signal-card::before {
+      content: ""; position: absolute; inset: 0; opacity: .32; pointer-events: none;
+      background:
+        linear-gradient(115deg, transparent 0 34%, rgba(94, 229, 255, .10) 35%, transparent 36% 100%),
+        radial-gradient(circle, rgba(91, 231, 255, .22) 1px, transparent 2px);
+      background-size: auto, 86px 86px;
+    }
+    .position-card-top, .position-badges, .position-levels, .position-thesis { position: relative; z-index: 1; }
+    .position-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+    .side-cube {
+      width: 92px; height: 92px; border-radius: 22px; display: grid; place-items: center;
+      font-size: 42px; font-weight: 900; letter-spacing: 0; box-shadow: inset 0 0 28px rgba(255,255,255,.04), 0 0 30px rgba(0,255,164,.10);
+    }
+    .side-cube.long { color: #5fffd9; background: rgba(0, 255, 164, .12); }
+    .side-cube.short { color: #ff7897; background: rgba(255, 85, 119, .12); }
+    .position-identity { text-align: right; }
+    .position-symbol { font: 900 clamp(34px, 7vw, 64px)/1 var(--mono); color: #f3f8ff; letter-spacing: .03em; }
+    .position-time { margin-top: 24px; white-space: pre-line; color: #aebfda; font: 800 clamp(24px, 4vw, 38px)/1.15 var(--mono); }
+    .position-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 58px; }
+    .signal-chip { padding: 10px 18px; border-radius: 14px; border: 1px solid rgba(147, 168, 204, .22); background: rgba(13, 22, 45, .70); color: #b9c8e4; font-weight: 900; }
+    .signal-chip.long, .signal-chip.official { color: #67ffd9; border-color: rgba(0, 255, 184, .42); background: rgba(0, 255, 184, .12); }
+    .signal-chip.short { color: #ff8ca4; border-color: rgba(255, 100, 130, .45); background: rgba(255, 85, 119, .12); }
+    .signal-chip.pnl { font-family: var(--mono); }
+    .position-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+    .position-levels div { border: 1px solid rgba(91, 115, 166, .34); border-radius: 14px; padding: 12px 14px; background: rgba(8, 15, 33, .68); }
+    .position-levels span { display: block; color: #92a2c2; font-weight: 800; margin-bottom: 6px; }
+    .position-levels strong { color: #eaf3ff; font: 800 18px/1.2 var(--mono); word-break: break-word; }
+    .position-thesis { margin-top: 34px; border: 1px solid rgba(91, 115, 166, .35); border-radius: 18px; padding: 22px; background: rgba(1, 6, 14, .72); }
+    .position-thesis-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .position-thesis h3 { margin: 0; font-size: clamp(24px, 4vw, 38px); }
+    .position-thesis p { margin: 12px 0 0; color: #b9c8e4; font-size: clamp(16px, 2.5vw, 24px); line-height: 1.55; }
+    .grade-badge { display: grid; place-items: center; min-width: 62px; height: 62px; border-radius: 16px; border: 2px solid #ffd36d; color: #ffd36d; font: 900 30px/1 var(--mono); }
+    @media (max-width: 760px) {
+      .position-signal-card { min-height: 520px; padding: 24px; border-radius: 16px; }
+      .side-cube { width: 78px; height: 78px; font-size: 36px; }
+      .position-badges { margin-top: 46px; }
+      .position-levels { grid-template-columns: 1fr; }
+      .position-thesis { padding: 18px; }
+    }
   </style>
 </head>
 <body>
@@ -918,7 +968,7 @@
         </div>
       </div>
       <div class="watch-stats" id="openPositionStats"></div>
-      <div class="table-wrap"><table><thead><tr><th>幣種</th><th>方向</th><th>週期</th><th>策略</th><th>狀態</th><th>Entry</th><th>SL</th><th>TP</th><th>目前PnL</th><th>進場</th></tr></thead><tbody id="openPositionRows"></tbody></table></div>
+      <div class="open-position-feed" id="openPositionCards"></div>
     </section>
     <section id="positions" class="view">
       <div class="section-head">
@@ -1938,42 +1988,62 @@
     }
 
     function renderPositionList() {
-      if (!$("openPositionRows")) return;
+      const holder = $("openPositionCards") || $("openPositionRows");
+      if (!holder) return;
       const source = CLOUD_MODE && state.positions?.length ? state.positions : buildStaticPositions();
       const query = clean($("openPositionSearch")?.value || "");
       const sideFilter = $("openPositionSide")?.value || "";
       const rows = source
         .filter(row => row.status === "OPEN")
         .filter(row => !query || clean(row.symbol).includes(query))
-        .filter(row => !sideFilter || row.side === sideFilter);
+        .filter(row => !sideFilter || row.side === sideFilter)
+        .sort((a, b) => positionTimeValue(b.entry_time) - positionTimeValue(a.entry_time));
       const longRows = rows.filter(row => row.side === "long");
       const shortRows = rows.filter(row => row.side === "short");
       const pnl = rows.reduce((sum, row) => sum + (Number(row.pnl_percent) || 0), 0);
       const avgPnl = rows.length ? pnl / rows.length : 0;
-      $("openPositionCount").textContent = `(${rows.length})`;
+      $("openPositionCount").textContent = "(" + rows.length + ")";
       $("openPositionStats").innerHTML = [
-        statCard("OPEN 持倉", rows.length, "目前追蹤中"),
-        statCard("多單 / 空單", `${longRows.length} / ${shortRows.length}`, "方向分布"),
+        statCard("OPEN 持倉", rows.length, "最新持倉排最上方"),
+        statCard("多單 / 空單", longRows.length + " / " + shortRows.length, "方向分布"),
         statCard("浮動盈虧", signed(pnl), "目前查詢合計"),
         statCard("平均盈虧", signed(avgPnl), "每筆平均")
       ].join("");
-      $("openPositionRows").innerHTML = rows.map(row => {
-        const side = row.side === "long" ? "多" : "空";
+      holder.innerHTML = rows.map(row => {
+        const isLong = row.side === "long";
+        const sideText = isLong ? "多" : "空";
+        const sideClass = isLong ? "long" : "short";
+        const grade = Number(row.pnl_percent) > 0 ? "B" : Number(row.pnl_percent) < 0 ? "S" : "N";
+        const reached = String(row.reached_state || "holding").toUpperCase();
         const tp = [row.take_profit_1, row.take_profit_2, row.take_profit_3, row.take_profit_final].filter(v => v !== null && v !== undefined && v !== "").map(v => fmt(v, 6)).join(" / ");
-        return `<tr data-position-id="${row.id}">
-          <td><button class="link-btn" data-position-detail="${row.id}">${clean(row.symbol)}</button></td>
-          <td class="${row.side === "long" ? "bull-text" : "bear-text"}">${side}</td>
-          <td>${row.timeframe}</td>
-          <td>${cleanStrategyName(row.strategy_name)}</td>
-          <td><span class="pill warn">${row.status}</span></td>
-          <td>${fmt(row.entry_price, 6)}</td>
-          <td>${fmt(row.stop_loss, 6)}</td>
-          <td>${tp}</td>
-          <td class="${numClass(row.pnl_percent)}">${signed(row.pnl_percent)}</td>
-          <td>${shortTime(row.entry_time)}</td>
-        </tr>`;
-      }).join("") || `<tr><td colspan="10" class="empty">目前沒有 OPEN 持倉。</td></tr>`;
-      document.querySelectorAll("#positionList [data-position-detail]").forEach(btn => btn.addEventListener("click", () => openPositionDetail(btn.dataset.positionDetail)));
+        const title = (isLong ? "多頭持倉" : "空頭持倉") + " · " + cleanStrategyName(row.strategy_name);
+        const conclusion = isLong ? "多頭訊號仍在追蹤，等待後續確認。" : "空頭訊號仍在追蹤，等待後續確認。";
+        return '<article class="position-signal-card ' + sideClass + '" data-position-id="' + cleanText(row.id) + '">' +
+          '<div class="position-card-top">' +
+            '<div class="side-cube ' + sideClass + '">' + sideText + '</div>' +
+            '<div class="position-identity"><div class="position-symbol">' + cleanText(clean(row.symbol)) + '</div><div class="position-time">' + shortTime(row.entry_time) + '</div></div>' +
+          '</div>' +
+          '<div class="position-badges">' +
+            '<span class="signal-chip ' + sideClass + '">' + (isLong ? "嘎多" : "嘎空") + '</span>' +
+            '<span class="signal-chip">' + cleanText(row.timeframe || "-") + '</span>' +
+            '<span class="signal-chip official">正式</span>' +
+            '<span class="signal-chip pnl ' + numClass(row.pnl_percent) + '">' + signed(row.pnl_percent) + '</span>' +
+            '<span class="signal-chip">' + reached + '</span>' +
+          '</div>' +
+          '<div class="position-levels">' +
+            '<div><span>Entry</span><strong>' + fmt(row.entry_price, 6) + '</strong></div>' +
+            '<div><span>保護價</span><strong>' + fmt(row.stop_loss, 6) + '</strong></div>' +
+            '<div><span>TP</span><strong>' + cleanText(tp || "-") + '</strong></div>' +
+          '</div>' +
+          '<section class="position-thesis">' +
+            '<div class="position-thesis-head"><h3>' + cleanText(title) + '</h3><span class="grade-badge">' + grade + '</span></div>' +
+            '<p><b>實戰結論：</b>' + cleanText(conclusion) + '</p>' +
+            '<p><b>Entry Engine：</b>' + cleanText(cleanStrategyName(row.strategy_name)) + ' | ' + cleanText(row.timeframe || "-") + '</p>' +
+            '<p><b>失效條件：</b>價格觸及 SL，或反向訊號明確成立。</p>' +
+          '</section>' +
+        '</article>';
+      }).join("") || '<div class="empty">目前沒有 OPEN 持倉。</div>';
+      document.querySelectorAll("#positionList [data-position-id]").forEach(card => card.addEventListener("click", () => openPositionDetail(card.dataset.positionId)));
     }
 
     function renderHarmonic() {
