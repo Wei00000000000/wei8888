@@ -47,6 +47,31 @@ SCANNER_STATUS = ROOT / "sentiment_scanner" / "scanner_status.json"      # 掃�
 # 持倉狀態優先順序：數值越大代表越接近獲利目標
 TARGET_ORDER = {"holding": 0, "tp1": 1, "tp2": 2, "tp3": 3, "ftp": 4, "sl": -1}
 SYMBOL_VOLUME_24H: dict[str, float] = {}  # 本次掃描的 24h 成交量快取
+SIGNAL_HISTORY_START_AT = os.getenv("SIGNAL_HISTORY_START_AT", "2026-09-09T00:00:00+08:00")
+
+
+def signal_started_today(row: dict[str, object]) -> bool:
+    """只保留指定日期之後建立的訊號，避免舊歷史被 GitHub Pages 匯出檔救回。"""
+    if not SIGNAL_HISTORY_START_AT:
+        return True
+    raw_ts = row.get("triggered_at") or row.get("established_at") or row.get("detected_at")
+    if not raw_ts:
+        return False
+    try:
+        cutoff = datetime.fromisoformat(str(SIGNAL_HISTORY_START_AT).replace("Z", "+00:00"))
+        started = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.replace(tzinfo=timezone.utc)
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        return started >= cutoff
+    except (TypeError, ValueError):
+        return False
+
+
+def keep_current_history(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """套用本次網站重置的歷史起始時間。"""
+    return [row for row in rows if signal_started_today(row)]
 
 
 def min_quote_volume() -> float:
@@ -85,7 +110,7 @@ def load_rows() -> list[dict[str, object]]:
         return load_exported_history_rows()
     if not isinstance(data, list) or not data:
         return load_exported_history_rows()
-    return [row for row in data if isinstance(row, dict)]
+    return keep_current_history([row for row in data if isinstance(row, dict)])
 
 
 def load_exported_history_rows() -> list[dict[str, object]]:
@@ -109,8 +134,9 @@ def load_exported_history_rows() -> list[dict[str, object]]:
             rows.extend(row for row in chunk_rows if isinstance(row, dict))
         except Exception:
             continue
+    rows = keep_current_history(rows)
     if rows:
-        print(f"recovered_seed_rows_from_export={len(rows)}")
+        print(f"recovered_seed_rows_from_export={len(rows)} after_cutoff={SIGNAL_HISTORY_START_AT}")
     return rows
 
 
@@ -1875,6 +1901,7 @@ async def main_async() -> None:
                         "state_audit": state_audit,
                         "state_consistency": state_consistency,
                         "min_volume_usdt": min_volume,
+                        "signal_history_start_at": SIGNAL_HISTORY_START_AT,
                         **radar_meta,
                     },
                     ensure_ascii=False,
