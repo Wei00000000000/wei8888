@@ -61,7 +61,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Keep previously exported history chunks; only replace the files this scan regenerates.
-          cp -r site/data ./data
+          cp -r site/data/. ./data/
           git add data sentiment_scanner/seed_signals.json sentiment_scanner/contract_anomalies.json sentiment_scanner/scanner_status.json
           if git diff --cached --quiet; then
             echo "No signal updates"
