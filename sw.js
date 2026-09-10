@@ -1,4 +1,4 @@
-const CACHE_NAME = "wei-strategy-v21";
+const CACHE_NAME = "wei-strategy-v22";
 const APP_SHELL = [
   "./",
   "./index.html",
