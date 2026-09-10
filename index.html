@@ -605,54 +605,61 @@
     }
 
       /* Position signal cards */
-    .open-position-feed { display: grid; gap: 22px; margin-top: 18px; }
+    .open-position-feed { display: grid; gap: 12px; margin-top: 12px; }
     .position-signal-card {
-      position: relative; overflow: hidden; min-height: 420px; padding: clamp(22px, 4vw, 42px);
-      border: 1px solid rgba(89, 221, 255, .22); border-radius: 18px;
+      position: relative; overflow: hidden; min-height: 0; padding: 16px 18px;
+      border: 1px solid rgba(89, 221, 255, .22); border-radius: 12px;
       background:
-        radial-gradient(circle at 20% 15%, rgba(0, 255, 164, .10), transparent 28%),
-        radial-gradient(circle at 84% 24%, rgba(0, 180, 255, .10), transparent 30%),
+        radial-gradient(circle at 18% 14%, rgba(0, 255, 164, .10), transparent 24%),
+        radial-gradient(circle at 86% 20%, rgba(0, 180, 255, .08), transparent 28%),
         linear-gradient(145deg, rgba(4, 12, 28, .94), rgba(2, 6, 16, .90));
-      box-shadow: 0 24px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.05);
+      box-shadow: 0 12px 34px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.05);
     }
     .position-signal-card::before {
-      content: ""; position: absolute; inset: 0; opacity: .32; pointer-events: none;
+      content: ""; position: absolute; inset: 0; opacity: .20; pointer-events: none;
       background:
-        linear-gradient(115deg, transparent 0 34%, rgba(94, 229, 255, .10) 35%, transparent 36% 100%),
-        radial-gradient(circle, rgba(91, 231, 255, .22) 1px, transparent 2px);
-      background-size: auto, 86px 86px;
+        linear-gradient(115deg, transparent 0 42%, rgba(94, 229, 255, .08) 43%, transparent 44% 100%),
+        radial-gradient(circle, rgba(91, 231, 255, .18) 1px, transparent 2px);
+      background-size: auto, 72px 72px;
     }
     .position-card-top, .position-badges, .position-levels, .position-thesis { position: relative; z-index: 1; }
-    .position-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+    .position-card-top { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
     .side-cube {
-      width: 92px; height: 92px; border-radius: 22px; display: grid; place-items: center;
-      font-size: 42px; font-weight: 900; letter-spacing: 0; box-shadow: inset 0 0 28px rgba(255,255,255,.04), 0 0 30px rgba(0,255,164,.10);
+      width: 54px; height: 54px; border-radius: 14px; display: grid; place-items: center;
+      font-size: 25px; font-weight: 900; letter-spacing: 0; flex: 0 0 auto;
+      box-shadow: inset 0 0 20px rgba(255,255,255,.04), 0 0 18px rgba(0,255,164,.08);
     }
     .side-cube.long { color: #5fffd9; background: rgba(0, 255, 164, .12); }
     .side-cube.short { color: #ff7897; background: rgba(255, 85, 119, .12); }
-    .position-identity { text-align: right; }
-    .position-symbol { font: 900 clamp(34px, 7vw, 64px)/1 var(--mono); color: #f3f8ff; letter-spacing: .03em; }
-    .position-time { margin-top: 24px; white-space: pre-line; color: #aebfda; font: 800 clamp(24px, 4vw, 38px)/1.15 var(--mono); }
-    .position-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 58px; }
-    .signal-chip { padding: 10px 18px; border-radius: 14px; border: 1px solid rgba(147, 168, 204, .22); background: rgba(13, 22, 45, .70); color: #b9c8e4; font-weight: 900; }
+    .position-identity { text-align: right; margin-left: auto; }
+    .position-symbol { font: 900 clamp(24px, 3.2vw, 38px)/1 var(--mono); color: #f3f8ff; letter-spacing: .03em; }
+    .position-time { margin-top: 6px; white-space: normal; color: #aebfda; font: 800 16px/1.15 var(--mono); }
+    .position-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 14px; }
+    .signal-chip { padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(147, 168, 204, .22); background: rgba(13, 22, 45, .70); color: #b9c8e4; font-size: 12px; font-weight: 900; }
     .signal-chip.long, .signal-chip.official { color: #67ffd9; border-color: rgba(0, 255, 184, .42); background: rgba(0, 255, 184, .12); }
     .signal-chip.short { color: #ff8ca4; border-color: rgba(255, 100, 130, .45); background: rgba(255, 85, 119, .12); }
     .signal-chip.pnl { font-family: var(--mono); }
-    .position-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
-    .position-levels div { border: 1px solid rgba(91, 115, 166, .34); border-radius: 14px; padding: 12px 14px; background: rgba(8, 15, 33, .68); }
-    .position-levels span { display: block; color: #92a2c2; font-weight: 800; margin-bottom: 6px; }
-    .position-levels strong { color: #eaf3ff; font: 800 18px/1.2 var(--mono); word-break: break-word; }
-    .position-thesis { margin-top: 34px; border: 1px solid rgba(91, 115, 166, .35); border-radius: 18px; padding: 22px; background: rgba(1, 6, 14, .72); }
-    .position-thesis-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
-    .position-thesis h3 { margin: 0; font-size: clamp(24px, 4vw, 38px); }
-    .position-thesis p { margin: 12px 0 0; color: #b9c8e4; font-size: clamp(16px, 2.5vw, 24px); line-height: 1.55; }
-    .grade-badge { display: grid; place-items: center; min-width: 62px; height: 62px; border-radius: 16px; border: 2px solid #ffd36d; color: #ffd36d; font: 900 30px/1 var(--mono); }
+    .position-levels { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; margin-top: 12px; }
+    .position-levels div { border: 1px solid rgba(91, 115, 166, .34); border-radius: 8px; padding: 8px 10px; background: rgba(8, 15, 33, .68); min-width: 0; }
+    .position-levels span { display: block; color: #92a2c2; font-size: 11px; font-weight: 800; margin-bottom: 4px; }
+    .position-levels strong { color: #eaf3ff; font: 800 13px/1.25 var(--mono); word-break: break-word; }
+    .position-thesis { margin-top: 12px; border: 1px solid rgba(91, 115, 166, .35); border-radius: 10px; padding: 12px 14px; background: rgba(1, 6, 14, .72); }
+    .position-thesis-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .position-thesis h3 { margin: 0; font-size: clamp(17px, 2vw, 22px); line-height: 1.25; }
+    .position-thesis p { margin: 6px 0 0; color: #b9c8e4; font-size: 13px; line-height: 1.45; }
+    .grade-badge { display: grid; place-items: center; min-width: 38px; height: 38px; border-radius: 10px; border: 2px solid #ffd36d; color: #ffd36d; font: 900 18px/1 var(--mono); flex: 0 0 auto; }
     @media (max-width: 760px) {
-      .position-signal-card { min-height: 520px; padding: 24px; border-radius: 16px; }
-      .side-cube { width: 78px; height: 78px; font-size: 36px; }
-      .position-badges { margin-top: 46px; }
-      .position-levels { grid-template-columns: 1fr; }
-      .position-thesis { padding: 18px; }
+      .open-position-feed { gap: 12px; }
+      .position-signal-card { padding: 14px; border-radius: 12px; }
+      .side-cube { width: 48px; height: 48px; font-size: 23px; border-radius: 12px; }
+      .position-symbol { font-size: 30px; }
+      .position-time { font-size: 15px; }
+      .position-badges { margin-top: 12px; gap: 6px; }
+      .signal-chip { padding: 5px 8px; font-size: 11px; }
+      .position-levels { grid-template-columns: 1fr; gap: 7px; }
+      .position-thesis { padding: 11px 12px; }
+      .position-thesis h3 { font-size: 18px; }
+      .position-thesis p { font-size: 12px; }
     }
   </style>
 </head>
