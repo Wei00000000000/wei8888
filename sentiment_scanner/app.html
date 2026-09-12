@@ -607,95 +607,83 @@
       /* Position signal cards */
     .open-position-feed {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 12px;
       margin-top: 12px;
     }
     .position-signal-card {
       position: relative;
       overflow: hidden;
-      min-height: 0;
-      padding: 14px;
-      border: 1px solid rgba(89, 221, 255, .22);
-      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid rgba(89, 221, 255, .25);
+      border-radius: 11px;
       background:
-        linear-gradient(135deg, rgba(0,224,164,.11), transparent 34%),
-        radial-gradient(circle at 78% 22%, rgba(91,158,255,.13), transparent 30%),
-        rgba(5, 11, 20, .86);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 12px 28px rgba(0,0,0,.28);
-    }
-    .position-signal-card.bear {
-      background:
-        linear-gradient(135deg, rgba(255,85,119,.1), transparent 34%),
-        radial-gradient(circle at 78% 22%, rgba(91,158,255,.12), transparent 30%),
-        rgba(5, 11, 20, .86);
+        radial-gradient(circle at 72% 18%, rgba(0, 225, 255, .12), transparent 30%),
+        linear-gradient(180deg, rgba(6, 15, 31, .92), rgba(3, 8, 18, .96));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px rgba(0,0,0,.30);
     }
     .position-signal-card::before {
       content: "";
       position: absolute;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(120,225,255,.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(120,225,255,.06) 1px, transparent 1px);
-      background-size: 28px 28px;
-      mask-image: linear-gradient(180deg, rgba(0,0,0,.35), transparent 72%);
+      opacity: .14;
       pointer-events: none;
+      background:
+        linear-gradient(rgba(120,225,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120,225,255,.06) 1px, transparent 1px),
+        radial-gradient(circle, rgba(120,225,255,.22) 1px, transparent 2px);
+      background-size: 32px 32px, 32px 32px, 76px 76px;
     }
     .position-signal-card > * { position: relative; z-index: 1; }
     .position-card-top {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
+      margin-bottom: 8px;
     }
     .side-cube {
-      width: 52px;
-      height: 52px;
-      border-radius: 12px;
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
       display: grid;
       place-items: center;
-      background: rgba(0,224,164,.18);
+      background: rgba(0,224,164,.16);
       color: var(--bull);
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 950;
-      box-shadow: 0 0 18px rgba(0,224,164,.1);
       flex: 0 0 auto;
     }
-    .side-cube.short {
-      background: rgba(255,85,119,.18);
-      color: var(--bear);
-      box-shadow: 0 0 18px rgba(255,85,119,.1);
-    }
+    .side-cube.short { background: rgba(255,85,119,.16); color: var(--bear); }
     .position-identity { text-align: right; min-width: 0; }
     .position-symbol {
-      font: 900 clamp(23px, 3vw, 34px)/1 var(--mono);
-      letter-spacing: 0;
+      font: 900 clamp(20px, 2.5vw, 28px)/1 var(--mono);
       color: #f4f8ff;
+      letter-spacing: 0;
       word-break: break-word;
     }
     .position-time {
-      margin-top: 5px;
+      margin-top: 3px;
       color: #b8c8e4;
-      white-space: normal;
-      font: 800 15px/1.15 var(--mono);
+      font: 800 11px/1.2 var(--mono);
     }
     .position-badges {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 6px;
-      margin-top: 12px;
+      gap: 5px;
+      margin: 0 0 9px;
     }
     .signal-chip {
-      min-height: 26px;
-      padding: 4px 9px;
-      border-radius: 8px;
+      min-height: 22px;
+      padding: 3px 7px;
+      border-radius: 7px;
       display: inline-flex;
       align-items: center;
       border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.045);
+      background: rgba(13, 22, 45, .70);
       color: #b9c7df;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 950;
     }
     .signal-chip.bull,
@@ -705,86 +693,54 @@
     .signal-chip.short { color: var(--bear); border-color: rgba(255,85,119,.42); background: rgba(255,85,119,.12); }
     .signal-chip.warn { color: var(--warn); border-color: rgba(255,177,59,.38); background: rgba(255,177,59,.11); }
     .signal-chip.pnl { font-family: var(--mono); }
-    .position-levels {
+    .position-level-stack {
       display: grid;
-      grid-template-columns: 1fr 1fr 1.35fr;
-      gap: 7px;
-      margin-top: 10px;
+      gap: 8px;
     }
-    .position-levels div {
-      border: 1px solid rgba(255,255,255,.12);
+    .position-board-level {
+      position: relative;
+      min-height: 52px;
+      border: 1px solid rgba(91, 115, 166, .34);
       border-radius: 8px;
-      background: rgba(4,8,13,.48);
-      padding: 7px 9px;
-      min-width: 0;
+      padding: 9px 34px 9px 12px;
+      background: rgba(67, 41, 76, .72);
     }
-    .position-levels span {
-      display: block;
-      color: #8091ad;
-      font-size: 10px;
-      font-weight: 900;
+    .position-board-level.tp {
+      background: rgba(15, 67, 72, .76);
+      border-color: rgba(0, 224, 164, .18);
     }
-    .position-levels strong {
+    .position-board-level span {
       display: block;
-      margin-top: 4px;
-      color: #eef5ff;
-      font: 800 12px/1.25 var(--mono);
+      color: #ff6f98;
+      font: 950 11px/1 var(--mono);
+      margin-bottom: 7px;
+    }
+    .position-board-level.tp span { color: var(--bull); }
+    .position-board-level b {
+      display: block;
+      color: #f5fbff;
+      font: 950 18px/1.1 var(--mono);
       overflow-wrap: anywhere;
     }
-    .position-thesis {
-      margin-top: 10px;
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 10px;
-      background: rgba(3,7,13,.58);
-      padding: 10px 12px;
-      min-height: 0;
-    }
-    .position-thesis-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 6px;
-    }
-    .position-thesis h3 {
-      margin: 0;
-      color: #f4f8ff;
-      font-size: clamp(16px, 1.8vw, 20px);
-      line-height: 1.2;
-    }
-    .position-thesis p {
-      margin: 5px 0 0;
-      color: #bdc9df;
-      font-size: 12px;
-      line-height: 1.45;
-    }
-    .grade-badge {
-      min-width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      border: 2px solid #ffd35d;
-      color: #ffd35d;
-      display: grid;
-      place-items: center;
-      font: 900 16px var(--mono);
-      flex: 0 0 auto;
+    .position-board-level i {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #8391a8;
+      font-style: normal;
+      font-size: 16px;
+      opacity: .78;
     }
     @media (max-width: 760px) {
-      .open-position-feed {
-        grid-template-columns: 1fr;
-        gap: 10px;
-      }
-      .position-signal-card { padding: 12px; border-radius: 11px; }
-      .side-cube { width: 46px; height: 46px; border-radius: 11px; font-size: 22px; }
-      .position-symbol { font-size: 26px; }
-      .position-time { font-size: 13px; }
-      .position-badges { margin-top: 10px; gap: 5px; }
-      .signal-chip { min-height: 24px; padding: 3px 7px; font-size: 10px; }
-      .position-levels { grid-template-columns: 1fr; gap: 6px; margin-top: 9px; }
-      .position-levels div { padding: 7px 8px; }
-      .position-thesis { padding: 10px; }
-      .position-thesis h3 { font-size: 17px; }
-      .position-thesis p { font-size: 12px; }
+      .open-position-feed { grid-template-columns: 1fr; gap: 11px; }
+      .position-signal-card { padding: 11px; border-radius: 10px; }
+      .side-cube { width: 36px; height: 36px; font-size: 19px; border-radius: 8px; }
+      .position-symbol { font-size: 23px; }
+      .position-time { font-size: 11px; }
+      .signal-chip { min-height: 21px; padding: 3px 7px; font-size: 10px; }
+      .position-board-level { min-height: 50px; padding: 8px 34px 8px 11px; }
+      .position-board-level b { font-size: 18px; }
     }
 
   </style>
@@ -2173,11 +2129,10 @@
         const isLong = row.side === "long";
         const sideText = isLong ? "多" : "空";
         const sideClass = isLong ? "long" : "short";
-        const grade = Number(row.pnl_percent) > 0 ? "B" : Number(row.pnl_percent) < 0 ? "S" : "N";
         const reached = String(row.reached_state || "holding").toUpperCase();
-        const tp = [row.take_profit_1, row.take_profit_2, row.take_profit_3, row.take_profit_final].filter(v => v !== null && v !== undefined && v !== "").map(v => fmt(v, 6)).join(" / ");
-        const title = (isLong ? "多頭持倉" : "空頭持倉") + " · " + cleanStrategyName(row.strategy_name);
-        const conclusion = isLong ? "多頭訊號仍在追蹤，等待後續確認。" : "空頭訊號仍在追蹤，等待後續確認。";
+        const entry = Number(row.entry_price);
+        const stop = Number(row.stop_loss);
+        const rPct = Number.isFinite(entry) && Number.isFinite(stop) && entry > 0 ? Math.abs(entry - stop) / entry * 100 : 0;
         return '<article class="position-signal-card ' + sideClass + '" data-position-id="' + cleanText(row.id) + '">' +
           '<div class="position-card-top">' +
             '<div class="side-cube ' + sideClass + '">' + sideText + '</div>' +
@@ -2190,17 +2145,14 @@
             '<span class="signal-chip pnl ' + numClass(row.pnl_percent) + '">' + signed(row.pnl_percent) + '</span>' +
             '<span class="signal-chip">' + reached + '</span>' +
           '</div>' +
-          '<div class="position-levels">' +
-            '<div><span>Entry</span><strong>' + fmt(row.entry_price, 6) + '</strong></div>' +
-            '<div><span>保護價</span><strong>' + fmt(row.stop_loss, 6) + '</strong></div>' +
-            '<div><span>TP</span><strong>' + cleanText(tp || "-") + '</strong></div>' +
+          '<div class="position-level-stack">' +
+            '<div class="position-board-level"><span>R</span><b>' + fmt(rPct, 2) + '%</b><i>□</i></div>' +
+            '<div class="position-board-level"><span>SL</span><b>' + fmt(row.stop_loss, 6) + '</b><i>□</i></div>' +
+            '<div class="position-board-level tp"><span>TP1</span><b>' + fmt(row.take_profit_1, 6) + '</b><i>□</i></div>' +
+            '<div class="position-board-level tp"><span>TP2</span><b>' + fmt(row.take_profit_2, 6) + '</b><i>□</i></div>' +
+            '<div class="position-board-level tp"><span>TP3</span><b>' + fmt(row.take_profit_3, 6) + '</b><i>□</i></div>' +
+            '<div class="position-board-level tp"><span>FTP</span><b>' + fmt(row.take_profit_final, 6) + '</b><i>□</i></div>' +
           '</div>' +
-          '<section class="position-thesis">' +
-            '<div class="position-thesis-head"><h3>' + cleanText(title) + '</h3><span class="grade-badge">' + grade + '</span></div>' +
-            '<p><b>實戰結論：</b>' + cleanText(conclusion) + '</p>' +
-            '<p><b>Entry Engine：</b>' + cleanText(cleanStrategyName(row.strategy_name)) + ' | ' + cleanText(row.timeframe || "-") + '</p>' +
-            '<p><b>失效條件：</b>價格觸及 SL，或反向訊號明確成立。</p>' +
-          '</section>' +
         '</article>';
       }).join("") || '<div class="empty">目前沒有 OPEN 持倉。</div>';
       document.querySelectorAll("#positionList [data-position-id]").forEach(card => card.addEventListener("click", () => openPositionDetail(card.dataset.positionId)));
