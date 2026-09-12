@@ -1,5 +1,131 @@
 [
   {
+    "symbol": "KAITOUSDT",
+    "timeframe": "15M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "market_contract_long_price_24h",
+    "triggered_at_ms": 1789171542483,
+    "triggered_at": "2026-09-12T00:05:42.483000+00:00",
+    "trigger_price": 0.30491673035468786,
+    "entry_price": 0.30491673035468786,
+    "atr_at_trigger": 0.0034150673799725043,
+    "sl_price": 0.2963790619047566,
+    "tp1_price": 0.3134543988046191,
+    "tp2_price": 0.3219920672545504,
+    "tp3_price": 0.33052973570448163,
+    "ftp_price": 0.34760507260434415,
+    "risk": 0.00853766844993126,
+    "sl_source": "market_risk_pct",
+    "oi_percentile": 89.5,
+    "oi_change_pct": null,
+    "price_change_pct": null,
+    "volume_24h": 6069965.0271,
+    "quote_volume": 6069965.0271,
+    "taker_buy_ratio": null,
+    "oi_value": 0,
+    "oi_value_usdt": null,
+    "source": "bybit_okx_contract_scan",
+    "snapshot_data": {
+      "contract_radar": true,
+      "entry_engine": {
+        "ready": true,
+        "formal": true,
+        "grade": "formal",
+        "timing_score": 76,
+        "entry_price": 0.30491673035468786,
+        "structure_5m": "Bullish BOS",
+        "structure_15m": "Range",
+        "vwap_state": "above",
+        "rolling_vwap": 0.30491673035468786,
+        "daily_vwap": 0.3052404223006794,
+        "bsl": 0.307,
+        "ssl": 0.3023,
+        "eqh": false,
+        "eql": false,
+        "sweep_bsl": false,
+        "sweep_ssl": false,
+        "trigger": "VWAP reclaim + bullish structure"
+      },
+      "radar_score": 12,
+      "bias": "long",
+      "trigger": "price_24h",
+      "market_label": "價格動能",
+      "cvd_ratio_1h": null,
+      "funding_rate": 0.0,
+      "long_short_ratio_1h": null,
+      "quality_score": 1,
+      "quality_text": "一般",
+      "volume_24h": 6069965.0271,
+      "quote_volume": 6069965.0271
+    },
+    "established_at": "2026-09-12T00:05:42.483000+00:00",
+    "id": "eb8cbac0-103f-507b-bd9f-baaba669a6b5",
+    "signal_id": "eb8cbac0-103f-507b-bd9f-baaba669a6b5",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-09-12T00:06:08.975301+00:00",
+    "raw_signal": true,
+    "trade_layer": "official_trade",
+    "official_trade": true,
+    "warning": false,
+    "filtered_out": false,
+    "trade_filter_reason": "",
+    "high_quality": true,
+    "current_price": 0.3071,
+    "price": 0.3071
+  },
+  {
+    "symbol": "METUSDT",
+    "timeframe": "5M",
+    "signal_type": "reversal_bullish",
+    "setup_id": "cvd_5m_bullish_divergence",
+    "triggered_at_ms": 1789171500000,
+    "triggered_at": "2026-09-12T00:05:00+00:00",
+    "trigger_price": 0.2314,
+    "entry_price": 0.2314,
+    "atr_at_trigger": 0.003300439101556008,
+    "sl_price": 0.22314890224610998,
+    "tp1_price": 0.23965109775389,
+    "tp2_price": 0.24790219550778003,
+    "tp3_price": 0.2561532932616701,
+    "ftp_price": 0.2726554887694501,
+    "risk": 0.00825109775389002,
+    "sl_source": "atr",
+    "oi_percentile": 23.46938775510204,
+    "oi_change_pct": -0.16916251230079926,
+    "price_change_pct": -1.7826825127334505,
+    "taker_buy_ratio": 0.9193653519021955,
+    "oi_value": 6704666.0,
+    "oi_value_usdt": 1552800.6456,
+    "snapshot_data": {
+      "divergence": "price_down_cvd_up",
+      "divergence_label": "bottom_divergence",
+      "interval": "5m",
+      "cvd_change_pct": 83.8730703804391,
+      "cvd_percentile": 100.0,
+      "cvd_window_bars": 3,
+      "volume_24h": 45204306.4213,
+      "quote_volume": 45204306.4213
+    },
+    "established_at": "2026-09-12T00:05:00+00:00",
+    "id": "f4429773-f4f1-5870-94dc-fecd12fb6355",
+    "signal_id": "f4429773-f4f1-5870-94dc-fecd12fb6355",
+    "status": "active",
+    "reached_state": "holding",
+    "detected_at": "2026-09-12T00:05:54.997750+00:00",
+    "raw_signal": true,
+    "trade_layer": "warning",
+    "official_trade": false,
+    "warning": true,
+    "filtered_out": false,
+    "trade_filter_reason": "score_below_60_warning_only; score_below_official_threshold; cvd_divergence_needs_price_vwap_confirmation",
+    "high_quality": false,
+    "volume_24h": 45204306.4213,
+    "quote_volume": 45204306.4213,
+    "current_price": 0.2328,
+    "price": 0.2328
+  },
+  {
     "symbol": "AAVEUSDT",
     "timeframe": "15M",
     "signal_type": "reversal_bullish",
@@ -71,7 +197,7 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "state_replay_failures": 1
+    "state_replay_failures": 2
   },
   {
     "symbol": "METUSDT",
@@ -122,8 +248,8 @@
     "volume_24h": 45398724.3639,
     "quote_volume": 45398724.3639,
     "state_replay_failures": 0,
-    "current_price": 0.2316,
-    "price": 0.2316
+    "current_price": 0.2328,
+    "price": 0.2328
   },
   {
     "symbol": "ORCLUSDT",
@@ -173,8 +299,8 @@
     "high_quality": false,
     "volume_24h": 14085871.0712,
     "quote_volume": 14085871.0712,
-    "current_price": 147.82,
-    "price": 147.82
+    "current_price": 147.84,
+    "price": 147.84
   },
   {
     "symbol": "BEATUSDT",
@@ -224,7 +350,7 @@
     "high_quality": false,
     "volume_24h": 44249596.2282,
     "quote_volume": 44249596.2282,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "current_price": 0.0938,
     "price": 0.0938
   },
@@ -277,7 +403,8 @@
     "volume_24h": 18477973.234,
     "quote_volume": 18477973.234,
     "current_price": 0.1689,
-    "price": 0.1689
+    "price": 0.1689,
+    "state_replay_failures": 1
   },
   {
     "symbol": "ORCLUSDT",
@@ -327,8 +454,8 @@
     "high_quality": false,
     "volume_24h": 14089147.949099999,
     "quote_volume": 14089147.949099999,
-    "current_price": 147.82,
-    "price": 147.82
+    "current_price": 147.84,
+    "price": 147.84
   },
   {
     "symbol": "BEATUSDT",
@@ -380,7 +507,7 @@
     "quote_volume": 44254292.4178,
     "current_price": 0.0938,
     "price": 0.0938,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "WLFIUSDT",
@@ -430,8 +557,8 @@
     "high_quality": false,
     "volume_24h": 31027283.886,
     "quote_volume": 31027283.886,
-    "current_price": 0.0553,
-    "price": 0.0553
+    "current_price": 0.05542,
+    "price": 0.05542
   },
   {
     "symbol": "NEARUSDT",
@@ -481,8 +608,8 @@
     "high_quality": false,
     "volume_24h": 123084072.47999999,
     "quote_volume": 123084072.47999999,
-    "current_price": 2.352,
-    "price": 2.352
+    "current_price": 2.357,
+    "price": 2.357
   },
   {
     "symbol": "WLFIUSDT",
@@ -532,8 +659,8 @@
     "high_quality": false,
     "volume_24h": 31011300.400500003,
     "quote_volume": 31011300.400500003,
-    "current_price": 0.0553,
-    "price": 0.0553
+    "current_price": 0.05542,
+    "price": 0.05542
   },
   {
     "symbol": "ETHUSDT",
@@ -583,8 +710,8 @@
     "high_quality": false,
     "volume_24h": 12970185762.89335,
     "quote_volume": 12970185762.89335,
-    "current_price": 2513.95,
-    "price": 2513.95
+    "current_price": 2512.51,
+    "price": 2512.51
   },
   {
     "symbol": "NEARUSDT",
@@ -634,8 +761,8 @@
     "high_quality": false,
     "volume_24h": 122786918.672,
     "quote_volume": 122786918.672,
-    "current_price": 2.352,
-    "price": 2.352
+    "current_price": 2.357,
+    "price": 2.357
   },
   {
     "symbol": "AAVEUSDT",
@@ -685,8 +812,8 @@
     "high_quality": false,
     "volume_24h": 33430032.720000003,
     "quote_volume": 33430032.720000003,
-    "current_price": 124.81,
-    "price": 124.81,
+    "current_price": 124.75,
+    "price": 124.75,
     "state_replay_failures": 0
   },
   {
@@ -737,8 +864,8 @@
     "high_quality": false,
     "volume_24h": 29644131.3984,
     "quote_volume": 29644131.3984,
-    "current_price": 23.477,
-    "price": 23.477
+    "current_price": 23.475,
+    "price": 23.475
   },
   {
     "symbol": "GRVTUSDT",
@@ -812,8 +939,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.17505,
-    "price": 0.17505,
+    "current_price": 0.1744,
+    "price": 0.1744,
     "state_replay_failures": 0
   },
   {
@@ -864,8 +991,8 @@
     "high_quality": false,
     "volume_24h": 120069268.54,
     "quote_volume": 120069268.54,
-    "current_price": 6.002,
-    "price": 6.002
+    "current_price": 6.001,
+    "price": 6.001
   },
   {
     "symbol": "METUSDT",
@@ -995,8 +1122,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.1437,
-    "price": 0.1437
+    "current_price": 0.1435,
+    "price": 0.1435
   },
   {
     "symbol": "WLFIUSDT",
@@ -1126,8 +1253,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.17505,
-    "price": 0.17505
+    "current_price": 0.1744,
+    "price": 0.1744
   },
   {
     "symbol": "IOSTUSDT",
@@ -1166,7 +1293,7 @@
     "id": "82b89071-5f18-525b-9fed-18f785e53c57",
     "signal_id": "82b89071-5f18-525b-9fed-18f785e53c57",
     "status": "active",
-    "reached_state": "tp1",
+    "reached_state": "tp2",
     "detected_at": "2026-09-11T23:11:00.088681+00:00",
     "raw_signal": true,
     "trade_layer": "warning",
@@ -1177,13 +1304,14 @@
     "high_quality": false,
     "volume_24h": 47504174.5212,
     "quote_volume": 47504174.5212,
-    "current_price": 0.0008902,
-    "price": 0.0008902,
+    "current_price": 0.0008925,
+    "price": 0.0008925,
     "state_replay_failures": 0,
-    "max_reached_state": "tp1",
-    "hit_price": 0.0008916695827895669,
-    "hit_at": "2026-09-11T23:45:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first"
+    "max_reached_state": "tp2",
+    "hit_price": 0.000906739165579134,
+    "hit_at": "2026-09-12T00:00:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first",
+    "active_sl_price": 0.0008766
   },
   {
     "symbol": "ICPUSDT",
@@ -1257,8 +1385,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 2.719,
-    "price": 2.719,
+    "current_price": 2.724,
+    "price": 2.724,
     "state_replay_failures": 0
   },
   {
@@ -1311,7 +1439,7 @@
     "quote_volume": 63082052.791999996,
     "current_price": 4.3623,
     "price": 4.3623,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "INJUSDT",
@@ -1361,8 +1489,8 @@
     "high_quality": false,
     "volume_24h": 12615443.161300002,
     "quote_volume": 12615443.161300002,
-    "current_price": 5.725,
-    "price": 5.725,
+    "current_price": 5.741,
+    "price": 5.741,
     "state_replay_failures": 0
   },
   {
@@ -1443,7 +1571,7 @@
     "hit_price": 0.07983448000000001,
     "hit_at": "2026-09-11T23:15:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "USELESSUSDT",
@@ -1493,8 +1621,8 @@
     "high_quality": false,
     "volume_24h": 101063242.7028,
     "quote_volume": 101063242.7028,
-    "current_price": 0.21429,
-    "price": 0.21429
+    "current_price": 0.21466,
+    "price": 0.21466
   },
   {
     "symbol": "CASHCATUSDT",
@@ -1545,7 +1673,8 @@
     "volume_24h": 19025758.955000002,
     "quote_volume": 19025758.955000002,
     "current_price": 0.1689,
-    "price": 0.1689
+    "price": 0.1689,
+    "state_replay_failures": 1
   },
   {
     "symbol": "HYPEUSDT",
@@ -1595,8 +1724,8 @@
     "high_quality": false,
     "volume_24h": 331749477.45059997,
     "quote_volume": 331749477.45059997,
-    "current_price": 79.441,
-    "price": 79.441,
+    "current_price": 79.305,
+    "price": 79.305,
     "state_replay_failures": 0
   },
   {
@@ -1647,8 +1776,8 @@
     "high_quality": false,
     "volume_24h": 61146942.077,
     "quote_volume": 61146942.077,
-    "current_price": 0.2062,
-    "price": 0.2062,
+    "current_price": 0.2061,
+    "price": 0.2061,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.20613954022141473,
@@ -1703,8 +1832,8 @@
     "high_quality": false,
     "volume_24h": 31169271.178000003,
     "quote_volume": 31169271.178000003,
-    "current_price": 23.477,
-    "price": 23.477
+    "current_price": 23.475,
+    "price": 23.475
   },
   {
     "symbol": "SHIBUSDT",
@@ -1754,8 +1883,8 @@
     "high_quality": false,
     "volume_24h": 15480643.5014,
     "quote_volume": 15480643.5014,
-    "current_price": 5.171e-06,
-    "price": 5.171e-06,
+    "current_price": 5.17e-06,
+    "price": 5.17e-06,
     "max_reached_state": "tp1",
     "hit_price": 5.149664295299503e-06,
     "hit_at": "2026-09-11T23:30:00+00:00",
@@ -1835,8 +1964,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 2.719,
-    "price": 2.719
+    "current_price": 2.724,
+    "price": 2.724
   },
   {
     "symbol": "CASHCATUSDT",
@@ -1942,7 +2071,8 @@
     "volume_24h": 8902483795.414,
     "quote_volume": 8902483795.414,
     "current_price": 77213.7,
-    "price": 77213.7
+    "price": 77213.7,
+    "state_replay_failures": 1
   },
   {
     "symbol": "HYPEUSDT",
@@ -1993,8 +2123,8 @@
     "volume_24h": 330663206.6562,
     "quote_volume": 330663206.6562,
     "state_replay_failures": 0,
-    "current_price": 79.441,
-    "price": 79.441
+    "current_price": 79.305,
+    "price": 79.305
   },
   {
     "symbol": "ENAUSDT",
@@ -2044,8 +2174,8 @@
     "high_quality": false,
     "volume_24h": 61534493.202,
     "quote_volume": 61534493.202,
-    "current_price": 0.14019,
-    "price": 0.14019
+    "current_price": 0.14004,
+    "price": 0.14004
   },
   {
     "symbol": "RAYUSDT",
@@ -2119,8 +2249,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 1.6766,
-    "price": 1.6766,
+    "current_price": 1.6721,
+    "price": 1.6721,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 1.7142928,
@@ -2175,7 +2305,7 @@
     "high_quality": false,
     "volume_24h": 8920919471.45382,
     "quote_volume": 8920919471.45382,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "current_price": 77213.7,
     "price": 77213.7
   },
@@ -2282,8 +2412,8 @@
     "high_quality": false,
     "volume_24h": 79302483.8144,
     "quote_volume": 79302483.8144,
-    "current_price": 0.3999,
-    "price": 0.3999
+    "current_price": 0.3997,
+    "price": 0.3997
   },
   {
     "symbol": "ARBUSDT",
@@ -2333,8 +2463,8 @@
     "high_quality": false,
     "volume_24h": 66876460.853999995,
     "quote_volume": 66876460.853999995,
-    "current_price": 0.13949,
-    "price": 0.13949,
+    "current_price": 0.13974,
+    "price": 0.13974,
     "state_replay_failures": 0
   },
   {
@@ -2385,8 +2515,8 @@
     "high_quality": false,
     "volume_24h": 39655195.02308,
     "quote_volume": 39655195.02308,
-    "current_price": 0.7867,
-    "price": 0.7867,
+    "current_price": 0.7871,
+    "price": 0.7871,
     "max_reached_state": "tp1",
     "hit_price": 0.7861304572125595,
     "hit_at": "2026-09-12T00:00:00+00:00",
@@ -2495,8 +2625,8 @@
     "high_quality": false,
     "volume_24h": 30836917.8611,
     "quote_volume": 30836917.8611,
-    "current_price": 0.6762,
-    "price": 0.6762
+    "current_price": 0.6794,
+    "price": 0.6794
   },
   {
     "symbol": "XPLUSDT",
@@ -2546,8 +2676,8 @@
     "high_quality": false,
     "volume_24h": 25230285.5922,
     "quote_volume": 25230285.5922,
-    "current_price": 0.08241,
-    "price": 0.08241,
+    "current_price": 0.08232,
+    "price": 0.08232,
     "state_replay_failures": 0
   },
   {
@@ -2598,8 +2728,8 @@
     "high_quality": false,
     "volume_24h": 12660106.2164,
     "quote_volume": 12660106.2164,
-    "current_price": 5.725,
-    "price": 5.725,
+    "current_price": 5.741,
+    "price": 5.741,
     "state_replay_failures": 0
   },
   {
@@ -2639,7 +2769,7 @@
     "id": "59480cfa-90c8-52dc-91c9-d759e96361c2",
     "signal_id": "59480cfa-90c8-52dc-91c9-d759e96361c2",
     "status": "active",
-    "reached_state": "holding",
+    "reached_state": "tp1",
     "detected_at": "2026-09-11T22:35:56.351346+00:00",
     "raw_signal": true,
     "trade_layer": "warning",
@@ -2650,8 +2780,12 @@
     "high_quality": false,
     "volume_24h": 132494671.705,
     "quote_volume": 132494671.705,
-    "current_price": 0.5883,
-    "price": 0.5883
+    "current_price": 0.5894,
+    "price": 0.5894,
+    "max_reached_state": "tp1",
+    "hit_price": 0.5906384956115538,
+    "hit_at": "2026-09-12T00:00:00+00:00",
+    "state_resolution": "chronological_ohlc_stop_first"
   },
   {
     "symbol": "IOSTUSDT",
@@ -2701,8 +2835,8 @@
     "high_quality": false,
     "volume_24h": 47538326.805,
     "quote_volume": 47538326.805,
-    "current_price": 0.0008902,
-    "price": 0.0008902,
+    "current_price": 0.0008925,
+    "price": 0.0008925,
     "max_reached_state": "tp2",
     "hit_price": 0.0009023902737339639,
     "hit_at": "2026-09-11T23:55:00+00:00",
@@ -2838,8 +2972,8 @@
     "high_quality": false,
     "volume_24h": 534362946.432,
     "quote_volume": 534362946.432,
-    "current_price": 1.3552,
-    "price": 1.3552,
+    "current_price": 1.354,
+    "price": 1.354,
     "state_replay_failures": 0
   },
   {
@@ -2948,7 +3082,7 @@
     "quote_volume": 64538352.16250001,
     "current_price": 4.3623,
     "price": 4.3623,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "PONSUSDT",
@@ -2998,8 +3132,8 @@
     "high_quality": false,
     "volume_24h": 132624860.9,
     "quote_volume": 132624860.9,
-    "current_price": 0.5883,
-    "price": 0.5883
+    "current_price": 0.5894,
+    "price": 0.5894
   },
   {
     "symbol": "XRPUSDT",
@@ -3050,8 +3184,8 @@
     "volume_24h": 533646988.2265,
     "quote_volume": 533646988.2265,
     "state_replay_failures": 0,
-    "current_price": 1.3552,
-    "price": 1.3552
+    "current_price": 1.354,
+    "price": 1.354
   },
   {
     "symbol": "HYPEUSDT",
@@ -3156,8 +3290,8 @@
     "high_quality": false,
     "volume_24h": 102299687.6655,
     "quote_volume": 102299687.6655,
-    "current_price": 0.21429,
-    "price": 0.21429
+    "current_price": 0.21466,
+    "price": 0.21466
   },
   {
     "symbol": "ARBUSDT",
@@ -3207,8 +3341,8 @@
     "high_quality": false,
     "volume_24h": 69212255.05842,
     "quote_volume": 69212255.05842,
-    "current_price": 0.13949,
-    "price": 0.13949,
+    "current_price": 0.13974,
+    "price": 0.13974,
     "state_replay_failures": 0
   },
   {
@@ -3314,8 +3448,8 @@
     "high_quality": false,
     "volume_24h": 61742587.64039999,
     "quote_volume": 61742587.64039999,
-    "current_price": 0.14019,
-    "price": 0.14019,
+    "current_price": 0.14004,
+    "price": 0.14004,
     "state_replay_failures": 0
   },
   {
@@ -3368,7 +3502,7 @@
     "quote_volume": 60664451.328,
     "current_price": 11.54,
     "price": 11.54,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "CASHCATUSDT",
@@ -3529,8 +3663,8 @@
     "high_quality": false,
     "volume_24h": 61176023.792,
     "quote_volume": 61176023.792,
-    "current_price": 0.2062,
-    "price": 0.2062,
+    "current_price": 0.2061,
+    "price": 0.2061,
     "state_replay_failures": 0
   },
   {
@@ -3581,8 +3715,8 @@
     "high_quality": false,
     "volume_24h": 41795595.027600005,
     "quote_volume": 41795595.027600005,
-    "current_price": 1.0394,
-    "price": 1.0394,
+    "current_price": 1.0407,
+    "price": 1.0407,
     "state_replay_failures": 0
   },
   {
@@ -3767,8 +3901,8 @@
     "high_quality": false,
     "volume_24h": 27282764.166,
     "quote_volume": 27282764.166,
-    "current_price": 0.3504,
-    "price": 0.3504,
+    "current_price": 0.3499,
+    "price": 0.3499,
     "state_replay_failures": 0
   },
   {
@@ -3819,8 +3953,8 @@
     "high_quality": false,
     "volume_24h": 15936679.6854,
     "quote_volume": 15936679.6854,
-    "current_price": 0.33834,
-    "price": 0.33834,
+    "current_price": 0.33843,
+    "price": 0.33843,
     "state_replay_failures": 0
   },
   {
@@ -3873,7 +4007,7 @@
     "quote_volume": 54752059.581999995,
     "current_price": 227.9,
     "price": 227.9,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "AAVEUSDT",
@@ -3979,8 +4113,8 @@
     "high_quality": false,
     "volume_24h": 24800046.8495,
     "quote_volume": 24800046.8495,
-    "current_price": 0.08241,
-    "price": 0.08241,
+    "current_price": 0.08232,
+    "price": 0.08232,
     "state_replay_failures": 0
   },
   {
@@ -4033,7 +4167,7 @@
     "quote_volume": 20781284.3007,
     "current_price": 0.01755,
     "price": 0.01755,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "TIAUSDT",
@@ -4107,8 +4241,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.354,
-    "price": 0.354,
+    "current_price": 0.3537,
+    "price": 0.3537,
     "state_replay_failures": 0
   },
   {
@@ -4159,8 +4293,8 @@
     "high_quality": false,
     "volume_24h": 16866443.8061,
     "quote_volume": 16866443.8061,
-    "current_price": 0.5959,
-    "price": 0.5959,
+    "current_price": 0.5958,
+    "price": 0.5958,
     "state_replay_failures": 0
   },
   {
@@ -4236,8 +4370,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.354,
-    "price": 0.354
+    "current_price": 0.3537,
+    "price": 0.3537
   },
   {
     "symbol": "METUSDT",
@@ -4534,8 +4668,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.1437,
-    "price": 0.1437
+    "current_price": 0.1435,
+    "price": 0.1435
   },
   {
     "symbol": "USELESSUSDT",
@@ -4664,8 +4798,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.45311,
-    "price": 0.45311,
+    "current_price": 0.45167,
+    "price": 0.45167,
     "state_replay_failures": 0
   },
   {
@@ -4716,8 +4850,8 @@
     "high_quality": false,
     "volume_24h": 33516415.812000003,
     "quote_volume": 33516415.812000003,
-    "current_price": 124.81,
-    "price": 124.81,
+    "current_price": 124.75,
+    "price": 124.75,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 124.44301408767036,
@@ -4772,8 +4906,8 @@
     "high_quality": false,
     "volume_24h": 15963139.385,
     "quote_volume": 15963139.385,
-    "current_price": 0.33834,
-    "price": 0.33834,
+    "current_price": 0.33843,
+    "price": 0.33843,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.3378548275740193,
@@ -4853,8 +4987,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.45311,
-    "price": 0.45311
+    "current_price": 0.45167,
+    "price": 0.45167
   },
   {
     "symbol": "ETHFIUSDT",
@@ -4904,8 +5038,8 @@
     "high_quality": false,
     "volume_24h": 32627651.6115,
     "quote_volume": 32627651.6115,
-    "current_price": 0.6762,
-    "price": 0.6762,
+    "current_price": 0.6794,
+    "price": 0.6794,
     "max_reached_state": "tp2",
     "hit_price": 0.6723795385005521,
     "hit_at": "2026-09-11T22:05:00+00:00",
@@ -4961,8 +5095,8 @@
     "high_quality": false,
     "volume_24h": 15956490.2394,
     "quote_volume": 15956490.2394,
-    "current_price": 0.33834,
-    "price": 0.33834,
+    "current_price": 0.33843,
+    "price": 0.33843,
     "state_replay_failures": 0
   },
   {
@@ -5044,7 +5178,7 @@
     "hit_at": "2026-09-11T21:30:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
     "active_sl_price": 0.09079410507514565,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "NEARUSDT",
@@ -5372,8 +5506,8 @@
     "high_quality": false,
     "volume_24h": 46136719.866,
     "quote_volume": 46136719.866,
-    "current_price": 235.0,
-    "price": 235.0,
+    "current_price": 234.8,
+    "price": 234.8,
     "max_reached_state": "tp1",
     "hit_price": 236.72727240018727,
     "hit_at": "2026-09-11T21:15:00+00:00",
@@ -5428,8 +5562,8 @@
     "high_quality": false,
     "volume_24h": 23097569.404,
     "quote_volume": 23097569.404,
-    "current_price": 0.01398,
-    "price": 0.01398,
+    "current_price": 0.01384,
+    "price": 0.01384,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.013929135094264999,
@@ -5484,8 +5618,8 @@
     "high_quality": false,
     "volume_24h": 20950618.374,
     "quote_volume": 20950618.374,
-    "current_price": 236.26,
-    "price": 236.26,
+    "current_price": 236.12,
+    "price": 236.12,
     "state_replay_failures": 0
   },
   {
@@ -5538,7 +5672,7 @@
     "quote_volume": 1438964381.6864,
     "current_price": 102.4,
     "price": 102.4,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 101.74927573549171,
     "hit_at": "2026-09-11T22:30:00+00:00",
@@ -5592,8 +5726,8 @@
     "high_quality": false,
     "volume_24h": 114502404.77,
     "quote_volume": 114502404.77,
-    "current_price": 150.4,
-    "price": 150.4,
+    "current_price": 150.28,
+    "price": 150.28,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 150.1427442954039,
@@ -5648,8 +5782,8 @@
     "high_quality": false,
     "volume_24h": 23168951.785,
     "quote_volume": 23168951.785,
-    "current_price": 0.01398,
-    "price": 0.01398,
+    "current_price": 0.01384,
+    "price": 0.01384,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.014041760870744522,
@@ -5785,8 +5919,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.9816,
-    "price": 0.9816,
+    "current_price": 0.9853,
+    "price": 0.9853,
     "max_reached_state": "tp1",
     "hit_price": 0.9755678162786893,
     "hit_at": "2026-09-11T22:15:00+00:00",
@@ -5920,8 +6054,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.9816,
-    "price": 0.9816,
+    "current_price": 0.9853,
+    "price": 0.9853,
     "max_reached_state": "tp1",
     "hit_price": 0.9756616387662992,
     "hit_at": "2026-09-11T22:15:00+00:00",
@@ -5999,8 +6133,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 6.481,
-    "price": 6.481,
+    "current_price": 6.483,
+    "price": 6.483,
     "max_reached_state": "tp1",
     "hit_price": 6.39019680991099,
     "hit_at": "2026-09-11T22:00:00+00:00",
@@ -6715,8 +6849,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 6.481,
-    "price": 6.481,
+    "current_price": 6.483,
+    "price": 6.483,
     "max_reached_state": "tp1",
     "hit_price": 6.393991013468747,
     "hit_at": "2026-09-11T22:00:00+00:00",
@@ -7158,8 +7292,8 @@
     "high_quality": false,
     "volume_24h": 17178019.0114,
     "quote_volume": 17178019.0114,
-    "current_price": 1.348,
-    "price": 1.348,
+    "current_price": 1.342,
+    "price": 1.342,
     "max_reached_state": "tp1",
     "hit_price": 1.299846707137674,
     "hit_at": "2026-09-11T20:25:00+00:00",
@@ -7347,8 +7481,8 @@
     "high_quality": false,
     "volume_24h": 17051164.7868,
     "quote_volume": 17051164.7868,
-    "current_price": 1.348,
-    "price": 1.348,
+    "current_price": 1.342,
+    "price": 1.342,
     "max_reached_state": "tp1",
     "hit_price": 1.304334915379052,
     "hit_at": "2026-09-11T20:25:00+00:00",
@@ -7403,8 +7537,8 @@
     "high_quality": false,
     "volume_24h": 15835757.992199998,
     "quote_volume": 15835757.992199998,
-    "current_price": 332.26,
-    "price": 332.26,
+    "current_price": 332.31,
+    "price": 332.31,
     "state_replay_failures": 0
   },
   {
@@ -7542,7 +7676,7 @@
     "hit_at": "2026-09-11T21:30:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
     "active_sl_price": 0.08991402105691951,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "JUPUSDT",
@@ -7617,8 +7751,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.2454,
-    "price": 0.2454
+    "current_price": 0.2458,
+    "price": 0.2458
   },
   {
     "symbol": "BTCUSDT",
@@ -7670,7 +7804,7 @@
     "quote_volume": 8842337903.01598,
     "current_price": 77213.7,
     "price": 77213.7,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 77072.57201037066,
     "hit_at": "2026-09-11T21:55:00+00:00",
@@ -7726,7 +7860,7 @@
     "quote_volume": 1414096332.964,
     "current_price": 102.4,
     "price": 102.4,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 101.73083949144224,
     "hit_at": "2026-09-11T22:30:00+00:00",
@@ -7892,8 +8026,8 @@
     "high_quality": false,
     "volume_24h": 32026165.9991,
     "quote_volume": 32026165.9991,
-    "current_price": 124.81,
-    "price": 124.81,
+    "current_price": 124.75,
+    "price": 124.75,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 123.96620214412441,
@@ -7973,8 +8107,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.2454,
-    "price": 0.2454
+    "current_price": 0.2458,
+    "price": 0.2458
   },
   {
     "symbol": "SPCXUSDT",
@@ -8024,8 +8158,8 @@
     "high_quality": false,
     "volume_24h": 115399217.695,
     "quote_volume": 115399217.695,
-    "current_price": 150.4,
-    "price": 150.4,
+    "current_price": 150.28,
+    "price": 150.28,
     "state_replay_failures": 0
   },
   {
@@ -8101,8 +8235,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.22493,
-    "price": 0.22493
+    "current_price": 0.22576,
+    "price": 0.22576
   },
   {
     "symbol": "XPLUSDT",
@@ -8209,8 +8343,8 @@
     "volume_24h": 15881165.815200003,
     "quote_volume": 15881165.815200003,
     "state_replay_failures": 0,
-    "current_price": 332.26,
-    "price": 332.26
+    "current_price": 332.31,
+    "price": 332.31
   },
   {
     "symbol": "XLMUSDT",
@@ -8341,8 +8475,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.10599,
-    "price": 0.10599
+    "current_price": 0.10651,
+    "price": 0.10651
   },
   {
     "symbol": "ALLOUSDT",
@@ -8417,8 +8551,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.22493,
-    "price": 0.22493
+    "current_price": 0.22576,
+    "price": 0.22576
   },
   {
     "symbol": "EIGENUSDT",
@@ -8492,8 +8626,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.2131,
-    "price": 0.2131,
+    "current_price": 0.2132,
+    "price": 0.2132,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.210947107215527,
@@ -8573,8 +8707,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.10599,
-    "price": 0.10599
+    "current_price": 0.10651,
+    "price": 0.10651
   },
   {
     "symbol": "SOLUSDT",
@@ -8791,8 +8925,8 @@
     "high_quality": false,
     "volume_24h": 60039822.699999996,
     "quote_volume": 60039822.699999996,
-    "current_price": 0.2062,
-    "price": 0.2062,
+    "current_price": 0.2061,
+    "price": 0.2061,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.20394351590471635,
@@ -8853,7 +8987,7 @@
     "hit_price": 0.018246957041839793,
     "hit_at": "2026-09-11T20:15:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "AAPLUSDT",
@@ -8903,8 +9037,8 @@
     "high_quality": false,
     "volume_24h": 15876966.336,
     "quote_volume": 15876966.336,
-    "current_price": 332.26,
-    "price": 332.26,
+    "current_price": 332.31,
+    "price": 332.31,
     "state_replay_failures": 0
   },
   {
@@ -9035,8 +9169,8 @@
     "high_quality": false,
     "volume_24h": 277501086.27,
     "quote_volume": 277501086.27,
-    "current_price": 96.52,
-    "price": 96.52,
+    "current_price": 96.49,
+    "price": 96.49,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 96.63716199513892,
@@ -9092,8 +9226,8 @@
     "high_quality": false,
     "volume_24h": 107066746.81500001,
     "quote_volume": 107066746.81500001,
-    "current_price": 0.7252,
-    "price": 0.7252,
+    "current_price": 0.7248,
+    "price": 0.7248,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.718321865109302,
@@ -9148,8 +9282,8 @@
     "high_quality": false,
     "volume_24h": 22678842.802,
     "quote_volume": 22678842.802,
-    "current_price": 0.151,
-    "price": 0.151,
+    "current_price": 0.1511,
+    "price": 0.1511,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.14823326027243444,
@@ -9450,8 +9584,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.1891,
-    "price": 0.1891
+    "current_price": 0.1893,
+    "price": 0.1893
   },
   {
     "symbol": "NEARUSDT",
@@ -9558,8 +9692,8 @@
     "volume_24h": 59999212.33499999,
     "quote_volume": 59999212.33499999,
     "state_replay_failures": 0,
-    "current_price": 0.2062,
-    "price": 0.2062
+    "current_price": 0.2061,
+    "price": 0.2061
   },
   {
     "symbol": "FILUSDT",
@@ -9609,8 +9743,8 @@
     "high_quality": false,
     "volume_24h": 38355916.74976,
     "quote_volume": 38355916.74976,
-    "current_price": 0.7867,
-    "price": 0.7867,
+    "current_price": 0.7871,
+    "price": 0.7871,
     "state_replay_failures": 0
   },
   {
@@ -9717,8 +9851,8 @@
     "high_quality": false,
     "volume_24h": 19378684.4638,
     "quote_volume": 19378684.4638,
-    "current_price": 218.49,
-    "price": 218.49,
+    "current_price": 218.58,
+    "price": 218.58,
     "state_replay_failures": 0
   },
   {
@@ -9770,8 +9904,8 @@
     "volume_24h": 15973704.023400001,
     "quote_volume": 15973704.023400001,
     "state_replay_failures": 0,
-    "current_price": 332.26,
-    "price": 332.26
+    "current_price": 332.31,
+    "price": 332.31
   },
   {
     "symbol": "AAOIUSDT",
@@ -9822,8 +9956,8 @@
     "volume_24h": 11677979.625,
     "quote_volume": 11677979.625,
     "state_replay_failures": 0,
-    "current_price": 105.47,
-    "price": 105.47,
+    "current_price": 105.44,
+    "price": 105.44,
     "max_reached_state": "tp1",
     "hit_price": 104.83474102927109,
     "hit_at": "2026-09-11T20:00:00+00:00",
@@ -9902,8 +10036,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.1891,
-    "price": 0.1891
+    "current_price": 0.1893,
+    "price": 0.1893
   },
   {
     "symbol": "ADAUSDT",
@@ -10115,8 +10249,8 @@
     "high_quality": false,
     "volume_24h": 19300320.7735,
     "quote_volume": 19300320.7735,
-    "current_price": 218.49,
-    "price": 218.49,
+    "current_price": 218.58,
+    "price": 218.58,
     "state_replay_failures": 0
   },
   {
@@ -10610,7 +10744,7 @@
     "quote_volume": 1379148916.077,
     "current_price": 102.4,
     "price": 102.4,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp2",
     "hit_price": 102.84766305646079,
     "hit_at": "2026-09-11T20:10:00+00:00",
@@ -10877,8 +11011,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.2131,
-    "price": 0.2131,
+    "current_price": 0.2132,
+    "price": 0.2132,
     "state_replay_failures": 0
   },
   {
@@ -10953,8 +11087,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 1634.58,
-    "price": 1634.58,
+    "current_price": 1634.88,
+    "price": 1634.88,
     "state_replay_failures": 0
   },
   {
@@ -11005,8 +11139,8 @@
     "high_quality": false,
     "volume_24h": 106326663.5145,
     "quote_volume": 106326663.5145,
-    "current_price": 0.7252,
-    "price": 0.7252,
+    "current_price": 0.7248,
+    "price": 0.7248,
     "state_replay_failures": 0
   },
   {
@@ -11278,8 +11412,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 1634.58,
-    "price": 1634.58
+    "current_price": 1634.88,
+    "price": 1634.88
   },
   {
     "symbol": "PUMPUSDT",
@@ -11329,8 +11463,8 @@
     "high_quality": false,
     "volume_24h": 158016248.28,
     "quote_volume": 158016248.28,
-    "current_price": 0.003578,
-    "price": 0.003578,
+    "current_price": 0.003581,
+    "price": 0.003581,
     "state_replay_failures": 0
   },
   {
@@ -11437,8 +11571,8 @@
     "high_quality": false,
     "volume_24h": 33124852.619999997,
     "quote_volume": 33124852.619999997,
-    "current_price": 53.3,
-    "price": 53.3,
+    "current_price": 53.31,
+    "price": 53.31,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 53.54765894300466,
@@ -11547,8 +11681,8 @@
     "volume_24h": 18086390.3013,
     "quote_volume": 18086390.3013,
     "state_replay_failures": 0,
-    "current_price": 0.6818,
-    "price": 0.6818
+    "current_price": 0.6801,
+    "price": 0.6801
   },
   {
     "symbol": "PENGUUSDT",
@@ -11598,8 +11732,8 @@
     "high_quality": false,
     "volume_24h": 16842964.226,
     "quote_volume": 16842964.226,
-    "current_price": 0.007249,
-    "price": 0.007249,
+    "current_price": 0.007239,
+    "price": 0.007239,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.007299537848881079,
@@ -11654,8 +11788,8 @@
     "high_quality": false,
     "volume_24h": 15094188.6428,
     "quote_volume": 15094188.6428,
-    "current_price": 5.171e-06,
-    "price": 5.171e-06,
+    "current_price": 5.17e-06,
+    "price": 5.17e-06,
     "state_replay_failures": 0
   },
   {
@@ -11916,8 +12050,8 @@
     "high_quality": false,
     "volume_24h": 77571386.7526,
     "quote_volume": 77571386.7526,
-    "current_price": 0.3999,
-    "price": 0.3999,
+    "current_price": 0.3997,
+    "price": 0.3997,
     "state_replay_failures": 0
   },
   {
@@ -12023,8 +12157,8 @@
     "high_quality": false,
     "volume_24h": 26905976.881,
     "quote_volume": 26905976.881,
-    "current_price": 0.3504,
-    "price": 0.3504,
+    "current_price": 0.3499,
+    "price": 0.3499,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.35422990097958107,
@@ -12079,8 +12213,8 @@
     "high_quality": false,
     "volume_24h": 17953561.3068,
     "quote_volume": 17953561.3068,
-    "current_price": 0.6818,
-    "price": 0.6818,
+    "current_price": 0.6801,
+    "price": 0.6801,
     "state_replay_failures": 0
   },
   {
@@ -12131,8 +12265,8 @@
     "high_quality": false,
     "volume_24h": 17514993.1336,
     "quote_volume": 17514993.1336,
-    "current_price": 0.5959,
-    "price": 0.5959,
+    "current_price": 0.5958,
+    "price": 0.5958,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.6059299326804165,
@@ -12211,8 +12345,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.2526,
-    "price": 0.2526,
+    "current_price": 0.2533,
+    "price": 0.2533,
     "state_replay_failures": 0
   },
   {
@@ -12263,8 +12397,8 @@
     "high_quality": false,
     "volume_24h": 105756034.86,
     "quote_volume": 105756034.86,
-    "current_price": 0.7252,
-    "price": 0.7252,
+    "current_price": 0.7248,
+    "price": 0.7248,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.7307392277508289,
@@ -12319,8 +12453,8 @@
     "high_quality": false,
     "volume_24h": 157650006.8,
     "quote_volume": 157650006.8,
-    "current_price": 0.003578,
-    "price": 0.003578,
+    "current_price": 0.003581,
+    "price": 0.003581,
     "state_replay_failures": 0
   },
   {
@@ -12429,7 +12563,7 @@
     "quote_volume": 58603230.477000006,
     "current_price": 11.54,
     "price": 11.54,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "AVAXUSDT",
@@ -12479,8 +12613,8 @@
     "high_quality": false,
     "volume_24h": 23801578.9425,
     "quote_volume": 23801578.9425,
-    "current_price": 7.443,
-    "price": 7.443,
+    "current_price": 7.444,
+    "price": 7.444,
     "state_replay_failures": 0
   },
   {
@@ -12586,8 +12720,8 @@
     "high_quality": false,
     "volume_24h": 44605684.52600001,
     "quote_volume": 44605684.52600001,
-    "current_price": 235.0,
-    "price": 235.0,
+    "current_price": 234.8,
+    "price": 234.8,
     "state_replay_failures": 0
   },
   {
@@ -12638,8 +12772,8 @@
     "high_quality": false,
     "volume_24h": 28240928.192,
     "quote_volume": 28240928.192,
-    "current_price": 0.2412,
-    "price": 0.2412,
+    "current_price": 0.2424,
+    "price": 0.2424,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.24395389998985495,
@@ -12806,8 +12940,8 @@
     "high_quality": false,
     "volume_24h": 349943324.7406,
     "quote_volume": 349943324.7406,
-    "current_price": 0.08426,
-    "price": 0.08426,
+    "current_price": 0.08412,
+    "price": 0.08412,
     "state_replay_failures": 0
   },
   {
@@ -13049,8 +13183,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.2526,
-    "price": 0.2526
+    "current_price": 0.2533,
+    "price": 0.2533
   },
   {
     "symbol": "SOLUSDT",
@@ -13102,7 +13236,7 @@
     "quote_volume": 1367080708.0728,
     "current_price": 102.4,
     "price": 102.4,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 102.43378650511248,
     "hit_at": "2026-09-11T20:05:00+00:00",
@@ -13156,8 +13290,8 @@
     "high_quality": false,
     "volume_24h": 349820460.75879997,
     "quote_volume": 349820460.75879997,
-    "current_price": 0.08426,
-    "price": 0.08426,
+    "current_price": 0.08412,
+    "price": 0.08412,
     "state_replay_failures": 0
   },
   {
@@ -13954,8 +14088,8 @@
     "high_quality": false,
     "volume_24h": 133344176.032,
     "quote_volume": 133344176.032,
-    "current_price": 3.303e-06,
-    "price": 3.303e-06,
+    "current_price": 3.299e-06,
+    "price": 3.299e-06,
     "state_replay_failures": 0
   },
   {
@@ -14031,8 +14165,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.5957,
-    "price": 0.5957,
+    "current_price": 0.5958,
+    "price": 0.5958,
     "max_reached_state": "tp1",
     "hit_price": 0.5953481892743349,
     "hit_at": "2026-09-11T18:45:00+00:00",
@@ -14086,8 +14220,8 @@
     "high_quality": false,
     "volume_24h": 503063281.1904,
     "quote_volume": 503063281.1904,
-    "current_price": 4357.0,
-    "price": 4357.0,
+    "current_price": 4357.1,
+    "price": 4357.1,
     "state_replay_failures": 0
   },
   {
@@ -14138,8 +14272,8 @@
     "high_quality": false,
     "volume_24h": 131082453.248,
     "quote_volume": 131082453.248,
-    "current_price": 2.352,
-    "price": 2.352,
+    "current_price": 2.357,
+    "price": 2.357,
     "max_reached_state": "tp3",
     "hit_price": 2.4045139861697695,
     "hit_at": "2026-09-11T22:45:00+00:00",
@@ -14250,8 +14384,8 @@
     "high_quality": false,
     "volume_24h": 17900543.3153,
     "quote_volume": 17900543.3153,
-    "current_price": 0.5959,
-    "price": 0.5959,
+    "current_price": 0.5958,
+    "price": 0.5958,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.5934035276091191,
@@ -14362,8 +14496,8 @@
     "high_quality": false,
     "volume_24h": 30434340.096,
     "quote_volume": 30434340.096,
-    "current_price": 0.2412,
-    "price": 0.2412,
+    "current_price": 0.2424,
+    "price": 0.2424,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.2415428187568864,
@@ -14474,8 +14608,8 @@
     "volume_24h": 14641802.0416,
     "quote_volume": 14641802.0416,
     "state_replay_failures": 0,
-    "current_price": 7.617,
-    "price": 7.617
+    "current_price": 7.612,
+    "price": 7.612
   },
   {
     "symbol": "ETHUSDT",
@@ -14530,8 +14664,8 @@
     },
     "volume_24h": 12507025522.16832,
     "quote_volume": 12507025522.16832,
-    "current_price": 2513.95,
-    "price": 2513.95,
+    "current_price": 2512.31,
+    "price": 2512.31,
     "state_replay_failures": 0
   },
   {
@@ -14582,8 +14716,8 @@
     "high_quality": false,
     "volume_24h": 133189263.74399999,
     "quote_volume": 133189263.74399999,
-    "current_price": 3.303e-06,
-    "price": 3.303e-06,
+    "current_price": 3.299e-06,
+    "price": 3.299e-06,
     "state_replay_failures": 0
   },
   {
@@ -14640,7 +14774,7 @@
     "hit_price": 101.35044744619375,
     "hit_at": "2026-09-11T18:20:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "BCHUSDT",
@@ -14692,7 +14826,7 @@
     "quote_volume": 54140249.18399999,
     "current_price": 227.9,
     "price": 227.9,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "VVVUSDT",
@@ -14909,8 +15043,8 @@
     "high_quality": false,
     "volume_24h": 23782783.824800003,
     "quote_volume": 23782783.824800003,
-    "current_price": 7.443,
-    "price": 7.443,
+    "current_price": 7.444,
+    "price": 7.444,
     "state_replay_failures": 0
   },
   {
@@ -15016,8 +15150,8 @@
     "high_quality": false,
     "volume_24h": 16488621.177,
     "quote_volume": 16488621.177,
-    "current_price": 0.007249,
-    "price": 0.007249,
+    "current_price": 0.007239,
+    "price": 0.007239,
     "state_replay_failures": 0
   },
   {
@@ -15068,8 +15202,8 @@
     "high_quality": false,
     "volume_24h": 14576940.710800001,
     "quote_volume": 14576940.710800001,
-    "current_price": 7.617,
-    "price": 7.617,
+    "current_price": 7.612,
+    "price": 7.612,
     "state_replay_failures": 0
   },
   {
@@ -15281,8 +15415,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 1.345,
-    "price": 1.345,
+    "current_price": 1.342,
+    "price": 1.342,
     "state_replay_failures": 0,
     "max_reached_state": "tp3",
     "hit_price": 1.3573778199990765,
@@ -15446,8 +15580,8 @@
     "high_quality": false,
     "volume_24h": 118770071.22,
     "quote_volume": 118770071.22,
-    "current_price": 6.002,
-    "price": 6.002,
+    "current_price": 6.001,
+    "price": 6.001,
     "state_replay_failures": 0
   },
   {
@@ -15553,8 +15687,8 @@
     "high_quality": false,
     "volume_24h": 44111553.4896,
     "quote_volume": 44111553.4896,
-    "current_price": 130.75,
-    "price": 130.75,
+    "current_price": 130.84,
+    "price": 130.84,
     "state_replay_failures": 0
   },
   {
@@ -15605,8 +15739,8 @@
     "high_quality": false,
     "volume_24h": 32760346.836000003,
     "quote_volume": 32760346.836000003,
-    "current_price": 53.3,
-    "price": 53.3,
+    "current_price": 53.31,
+    "price": 53.31,
     "state_replay_failures": 0
   },
   {
@@ -15657,8 +15791,8 @@
     "high_quality": false,
     "volume_24h": 30524055.606,
     "quote_volume": 30524055.606,
-    "current_price": 90.86,
-    "price": 90.86,
+    "current_price": 90.93,
+    "price": 90.93,
     "state_replay_failures": 0
   },
   {
@@ -15957,8 +16091,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.21429,
-    "price": 0.21429,
+    "current_price": 0.21466,
+    "price": 0.21466,
     "max_reached_state": "tp3",
     "hit_price": 0.21323564,
     "hit_at": "2026-09-11T22:15:00+00:00",
@@ -16014,8 +16148,8 @@
     "high_quality": false,
     "volume_24h": 30320998.005,
     "quote_volume": 30320998.005,
-    "current_price": 90.86,
-    "price": 90.86,
+    "current_price": 90.93,
+    "price": 90.93,
     "state_replay_failures": 0
   },
   {
@@ -16066,8 +16200,8 @@
     "high_quality": false,
     "volume_24h": 12244127.909599999,
     "quote_volume": 12244127.909599999,
-    "current_price": 1.348,
-    "price": 1.348,
+    "current_price": 1.342,
+    "price": 1.342,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 1.352899434560918,
@@ -16281,8 +16415,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.1395,
-    "price": 0.1395,
+    "current_price": 0.13979,
+    "price": 0.13979,
     "max_reached_state": "tp1",
     "hit_price": 0.1396278,
     "hit_at": "2026-09-11T18:45:00+00:00",
@@ -16971,8 +17105,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.09347,
-    "price": 0.09347
+    "current_price": 0.09307,
+    "price": 0.09307
   },
   {
     "symbol": "SPCXUSDT",
@@ -17250,8 +17384,8 @@
     },
     "volume_24h": 43228450.3324,
     "quote_volume": 43228450.3324,
-    "current_price": 0.2313,
-    "price": 0.2313,
+    "current_price": 0.2325,
+    "price": 0.2325,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.23976038835669652,
@@ -17361,8 +17495,8 @@
     "high_quality": false,
     "volume_24h": 20986203.223,
     "quote_volume": 20986203.223,
-    "current_price": 236.26,
-    "price": 236.26,
+    "current_price": 236.12,
+    "price": 236.12,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 235.3219826663818,
@@ -17443,8 +17577,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.09347,
-    "price": 0.09347
+    "current_price": 0.09307,
+    "price": 0.09307
   },
   {
     "symbol": "SOLUSDT",
@@ -17551,8 +17685,8 @@
     "high_quality": false,
     "volume_24h": 139045515.2838,
     "quote_volume": 139045515.2838,
-    "current_price": 150.4,
-    "price": 150.4,
+    "current_price": 150.28,
+    "price": 150.28,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 150.85248610264574,
@@ -17608,8 +17742,8 @@
     "volume_24h": 72380022.17433,
     "quote_volume": 72380022.17433,
     "state_replay_failures": 0,
-    "current_price": 0.13949,
-    "price": 0.13949,
+    "current_price": 0.13974,
+    "price": 0.13974,
     "max_reached_state": "tp3",
     "hit_price": 0.13729318691015288,
     "hit_at": "2026-09-11T22:00:00+00:00",
@@ -17720,8 +17854,8 @@
     "high_quality": false,
     "volume_24h": 120481502.64999999,
     "quote_volume": 120481502.64999999,
-    "current_price": 6.002,
-    "price": 6.002,
+    "current_price": 6.001,
+    "price": 6.001,
     "max_reached_state": "tp1",
     "hit_price": 6.022739769673422,
     "hit_at": "2026-09-11T18:00:00+00:00",
@@ -17776,8 +17910,8 @@
     "high_quality": false,
     "volume_24h": 17843657.693400003,
     "quote_volume": 17843657.693400003,
-    "current_price": 0.6818,
-    "price": 0.6818,
+    "current_price": 0.6801,
+    "price": 0.6801,
     "state_replay_failures": 0,
     "max_reached_state": "tp3",
     "hit_price": 0.6718413463132765,
@@ -18005,8 +18139,8 @@
     "high_quality": false,
     "volume_24h": 323888403.0538,
     "quote_volume": 323888403.0538,
-    "current_price": 79.441,
-    "price": 79.441,
+    "current_price": 79.305,
+    "price": 79.305,
     "max_reached_state": "tp3",
     "hit_price": 78.76033068044255,
     "hit_at": "2026-09-11T22:50:00+00:00",
@@ -18119,8 +18253,8 @@
     "volume_24h": 115056520.8329,
     "quote_volume": 115056520.8329,
     "state_replay_failures": 0,
-    "current_price": 0.21429,
-    "price": 0.21429,
+    "current_price": 0.21466,
+    "price": 0.21466,
     "max_reached_state": "tp3",
     "hit_price": 0.2128661375975793,
     "hit_at": "2026-09-11T22:25:00+00:00",
@@ -18899,8 +19033,8 @@
     "high_quality": false,
     "volume_24h": 12054629.206,
     "quote_volume": 12054629.206,
-    "current_price": 0.04699,
-    "price": 0.04699,
+    "current_price": 0.04748,
+    "price": 0.04748,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.04596569133734256,
@@ -19011,8 +19145,8 @@
     "high_quality": false,
     "volume_24h": 32971824.0,
     "quote_volume": 32971824.0,
-    "current_price": 103.04,
-    "price": 103.04,
+    "current_price": 103.02,
+    "price": 103.02,
     "state_replay_failures": 0
   },
   {
@@ -19126,7 +19260,7 @@
     "quote_volume": 14886527.609600002,
     "current_price": 929.52,
     "price": 929.52,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "ETCUSDT",
@@ -19238,7 +19372,7 @@
     "hit_price": 0.004479403404995025,
     "hit_at": "2026-09-11T17:55:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "XRPUSDT",
@@ -19869,8 +20003,8 @@
     "high_quality": false,
     "volume_24h": 93920206.65580001,
     "quote_volume": 93920206.65580001,
-    "current_price": 64.53,
-    "price": 64.53,
+    "current_price": 64.49,
+    "price": 64.49,
     "state_replay_failures": 0
   },
   {
@@ -19927,7 +20061,7 @@
     "hit_price": 4.30671194371795,
     "hit_at": "2026-09-11T22:50:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "active_sl_price": 4.6543
   },
   {
@@ -19980,7 +20114,7 @@
     "quote_volume": 55125767.308,
     "current_price": 23.27,
     "price": 23.27,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "BEATUSDT",
@@ -20151,7 +20285,7 @@
     "quote_volume": 18915296.7584,
     "current_price": 0.01754,
     "price": 0.01754,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 0.017474691722479608,
     "hit_at": "2026-09-11T21:45:00+00:00",
@@ -20285,8 +20419,8 @@
     "high_quality": false,
     "volume_24h": 523163297.8914,
     "quote_volume": 523163297.8914,
-    "current_price": 1.3552,
-    "price": 1.3552,
+    "current_price": 1.354,
+    "price": 1.354,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 1.3568052991452833,
@@ -20341,8 +20475,8 @@
     "high_quality": false,
     "volume_24h": 347614345.5575,
     "quote_volume": 347614345.5575,
-    "current_price": 0.08426,
-    "price": 0.08426,
+    "current_price": 0.08412,
+    "price": 0.08412,
     "max_reached_state": "tp2",
     "hit_price": 0.0834610492811293,
     "hit_at": "2026-09-11T18:05:00+00:00",
@@ -20404,7 +20538,7 @@
     "hit_price": 11.613290066524485,
     "hit_at": "2026-09-11T18:00:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "KORUUSDT",
@@ -20456,7 +20590,7 @@
     "quote_volume": 55076887.896000005,
     "current_price": 23.27,
     "price": 23.27,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "AAVEUSDT",
@@ -20618,8 +20752,8 @@
     "high_quality": false,
     "volume_24h": 12071855.008,
     "quote_volume": 12071855.008,
-    "current_price": 0.04699,
-    "price": 0.04699,
+    "current_price": 0.04748,
+    "price": 0.04748,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.04587519858374836,
@@ -20835,8 +20969,8 @@
     "high_quality": false,
     "volume_24h": 37820067.92753,
     "quote_volume": 37820067.92753,
-    "current_price": 0.7867,
-    "price": 0.7867,
+    "current_price": 0.7871,
+    "price": 0.7871,
     "max_reached_state": "tp2",
     "hit_price": 0.7777098468117771,
     "hit_at": "2026-09-11T18:50:00+00:00",
@@ -20892,8 +21026,8 @@
     "high_quality": false,
     "volume_24h": 32056876.2,
     "quote_volume": 32056876.2,
-    "current_price": 103.04,
-    "price": 103.04,
+    "current_price": 103.02,
+    "price": 103.02,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 103.34506784997708,
@@ -21004,8 +21138,8 @@
     "high_quality": false,
     "volume_24h": 17878411.7667,
     "quote_volume": 17878411.7667,
-    "current_price": 0.6818,
-    "price": 0.6818,
+    "current_price": 0.6801,
+    "price": 0.6801,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.6743695001697995,
@@ -21196,7 +21330,7 @@
     "quote_volume": 180557808.7712,
     "current_price": 122.47,
     "price": 122.47,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "APTUSDT",
@@ -21382,8 +21516,8 @@
     "volume_24h": 226966766.5356,
     "quote_volume": 226966766.5356,
     "state_replay_failures": 0,
-    "current_price": 1371.33,
-    "price": 1371.33
+    "current_price": 1371.67,
+    "price": 1371.67
   },
   {
     "symbol": "ADAUSDT",
@@ -21545,8 +21679,8 @@
     "high_quality": false,
     "volume_24h": 24311588.426400002,
     "quote_volume": 24311588.426400002,
-    "current_price": 7.443,
-    "price": 7.443,
+    "current_price": 7.444,
+    "price": 7.444,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 7.443905658234325,
@@ -21897,8 +22031,8 @@
     "high_quality": false,
     "volume_24h": 121114839.902,
     "quote_volume": 121114839.902,
-    "current_price": 6.002,
-    "price": 6.002,
+    "current_price": 6.001,
+    "price": 6.001,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 6.00346567905837,
@@ -22363,8 +22497,8 @@
     },
     "volume_24h": 57670403.0751,
     "quote_volume": 57670403.0751,
-    "current_price": 0.14019,
-    "price": 0.14019,
+    "current_price": 0.14004,
+    "price": 0.14004,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.13924769029490608,
@@ -22914,8 +23048,8 @@
     "high_quality": false,
     "volume_24h": 1157545301.85078,
     "quote_volume": 1157545301.85078,
-    "current_price": 1634.59,
-    "price": 1634.59,
+    "current_price": 1634.88,
+    "price": 1634.88,
     "state_replay_failures": 0
   },
   {
@@ -23077,8 +23211,8 @@
     "high_quality": false,
     "volume_24h": 32122967.484500002,
     "quote_volume": 32122967.484500002,
-    "current_price": 56.77,
-    "price": 56.77,
+    "current_price": 56.98,
+    "price": 56.98,
     "state_replay_failures": 0
   },
   {
@@ -23377,8 +23511,8 @@
     "high_quality": false,
     "volume_24h": 115745652.75,
     "quote_volume": 115745652.75,
-    "current_price": 976.08,
-    "price": 976.08,
+    "current_price": 975.82,
+    "price": 975.82,
     "state_replay_failures": 0
   },
   {
@@ -23429,7 +23563,7 @@
     "high_quality": false,
     "volume_24h": 55355938.0452,
     "quote_volume": 55355938.0452,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "current_price": 23.27,
     "price": 23.27
   },
@@ -23483,7 +23617,7 @@
     "quote_volume": 49329013.622,
     "current_price": 15.24,
     "price": 15.24,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "TAOUSDT",
@@ -24023,8 +24157,8 @@
     "high_quality": false,
     "volume_24h": 127617617.67,
     "quote_volume": 127617617.67,
-    "current_price": 2.352,
-    "price": 2.352,
+    "current_price": 2.357,
+    "price": 2.357,
     "max_reached_state": "tp3",
     "hit_price": 2.377983636267527,
     "hit_at": "2026-09-11T23:20:00+00:00",
@@ -24204,7 +24338,7 @@
     "quote_volume": 59617694.59723001,
     "current_price": 0.07907,
     "price": 0.07907,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp3",
     "hit_price": 0.081861,
     "hit_at": "2026-09-11T22:00:00+00:00",
@@ -24261,7 +24395,7 @@
     "quote_volume": 57968068.3956,
     "current_price": 11.54,
     "price": 11.54,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 11.53990244395006,
     "hit_at": "2026-09-11T18:50:00+00:00",
@@ -24317,7 +24451,7 @@
     "quote_volume": 54628706.748,
     "current_price": 227.9,
     "price": 227.9,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 229.0409477769212,
     "hit_at": "2026-09-11T18:00:00+00:00",
@@ -24376,8 +24510,8 @@
     },
     "volume_24h": 43361962.11,
     "quote_volume": 43361962.11,
-    "current_price": 1.0395,
-    "price": 1.0395,
+    "current_price": 1.0409,
+    "price": 1.0409,
     "state_replay_failures": 0
   },
   {
@@ -24484,8 +24618,8 @@
     "high_quality": false,
     "volume_24h": 24264477.2996,
     "quote_volume": 24264477.2996,
-    "current_price": 7.443,
-    "price": 7.443,
+    "current_price": 7.444,
+    "price": 7.444,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 7.4912786350277685,
@@ -24540,8 +24674,8 @@
     "high_quality": false,
     "volume_24h": 23448945.1406,
     "quote_volume": 23448945.1406,
-    "current_price": 0.08241,
-    "price": 0.08241,
+    "current_price": 0.08232,
+    "price": 0.08232,
     "max_reached_state": "tp2",
     "hit_price": 0.08267627893395212,
     "hit_at": "2026-09-11T18:50:00+00:00",
@@ -24716,7 +24850,7 @@
     "quote_volume": 17108705.5605,
     "current_price": 0.01754,
     "price": 0.01754,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 0.017803049197269487,
     "hit_at": "2026-09-11T19:45:00+00:00",
@@ -25304,7 +25438,7 @@
     "quote_volume": 183242122.8324,
     "current_price": 122.47,
     "price": 122.47,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 121.31040235041279,
     "hit_at": "2026-09-11T19:55:00+00:00",
@@ -25360,7 +25494,7 @@
     "quote_volume": 55825085.2817,
     "current_price": 23.27,
     "price": 23.27,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "SNXXUSDT",
@@ -25412,7 +25546,7 @@
     "quote_volume": 49425539.226,
     "current_price": 15.24,
     "price": 15.24,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "XPLUSDT",
@@ -25462,8 +25596,8 @@
     "high_quality": false,
     "volume_24h": 23462897.074,
     "quote_volume": 23462897.074,
-    "current_price": 0.08241,
-    "price": 0.08241,
+    "current_price": 0.08232,
+    "price": 0.08232,
     "max_reached_state": "tp3",
     "hit_price": 0.08095745058561743,
     "hit_at": "2026-09-11T22:35:00+00:00",
@@ -25600,8 +25734,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.7442,
-    "price": 0.7442
+    "current_price": 0.7445,
+    "price": 0.7445
   },
   {
     "symbol": "CHIPUSDT",
@@ -25755,8 +25889,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 130.75,
-    "price": 130.75,
+    "current_price": 130.84,
+    "price": 130.84,
     "state_replay_failures": 0
   },
   {
@@ -25808,8 +25942,8 @@
     "volume_24h": 1175288759.47392,
     "quote_volume": 1175288759.47392,
     "state_replay_failures": 0,
-    "current_price": 1634.59,
-    "price": 1634.59
+    "current_price": 1634.88,
+    "price": 1634.88
   },
   {
     "symbol": "SKHYNIXUSDT",
@@ -26025,8 +26159,8 @@
     "high_quality": false,
     "volume_24h": 32931954.5464,
     "quote_volume": 32931954.5464,
-    "current_price": 56.77,
-    "price": 56.77,
+    "current_price": 56.98,
+    "price": 56.98,
     "state_replay_failures": 0
   },
   {
@@ -26272,8 +26406,8 @@
     },
     "volume_24h": 12128347656.28331,
     "quote_volume": 12128347656.28331,
-    "current_price": 2513.95,
-    "price": 2513.95,
+    "current_price": 2512.31,
+    "price": 2512.31,
     "state_replay_failures": 0
   },
   {
@@ -26329,8 +26463,8 @@
     },
     "volume_24h": 2050477166.3619998,
     "quote_volume": 2050477166.3619998,
-    "current_price": 1162.49,
-    "price": 1162.49,
+    "current_price": 1161.11,
+    "price": 1161.11,
     "state_replay_failures": 0
   },
   {
@@ -26386,8 +26520,8 @@
     },
     "volume_24h": 347939481.3216,
     "quote_volume": 347939481.3216,
-    "current_price": 0.08426,
-    "price": 0.08426,
+    "current_price": 0.08412,
+    "price": 0.08412,
     "state_replay_failures": 0
   },
   {
@@ -26443,8 +26577,8 @@
     },
     "volume_24h": 150726742.936,
     "quote_volume": 150726742.936,
-    "current_price": 0.588,
-    "price": 0.588,
+    "current_price": 0.589,
+    "price": 0.589,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.591368669795009,
@@ -26504,8 +26638,8 @@
     },
     "volume_24h": 78307277.002,
     "quote_volume": 78307277.002,
-    "current_price": 0.3999,
-    "price": 0.3999,
+    "current_price": 0.3997,
+    "price": 0.3997,
     "state_replay_failures": 0
   },
   {
@@ -26561,8 +26695,8 @@
     },
     "volume_24h": 56253701.3856,
     "quote_volume": 56253701.3856,
-    "current_price": 0.14019,
-    "price": 0.14019,
+    "current_price": 0.14004,
+    "price": 0.14004,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.14180285383317756,
@@ -26622,8 +26756,8 @@
     },
     "volume_24h": 39147515.559,
     "quote_volume": 39147515.559,
-    "current_price": 23.478,
-    "price": 23.478,
+    "current_price": 23.475,
+    "price": 23.475,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 23.78003342970432,
@@ -26759,8 +26893,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.003578,
-    "price": 0.003578,
+    "current_price": 0.003581,
+    "price": 0.003581,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.003548772,
@@ -26822,7 +26956,7 @@
     "quote_volume": 54619173.354,
     "current_price": 227.9,
     "price": 227.9,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 225.34789263442565,
     "hit_at": "2026-09-11T18:45:00+00:00",
@@ -26954,8 +27088,8 @@
     "volume_24h": 231017338.94343,
     "quote_volume": 231017338.94343,
     "state_replay_failures": 0,
-    "current_price": 1371.33,
-    "price": 1371.33
+    "current_price": 1371.67,
+    "price": 1371.67
   },
   {
     "symbol": "ZECUSDT",
@@ -27029,8 +27163,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 1162.49,
-    "price": 1162.49,
+    "current_price": 1161.11,
+    "price": 1161.11,
     "state_replay_failures": 0
   },
   {
@@ -27106,8 +27240,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.003578,
-    "price": 0.003578,
+    "current_price": 0.003581,
+    "price": 0.003581,
     "max_reached_state": "tp1",
     "hit_price": 0.0035497439999999996,
     "hit_at": "2026-09-11T18:45:00+00:00",
@@ -27485,8 +27619,8 @@
     "high_quality": false,
     "volume_24h": 329637856.91200006,
     "quote_volume": 329637856.91200006,
-    "current_price": 79.441,
-    "price": 79.441,
+    "current_price": 79.305,
+    "price": 79.305,
     "max_reached_state": "tp3",
     "hit_price": 79.57933489282657,
     "hit_at": "2026-09-11T22:00:00+00:00",
@@ -27836,8 +27970,8 @@
     "high_quality": false,
     "volume_24h": 38287866.0815,
     "quote_volume": 38287866.0815,
-    "current_price": 0.7867,
-    "price": 0.7867,
+    "current_price": 0.7871,
+    "price": 0.7871,
     "max_reached_state": "tp3",
     "hit_price": 0.7769251231972482,
     "hit_at": "2026-09-11T18:50:00+00:00",
@@ -28130,8 +28264,8 @@
     "high_quality": false,
     "volume_24h": 502140220.247,
     "quote_volume": 502140220.247,
-    "current_price": 4357.0,
-    "price": 4357.0,
+    "current_price": 4357.1,
+    "price": 4357.1,
     "max_reached_state": "tp1",
     "hit_price": 4359.255696656445,
     "hit_at": "2026-09-11T16:20:00+00:00",
@@ -28244,8 +28378,8 @@
     "volume_24h": 140343172.624,
     "quote_volume": 140343172.624,
     "state_replay_failures": 0,
-    "current_price": 3.303e-06,
-    "price": 3.303e-06,
+    "current_price": 3.299e-06,
+    "price": 3.299e-06,
     "max_reached_state": "tp3",
     "hit_price": 3.257169481329587e-06,
     "hit_at": "2026-09-11T18:50:00+00:00",
@@ -28301,8 +28435,8 @@
     "volume_24h": 75892958.50580001,
     "quote_volume": 75892958.50580001,
     "state_replay_failures": 0,
-    "current_price": 0.3999,
-    "price": 0.3999,
+    "current_price": 0.3997,
+    "price": 0.3997,
     "max_reached_state": "tp3",
     "hit_price": 0.3993087582324766,
     "hit_at": "2026-09-11T18:50:00+00:00",
@@ -28357,8 +28491,8 @@
     "high_quality": false,
     "volume_24h": 31121930.951999996,
     "quote_volume": 31121930.951999996,
-    "current_price": 90.86,
-    "price": 90.86,
+    "current_price": 90.93,
+    "price": 90.93,
     "max_reached_state": "tp2",
     "hit_price": 91.20689358768225,
     "hit_at": "2026-09-11T18:00:00+00:00",
@@ -28774,8 +28908,8 @@
     "high_quality": false,
     "volume_24h": 22664463.512500003,
     "quote_volume": 22664463.512500003,
-    "current_price": 196.42,
-    "price": 196.42,
+    "current_price": 196.44,
+    "price": 196.44,
     "state_replay_failures": 0
   },
   {
@@ -28827,8 +28961,8 @@
     "volume_24h": 13272444.2688,
     "quote_volume": 13272444.2688,
     "state_replay_failures": 0,
-    "current_price": 7.617,
-    "price": 7.617,
+    "current_price": 7.612,
+    "price": 7.612,
     "max_reached_state": "tp2",
     "hit_price": 7.657835520215298,
     "hit_at": "2026-09-11T18:00:00+00:00",
@@ -29068,8 +29202,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.3057,
-    "price": 0.3057
+    "current_price": 0.3071,
+    "price": 0.3071
   },
   {
     "symbol": "ORDIUSDT",
@@ -29359,8 +29493,8 @@
     "high_quality": false,
     "volume_24h": 500946284.9845,
     "quote_volume": 500946284.9845,
-    "current_price": 4357.0,
-    "price": 4357.0,
+    "current_price": 4357.1,
+    "price": 4357.1,
     "max_reached_state": "tp1",
     "hit_price": 4350.728204406455,
     "hit_at": "2026-09-11T18:10:00+00:00",
@@ -29421,7 +29555,7 @@
     "hit_price": 4.382118156826914,
     "hit_at": "2026-09-11T19:00:00+00:00",
     "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "active_sl_price": 4.7805
   },
   {
@@ -29693,8 +29827,8 @@
     "high_quality": false,
     "volume_24h": 15780478.523899999,
     "quote_volume": 15780478.523899999,
-    "current_price": 0.007249,
-    "price": 0.007249,
+    "current_price": 0.007239,
+    "price": 0.007239,
     "state_replay_failures": 0,
     "max_reached_state": "tp3",
     "hit_price": 0.007196631060133648,
@@ -29987,8 +30121,8 @@
     "high_quality": false,
     "volume_24h": 232400161.09190997,
     "quote_volume": 232400161.09190997,
-    "current_price": 1371.33,
-    "price": 1371.33,
+    "current_price": 1371.67,
+    "price": 1371.67,
     "state_replay_failures": 0
   },
   {
@@ -30039,8 +30173,8 @@
     "high_quality": false,
     "volume_24h": 156462009.14180002,
     "quote_volume": 156462009.14180002,
-    "current_price": 150.4,
-    "price": 150.4,
+    "current_price": 150.28,
+    "price": 150.28,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 150.96266814942564,
@@ -30096,8 +30230,8 @@
     "high_quality": false,
     "volume_24h": 41510790.839999996,
     "quote_volume": 41510790.839999996,
-    "current_price": 130.75,
-    "price": 130.75,
+    "current_price": 130.84,
+    "price": 130.84,
     "max_reached_state": "tp2",
     "hit_price": 131.07971652830517,
     "hit_at": "2026-09-11T18:05:00+00:00",
@@ -30263,8 +30397,8 @@
     "high_quality": false,
     "volume_24h": 27985053.6,
     "quote_volume": 27985053.6,
-    "current_price": 103.04,
-    "price": 103.04,
+    "current_price": 103.02,
+    "price": 103.02,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 101.61720199218698,
@@ -30486,8 +30620,8 @@
     "high_quality": false,
     "volume_24h": 13146797.25,
     "quote_volume": 13146797.25,
-    "current_price": 5.725,
-    "price": 5.725,
+    "current_price": 5.741,
+    "price": 5.741,
     "max_reached_state": "tp3",
     "hit_price": 5.713383008870216,
     "hit_at": "2026-09-11T22:00:00+00:00",
@@ -30543,8 +30677,8 @@
     "high_quality": false,
     "volume_24h": 12632522.627999999,
     "quote_volume": 12632522.627999999,
-    "current_price": 338.51,
-    "price": 338.51,
+    "current_price": 338.47,
+    "price": 338.47,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 338.8721159019119,
@@ -30600,8 +30734,8 @@
     "high_quality": false,
     "volume_24h": 498650609.70689994,
     "quote_volume": 498650609.70689994,
-    "current_price": 4357.0,
-    "price": 4357.0,
+    "current_price": 4357.1,
+    "price": 4357.1,
     "state_replay_failures": 0
   },
   {
@@ -30707,8 +30841,8 @@
     "high_quality": false,
     "volume_24h": 12263522.934999999,
     "quote_volume": 12263522.934999999,
-    "current_price": 338.51,
-    "price": 338.51,
+    "current_price": 338.47,
+    "price": 338.47,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 338.30074020200675,
@@ -30906,7 +31040,7 @@
     "high_quality": true,
     "current_price": 43.94,
     "price": 43.94,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "MUUSDT",
@@ -30956,8 +31090,8 @@
     "high_quality": false,
     "volume_24h": 116870759.35159999,
     "quote_volume": 116870759.35159999,
-    "current_price": 976.08,
-    "price": 976.08,
+    "current_price": 975.82,
+    "price": 975.82,
     "state_replay_failures": 0
   },
   {
@@ -31008,8 +31142,8 @@
     "high_quality": false,
     "volume_24h": 28104452.224000003,
     "quote_volume": 28104452.224000003,
-    "current_price": 103.04,
-    "price": 103.04,
+    "current_price": 103.02,
+    "price": 103.02,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 101.78515734000656,
@@ -31175,8 +31309,8 @@
     "high_quality": false,
     "volume_24h": 41407351.91,
     "quote_volume": 41407351.91,
-    "current_price": 130.75,
-    "price": 130.75,
+    "current_price": 130.84,
+    "price": 130.84,
     "max_reached_state": "tp1",
     "hit_price": 133.01493904253547,
     "hit_at": "2026-09-11T15:55:00+00:00",
@@ -31231,8 +31365,8 @@
     "high_quality": false,
     "volume_24h": 30977103.492,
     "quote_volume": 30977103.492,
-    "current_price": 90.86,
-    "price": 90.86,
+    "current_price": 90.93,
+    "price": 90.93,
     "max_reached_state": "tp1",
     "hit_price": 92.20961284513835,
     "hit_at": "2026-09-11T15:55:00+00:00",
@@ -31398,8 +31532,8 @@
     "high_quality": false,
     "volume_24h": 117017512.47440001,
     "quote_volume": 117017512.47440001,
-    "current_price": 976.08,
-    "price": 976.08,
+    "current_price": 975.82,
+    "price": 975.82,
     "state_replay_failures": 0
   },
   {
@@ -31627,7 +31761,7 @@
     "quote_volume": 18358479.987,
     "current_price": 0.1687,
     "price": 0.1687,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 0.1699591642421428,
     "hit_at": "2026-09-11T22:45:00+00:00",
@@ -32036,8 +32170,8 @@
     "high_quality": false,
     "volume_24h": 139292538.968,
     "quote_volume": 139292538.968,
-    "current_price": 3.303e-06,
-    "price": 3.303e-06,
+    "current_price": 3.299e-06,
+    "price": 3.299e-06,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 3.293843328532995e-06,
@@ -32093,8 +32227,8 @@
     "high_quality": false,
     "volume_24h": 40455000.0833,
     "quote_volume": 40455000.0833,
-    "current_price": 23.477,
-    "price": 23.477,
+    "current_price": 23.475,
+    "price": 23.475,
     "max_reached_state": "tp2",
     "hit_price": 24.017821836826094,
     "hit_at": "2026-09-11T18:40:00+00:00",
@@ -32206,8 +32340,8 @@
     "high_quality": false,
     "volume_24h": 14190991.470900001,
     "quote_volume": 14190991.470900001,
-    "current_price": 5.171e-06,
-    "price": 5.171e-06,
+    "current_price": 5.17e-06,
+    "price": 5.17e-06,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 5.1476275416650525e-06,
@@ -32263,8 +32397,8 @@
     "high_quality": false,
     "volume_24h": 13484676.571400002,
     "quote_volume": 13484676.571400002,
-    "current_price": 715.3,
-    "price": 715.3,
+    "current_price": 715.44,
+    "price": 715.44,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 717.469708120006,
@@ -32319,8 +32453,8 @@
     "high_quality": false,
     "volume_24h": 13050716.4288,
     "quote_volume": 13050716.4288,
-    "current_price": 7.617,
-    "price": 7.617,
+    "current_price": 7.612,
+    "price": 7.612,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 7.5626212852995405,
@@ -32620,7 +32754,7 @@
     "quote_volume": 104962334.42099999,
     "current_price": 100.63,
     "price": 100.63,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "TSLAUSDT",
@@ -32670,8 +32804,8 @@
     "high_quality": false,
     "volume_24h": 26939662.290400002,
     "quote_volume": 26939662.290400002,
-    "current_price": 365.47,
-    "price": 365.47,
+    "current_price": 365.48,
+    "price": 365.48,
     "state_replay_failures": 0
   },
   {
@@ -32777,8 +32911,8 @@
     "high_quality": false,
     "volume_24h": 15463537.0581,
     "quote_volume": 15463537.0581,
-    "current_price": 0.007249,
-    "price": 0.007249,
+    "current_price": 0.007239,
+    "price": 0.007239,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.007292294230622659,
@@ -32834,8 +32968,8 @@
     "high_quality": false,
     "volume_24h": 14149927.3236,
     "quote_volume": 14149927.3236,
-    "current_price": 5.171e-06,
-    "price": 5.171e-06,
+    "current_price": 5.17e-06,
+    "price": 5.17e-06,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 5.135060429488413e-06,
@@ -33190,8 +33324,8 @@
     },
     "volume_24h": 31487296.8762,
     "quote_volume": 31487296.8762,
-    "current_price": 56.81,
-    "price": 56.81,
+    "current_price": 56.93,
+    "price": 56.93,
     "state_replay_failures": 0
   },
   {
@@ -33242,8 +33376,8 @@
     "high_quality": false,
     "volume_24h": 27643296.6979,
     "quote_volume": 27643296.6979,
-    "current_price": 113.29,
-    "price": 113.29,
+    "current_price": 113.3,
+    "price": 113.3,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 112.5544783422857,
@@ -33303,8 +33437,8 @@
     },
     "volume_24h": 26962252.128000002,
     "quote_volume": 26962252.128000002,
-    "current_price": 365.47,
-    "price": 365.47,
+    "current_price": 365.48,
+    "price": 365.48,
     "state_replay_failures": 0
   },
   {
@@ -33466,8 +33600,8 @@
     "high_quality": false,
     "volume_24h": 19301254.32,
     "quote_volume": 19301254.32,
-    "current_price": 236.26,
-    "price": 236.26,
+    "current_price": 236.12,
+    "price": 236.12,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 239.26241506975242,
@@ -33988,8 +34122,8 @@
     "high_quality": false,
     "volume_24h": 19612429.4416,
     "quote_volume": 19612429.4416,
-    "current_price": 147.82,
-    "price": 147.82,
+    "current_price": 147.84,
+    "price": 147.84,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 149.35846791054445,
@@ -34046,7 +34180,7 @@
     "quote_volume": 17007342.0948,
     "current_price": 929.52,
     "price": 929.52,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "ETCUSDT",
@@ -34342,8 +34476,8 @@
     "high_quality": false,
     "volume_24h": 128451387.1716,
     "quote_volume": 128451387.1716,
-    "current_price": 190.73,
-    "price": 190.73,
+    "current_price": 190.86,
+    "price": 190.86,
     "state_replay_failures": 0
   },
   {
@@ -34450,8 +34584,8 @@
     "high_quality": false,
     "volume_24h": 19276533.704299998,
     "quote_volume": 19276533.704299998,
-    "current_price": 236.26,
-    "price": 236.26,
+    "current_price": 236.12,
+    "price": 236.12,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 239.89513818776817,
@@ -34506,8 +34640,8 @@
     "high_quality": false,
     "volume_24h": 11333779.844999999,
     "quote_volume": 11333779.844999999,
-    "current_price": 43.94,
-    "price": 43.94,
+    "current_price": 43.98,
+    "price": 43.98,
     "state_replay_failures": 0
   },
   {
@@ -34635,8 +34769,8 @@
     "high_quality": false,
     "volume_24h": 117177484.50450002,
     "quote_volume": 117177484.50450002,
-    "current_price": 976.08,
-    "price": 976.08,
+    "current_price": 975.82,
+    "price": 975.82,
     "state_replay_failures": 0
   },
   {
@@ -34689,7 +34823,7 @@
     "quote_volume": 63727796.901999995,
     "current_price": 726.7,
     "price": 726.7,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 726.2809962817748,
     "hit_at": "2026-09-11T15:55:00+00:00",
@@ -34914,8 +35048,8 @@
     },
     "volume_24h": 42002285.456,
     "quote_volume": 42002285.456,
-    "current_price": 0.2412,
-    "price": 0.2412,
+    "current_price": 0.2424,
+    "price": 0.2424,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.23149538409384263,
@@ -35025,8 +35159,8 @@
     "high_quality": false,
     "volume_24h": 22216372.956,
     "quote_volume": 22216372.956,
-    "current_price": 196.42,
-    "price": 196.42,
+    "current_price": 196.44,
+    "price": 196.44,
     "state_replay_failures": 0
   },
   {
@@ -35268,8 +35402,8 @@
     "high_quality": false,
     "volume_24h": 131163968.9013,
     "quote_volume": 131163968.9013,
-    "current_price": 190.73,
-    "price": 190.73,
+    "current_price": 190.86,
+    "price": 190.86,
     "state_replay_failures": 0
   },
   {
@@ -35320,8 +35454,8 @@
     "high_quality": false,
     "volume_24h": 47555628.54,
     "quote_volume": 47555628.54,
-    "current_price": 235.0,
-    "price": 235.0,
+    "current_price": 234.8,
+    "price": 234.8,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 234.29515529532242,
@@ -35377,8 +35511,8 @@
     "high_quality": false,
     "volume_24h": 31258912.970999997,
     "quote_volume": 31258912.970999997,
-    "current_price": 0.151,
-    "price": 0.151,
+    "current_price": 0.1511,
+    "price": 0.1511,
     "max_reached_state": "tp3",
     "hit_price": 0.15162509729671306,
     "hit_at": "2026-09-11T19:40:00+00:00",
@@ -35434,8 +35568,8 @@
     "high_quality": false,
     "volume_24h": 30350734.831,
     "quote_volume": 30350734.831,
-    "current_price": 53.3,
-    "price": 53.3,
+    "current_price": 53.31,
+    "price": 53.31,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 53.38403643217438,
@@ -35490,8 +35624,8 @@
     "high_quality": false,
     "volume_24h": 26203127.737499997,
     "quote_volume": 26203127.737499997,
-    "current_price": 365.47,
-    "price": 365.47,
+    "current_price": 365.48,
+    "price": 365.48,
     "state_replay_failures": 0
   },
   {
@@ -35542,8 +35676,8 @@
     "high_quality": false,
     "volume_24h": 24272842.86,
     "quote_volume": 24272842.86,
-    "current_price": 0.3504,
-    "price": 0.3504,
+    "current_price": 0.3499,
+    "price": 0.3499,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.3493698780026338,
@@ -35599,8 +35733,8 @@
     "high_quality": false,
     "volume_24h": 22308343.5365,
     "quote_volume": 22308343.5365,
-    "current_price": 218.49,
-    "price": 218.49,
+    "current_price": 218.58,
+    "price": 218.58,
     "max_reached_state": "tp2",
     "hit_price": 218.41000540723883,
     "hit_at": "2026-09-11T19:55:00+00:00",
@@ -35949,8 +36083,8 @@
     "high_quality": false,
     "volume_24h": 42306596.424,
     "quote_volume": 42306596.424,
-    "current_price": 0.2412,
-    "price": 0.2412,
+    "current_price": 0.2424,
+    "price": 0.2424,
     "max_reached_state": "tp2",
     "hit_price": 0.22464530009889705,
     "hit_at": "2026-09-11T18:10:00+00:00",
@@ -36086,8 +36220,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 567.92,
-    "price": 567.92
+    "current_price": 567.81,
+    "price": 567.81
   },
   {
     "symbol": "SHIBUSDT",
@@ -36301,7 +36435,7 @@
     "quote_volume": 7761507422.863689,
     "current_price": 77213.7,
     "price": 77213.7,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 77791.13885690772,
     "hit_at": "2026-09-11T15:45:00+00:00",
@@ -36420,8 +36554,8 @@
     },
     "volume_24h": 480466967.7423,
     "quote_volume": 480466967.7423,
-    "current_price": 1.3552,
-    "price": 1.3552,
+    "current_price": 1.3539,
+    "price": 1.3539,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 1.36520592806041,
@@ -36543,7 +36677,7 @@
     "quote_volume": 63089519.787,
     "current_price": 726.7,
     "price": 726.7,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 721.7396450849124,
     "hit_at": "2026-09-11T18:00:00+00:00",
@@ -36720,7 +36854,7 @@
     "quote_volume": 18303995.294999998,
     "current_price": 0.1687,
     "price": 0.1687,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp1",
     "hit_price": 0.17204289789843963,
     "hit_at": "2026-09-11T18:30:00+00:00",
@@ -36779,8 +36913,8 @@
     },
     "volume_24h": 17761640.752,
     "quote_volume": 17761640.752,
-    "current_price": 147.82,
-    "price": 147.82,
+    "current_price": 147.84,
+    "price": 147.84,
     "max_reached_state": "tp1",
     "hit_price": 151.30349808436173,
     "hit_at": "2026-09-11T16:30:00+00:00",
@@ -36837,7 +36971,7 @@
     "quote_volume": 16135170.345,
     "current_price": 929.52,
     "price": 929.52,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "INJUSDT",
@@ -36892,8 +37026,8 @@
     },
     "volume_24h": 12976059.4306,
     "quote_volume": 12976059.4306,
-    "current_price": 5.725,
-    "price": 5.725,
+    "current_price": 5.741,
+    "price": 5.741,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 5.699883791851053,
@@ -37325,7 +37459,7 @@
     "high_quality": true,
     "current_price": 929.52,
     "price": 929.52,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "ONDOUSDT",
@@ -37455,8 +37589,8 @@
     "high_quality": false,
     "volume_24h": 92366403.92699999,
     "quote_volume": 92366403.92699999,
-    "current_price": 64.53,
-    "price": 64.53,
+    "current_price": 64.49,
+    "price": 64.49,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 64.46554423706141,
@@ -37887,8 +38021,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 567.92,
-    "price": 567.92
+    "current_price": 567.81,
+    "price": 567.81
   },
   {
     "symbol": "BNBUSDT",
@@ -37964,7 +38098,7 @@
     "high_quality": true,
     "current_price": 726.7,
     "price": 726.7,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "NVDAUSDT",
@@ -38014,8 +38148,8 @@
     "high_quality": false,
     "volume_24h": 22152580.832,
     "quote_volume": 22152580.832,
-    "current_price": 218.49,
-    "price": 218.49,
+    "current_price": 218.58,
+    "price": 218.58,
     "max_reached_state": "tp2",
     "hit_price": 218.5638243666621,
     "hit_at": "2026-09-11T19:30:00+00:00",
@@ -38344,8 +38478,8 @@
     },
     "volume_24h": 127320373.63489999,
     "quote_volume": 127320373.63489999,
-    "current_price": 190.73,
-    "price": 190.73,
+    "current_price": 190.86,
+    "price": 190.86,
     "state_replay_failures": 0
   },
   {
@@ -39283,7 +39417,7 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "current_price": 726.7,
     "price": 726.7,
     "max_reached_state": "tp1",
@@ -39418,8 +39552,8 @@
     "high_quality": false,
     "volume_24h": 29633721.1128,
     "quote_volume": 29633721.1128,
-    "current_price": 56.77,
-    "price": 56.77,
+    "current_price": 56.98,
+    "price": 56.98,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 56.66161715388794,
@@ -39474,8 +39608,8 @@
     "high_quality": false,
     "volume_24h": 28979933.29,
     "quote_volume": 28979933.29,
-    "current_price": 53.3,
-    "price": 53.3,
+    "current_price": 53.31,
+    "price": 53.31,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 53.2845206784219,
@@ -39586,8 +39720,8 @@
     "high_quality": false,
     "volume_24h": 26424979.425,
     "quote_volume": 26424979.425,
-    "current_price": 113.29,
-    "price": 113.29,
+    "current_price": 113.3,
+    "price": 113.3,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 112.62351371669719,
@@ -40029,8 +40163,8 @@
     "high_quality": false,
     "volume_24h": 91378524.072,
     "quote_volume": 91378524.072,
-    "current_price": 64.53,
-    "price": 64.53,
+    "current_price": 64.49,
+    "price": 64.49,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 64.35953727192864,
@@ -40140,8 +40274,8 @@
     "high_quality": false,
     "volume_24h": 45017586.185,
     "quote_volume": 45017586.185,
-    "current_price": 235.0,
-    "price": 235.0,
+    "current_price": 234.8,
+    "price": 234.8,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 233.5250954245927,
@@ -40197,8 +40331,8 @@
     "high_quality": false,
     "volume_24h": 27108654.701599997,
     "quote_volume": 27108654.701599997,
-    "current_price": 365.47,
-    "price": 365.47,
+    "current_price": 365.48,
+    "price": 365.48,
     "state_replay_failures": 0
   },
   {
@@ -40249,8 +40383,8 @@
     "high_quality": false,
     "volume_24h": 22736219.009999998,
     "quote_volume": 22736219.009999998,
-    "current_price": 0.3504,
-    "price": 0.3504,
+    "current_price": 0.3499,
+    "price": 0.3499,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.34993553594834764,
@@ -40622,8 +40756,8 @@
     "high_quality": false,
     "volume_24h": 14495411.219999999,
     "quote_volume": 14495411.219999999,
-    "current_price": 715.3,
-    "price": 715.3,
+    "current_price": 715.44,
+    "price": 715.44,
     "max_reached_state": "tp1",
     "hit_price": 714.2472526549128,
     "hit_at": "2026-09-11T14:45:00+00:00",
@@ -40862,8 +40996,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 32.99,
-    "price": 32.99,
+    "current_price": 32.96,
+    "price": 32.96,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 33.2812675134204,
@@ -41065,7 +41199,7 @@
     "quote_volume": 169201105.6358,
     "current_price": 122.46,
     "price": 122.46,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "KORUUSDT",
@@ -41625,8 +41759,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 32.99,
-    "price": 32.99,
+    "current_price": 32.96,
+    "price": 32.96,
     "max_reached_state": "tp1",
     "hit_price": 33.2829507551774,
     "hit_at": "2026-09-11T18:30:00+00:00",
@@ -42986,8 +43120,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.09731,
-    "price": 0.09731,
+    "current_price": 0.09725,
+    "price": 0.09725,
     "state_replay_failures": 0
   },
   {
@@ -43272,8 +43406,8 @@
     },
     "volume_24h": 37193561.3238,
     "quote_volume": 37193561.3238,
-    "current_price": 1.0395,
-    "price": 1.0395,
+    "current_price": 1.0409,
+    "price": 1.0409,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 1.0307933483323342,
@@ -43334,8 +43468,8 @@
     },
     "volume_24h": 32718670.554500002,
     "quote_volume": 32718670.554500002,
-    "current_price": 0.2313,
-    "price": 0.2313,
+    "current_price": 0.2325,
+    "price": 0.2325,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.23113909434559388,
@@ -43704,8 +43838,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.604,
-    "price": 0.604,
+    "current_price": 0.6059,
+    "price": 0.6059,
     "max_reached_state": "tp3",
     "hit_price": 0.6195616645930463,
     "hit_at": "2026-09-11T15:00:00+00:00",
@@ -44111,8 +44245,8 @@
     "high_quality": false,
     "volume_24h": 89593997.43630001,
     "quote_volume": 89593997.43630001,
-    "current_price": 64.53,
-    "price": 64.53,
+    "current_price": 64.49,
+    "price": 64.49,
     "state_replay_failures": 0
   },
   {
@@ -44275,8 +44409,8 @@
     "high_quality": false,
     "volume_24h": 22272004.8,
     "quote_volume": 22272004.8,
-    "current_price": 0.01398,
-    "price": 0.01398,
+    "current_price": 0.01384,
+    "price": 0.01384,
     "max_reached_state": "tp1",
     "hit_price": 0.014283772297421381,
     "hit_at": "2026-09-11T15:35:00+00:00",
@@ -44388,8 +44522,8 @@
     "high_quality": false,
     "volume_24h": 13936977.457,
     "quote_volume": 13936977.457,
-    "current_price": 715.3,
-    "price": 715.3,
+    "current_price": 715.44,
+    "price": 715.44,
     "max_reached_state": "tp1",
     "hit_price": 715.007448905157,
     "hit_at": "2026-09-11T13:30:00+00:00",
@@ -44521,8 +44655,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.437,
-    "price": 0.437,
+    "current_price": 0.4404,
+    "price": 0.4404,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.441012,
@@ -44602,8 +44736,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.604,
-    "price": 0.604,
+    "current_price": 0.6059,
+    "price": 0.6059,
     "max_reached_state": "tp2",
     "hit_price": 0.6144864,
     "hit_at": "2026-09-11T15:00:00+00:00",
@@ -44683,8 +44817,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.09731,
-    "price": 0.09731
+    "current_price": 0.09725,
+    "price": 0.09725
   },
   {
     "symbol": "FARTCOINUSDT",
@@ -44974,8 +45108,8 @@
     "high_quality": false,
     "volume_24h": 130434830.838,
     "quote_volume": 130434830.838,
-    "current_price": 190.73,
-    "price": 190.73,
+    "current_price": 190.86,
+    "price": 190.86,
     "state_replay_failures": 0,
     "max_reached_state": "tp3",
     "hit_price": 188.29803643427272,
@@ -46594,7 +46728,7 @@
     "high_quality": true,
     "current_price": 122.46,
     "price": 122.46,
-    "state_replay_failures": 0
+    "state_replay_failures": 1
   },
   {
     "symbol": "BLURUSDT",
@@ -46750,8 +46884,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 0.437,
-    "price": 0.437,
+    "current_price": 0.4404,
+    "price": 0.4404,
     "max_reached_state": "tp1",
     "hit_price": 0.4373112,
     "hit_at": "2026-09-11T13:45:00+00:00",
@@ -47028,8 +47162,8 @@
     "high_quality": false,
     "volume_24h": 24972328.200400002,
     "quote_volume": 24972328.200400002,
-    "current_price": 0.0553,
-    "price": 0.0553,
+    "current_price": 0.05542,
+    "price": 0.05542,
     "max_reached_state": "tp2",
     "hit_price": 0.055340395707657745,
     "hit_at": "2026-09-11T23:40:00+00:00",
@@ -47839,8 +47973,8 @@
     "volume_24h": 1860821096.9685,
     "quote_volume": 1860821096.9685,
     "state_replay_failures": 0,
-    "current_price": 1162.49,
-    "price": 1162.49,
+    "current_price": 1161.11,
+    "price": 1161.11,
     "max_reached_state": "tp1",
     "hit_price": 1195.868496963849,
     "hit_at": "2026-09-11T13:45:00+00:00",
@@ -48071,8 +48205,8 @@
     "volume_24h": 22961993.299,
     "quote_volume": 22961993.299,
     "state_replay_failures": 0,
-    "current_price": 0.01398,
-    "price": 0.01398,
+    "current_price": 0.01384,
+    "price": 0.01384,
     "max_reached_state": "tp1",
     "hit_price": 0.014444889782676074,
     "hit_at": "2026-09-11T20:40:00+00:00",
@@ -48544,8 +48678,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.6768,
-    "price": 0.6768,
+    "current_price": 0.6794,
+    "price": 0.6794,
     "max_reached_state": "tp3",
     "hit_price": 0.6881394319491515,
     "hit_at": "2026-09-11T14:00:00+00:00",
@@ -49060,8 +49194,8 @@
     "high_quality": false,
     "volume_24h": 14314451.0114,
     "quote_volume": 14314451.0114,
-    "current_price": 715.3,
-    "price": 715.3,
+    "current_price": 715.44,
+    "price": 715.44,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 717.2728123724994,
@@ -49222,8 +49356,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.6768,
-    "price": 0.6768,
+    "current_price": 0.6794,
+    "price": 0.6794,
     "max_reached_state": "tp3",
     "hit_price": 0.6875795346171283,
     "hit_at": "2026-09-11T14:00:00+00:00",
@@ -49821,8 +49955,8 @@
     "high_quality": false,
     "volume_24h": 34948988.208000004,
     "quote_volume": 34948988.208000004,
-    "current_price": 0.151,
-    "price": 0.151,
+    "current_price": 0.1511,
+    "price": 0.1511,
     "max_reached_state": "tp3",
     "hit_price": 0.15055483914069243,
     "hit_at": "2026-09-11T16:40:00+00:00",
@@ -51594,8 +51728,8 @@
     "high_quality": false,
     "volume_24h": 23340594.759999998,
     "quote_volume": 23340594.759999998,
-    "current_price": 113.29,
-    "price": 113.29,
+    "current_price": 113.3,
+    "price": 113.3,
     "max_reached_state": "tp1",
     "hit_price": 113.50574810702761,
     "hit_at": "2026-09-11T12:35:00+00:00",
@@ -51712,8 +51846,8 @@
     },
     "volume_24h": 11402879.849100001,
     "quote_volume": 11402879.849100001,
-    "current_price": 97.84,
-    "price": 97.84,
+    "current_price": 97.83,
+    "price": 97.83,
     "state_replay_failures": 0
   },
   {
@@ -51956,8 +52090,8 @@
     "high_quality": false,
     "volume_24h": 23210638.3862,
     "quote_volume": 23210638.3862,
-    "current_price": 113.29,
-    "price": 113.29,
+    "current_price": 113.3,
+    "price": 113.3,
     "max_reached_state": "tp2",
     "hit_price": 114.51007284589214,
     "hit_at": "2026-09-11T13:55:00+00:00",
@@ -55484,8 +55618,8 @@
     "high_quality": false,
     "volume_24h": 366348177.18,
     "quote_volume": 366348177.18,
-    "current_price": 96.52,
-    "price": 96.52,
+    "current_price": 96.49,
+    "price": 96.49,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 97.5572482711399,
@@ -56356,8 +56490,8 @@
     },
     "volume_24h": 17688136.1202,
     "quote_volume": 17688136.1202,
-    "current_price": 0.0553,
-    "price": 0.0553,
+    "current_price": 0.05542,
+    "price": 0.05542,
     "max_reached_state": "tp3",
     "hit_price": 0.05439120571351285,
     "hit_at": "2026-09-11T20:00:00+00:00",
@@ -57646,8 +57780,8 @@
     "high_quality": false,
     "volume_24h": 370173908.12,
     "quote_volume": 370173908.12,
-    "current_price": 96.52,
-    "price": 96.52,
+    "current_price": 96.49,
+    "price": 96.49,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 97.17400519750753,
@@ -58803,8 +58937,8 @@
     },
     "volume_24h": 151488854.451,
     "quote_volume": 151488854.451,
-    "current_price": 1.6766,
-    "price": 1.6766,
+    "current_price": 1.6721,
+    "price": 1.6721,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 1.7107634667162213,
@@ -59641,8 +59775,8 @@
     },
     "volume_24h": 71004566.142,
     "quote_volume": 71004566.142,
-    "current_price": 0.0008907,
-    "price": 0.0008907,
+    "current_price": 0.0008922,
+    "price": 0.0008922,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.0008933413611080842,
@@ -59814,8 +59948,8 @@
     },
     "volume_24h": 32931658.882799998,
     "quote_volume": 32931658.882799998,
-    "current_price": 1.0395,
-    "price": 1.0395,
+    "current_price": 1.0409,
+    "price": 1.0409,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 1.0332357276083628,
@@ -60717,8 +60851,8 @@
     },
     "volume_24h": 74778831.67650001,
     "quote_volume": 74778831.67650001,
-    "current_price": 0.0008907,
-    "price": 0.0008907,
+    "current_price": 0.0008922,
+    "price": 0.0008922,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 0.0008515890854639481,
@@ -62024,8 +62158,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 150.73,
-    "price": 150.73,
+    "current_price": 150.89,
+    "price": 150.89,
     "state_replay_failures": 0
   },
   {
@@ -63001,8 +63135,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 150.73,
-    "price": 150.73
+    "current_price": 150.89,
+    "price": 150.89
   },
   {
     "symbol": "CLUSDT",
@@ -63511,7 +63645,7 @@
     },
     "volume_24h": 15010015.200000001,
     "quote_volume": 15010015.200000001,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "current_price": 43.94,
     "price": 43.94,
     "max_reached_state": "tp3",
@@ -64593,8 +64727,8 @@
     },
     "volume_24h": 166140590.4,
     "quote_volume": 166140590.4,
-    "current_price": 0.588,
-    "price": 0.588,
+    "current_price": 0.589,
+    "price": 0.589,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.607078355571545,
@@ -65122,8 +65256,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.002233,
-    "price": 0.002233,
+    "current_price": 0.002216,
+    "price": 0.002216,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.002203302483371059,
@@ -68744,8 +68878,8 @@
     },
     "volume_24h": 120498145.3856,
     "quote_volume": 120498145.3856,
-    "current_price": 1.6766,
-    "price": 1.6766,
+    "current_price": 1.6721,
+    "price": 1.6721,
     "state_replay_failures": 0
   },
   {
@@ -69273,8 +69407,8 @@
     },
     "volume_24h": 114670006.476,
     "quote_volume": 114670006.476,
-    "current_price": 1.6766,
-    "price": 1.6766,
+    "current_price": 1.6721,
+    "price": 1.6721,
     "state_replay_failures": 0
   },
   {
@@ -69819,8 +69953,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 0.488,
-    "price": 0.488,
+    "current_price": 0.4858,
+    "price": 0.4858,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.48562615805196374,
@@ -70802,8 +70936,8 @@
     "high_quality": false,
     "volume_24h": 20421758.599200003,
     "quote_volume": 20421758.599200003,
-    "current_price": 70.14,
-    "price": 70.14,
+    "current_price": 70.19,
+    "price": 70.19,
     "max_reached_state": "tp2",
     "hit_price": 71.12430802591363,
     "hit_at": "2026-09-11T07:00:00+00:00",
@@ -71028,8 +71162,8 @@
     "high_quality": false,
     "volume_24h": 20110712.3034,
     "quote_volume": 20110712.3034,
-    "current_price": 70.14,
-    "price": 70.14,
+    "current_price": 70.19,
+    "price": 70.19,
     "max_reached_state": "tp2",
     "hit_price": 70.93079325869505,
     "hit_at": "2026-09-11T06:30:00+00:00",
@@ -71339,8 +71473,8 @@
     },
     "volume_24h": 73553079.112,
     "quote_volume": 73553079.112,
-    "current_price": 0.1508,
-    "price": 0.1508,
+    "current_price": 0.1512,
+    "price": 0.1512,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.13903153037689772,
@@ -76137,8 +76271,8 @@
     "high_quality": false,
     "volume_24h": 25317091.2978,
     "quote_volume": 25317091.2978,
-    "current_price": 196.42,
-    "price": 196.42,
+    "current_price": 196.44,
+    "price": 196.44,
     "state_replay_failures": 0,
     "max_reached_state": "tp3",
     "hit_price": 195.33078621236808,
@@ -76797,8 +76931,8 @@
     "volume_24h": 12569900.4592,
     "quote_volume": 12569900.4592,
     "state_replay_failures": 0,
-    "current_price": 0.00477,
-    "price": 0.00477,
+    "current_price": 0.004818,
+    "price": 0.004818,
     "max_reached_state": "tp1",
     "hit_price": 0.005091223390698153,
     "hit_at": "2026-09-11T03:15:00+00:00",
@@ -76857,8 +76991,8 @@
     },
     "volume_24h": 1526192983.9199998,
     "quote_volume": 1526192983.9199998,
-    "current_price": 1162.49,
-    "price": 1162.49,
+    "current_price": 1161.11,
+    "price": 1161.11,
     "state_replay_failures": 0,
     "max_reached_state": "tp3",
     "hit_price": 1181.7731354900932,
@@ -77618,8 +77752,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 97.84,
-    "price": 97.84,
+    "current_price": 97.83,
+    "price": 97.83,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 97.86096,
@@ -77676,7 +77810,7 @@
     "quote_volume": 14931172.5904,
     "current_price": 0.004586,
     "price": 0.004586,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp3",
     "hit_price": 0.0044853657026235555,
     "hit_at": "2026-09-11T10:00:00+00:00",
@@ -77756,8 +77890,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 97.84,
-    "price": 97.84,
+    "current_price": 97.83,
+    "price": 97.83,
     "max_reached_state": "tp1",
     "hit_price": 98.901,
     "hit_at": "2026-09-11T05:00:00+00:00",
@@ -77871,7 +78005,7 @@
     "quote_volume": 14902949.1128,
     "current_price": 0.004586,
     "price": 0.004586,
-    "state_replay_failures": 0,
+    "state_replay_failures": 1,
     "max_reached_state": "tp3",
     "hit_price": 0.004470663064362556,
     "hit_at": "2026-09-11T10:00:00+00:00",
@@ -78440,8 +78574,8 @@
     "volume_24h": 13030774.829100002,
     "quote_volume": 13030774.829100002,
     "state_replay_failures": 0,
-    "current_price": 0.00477,
-    "price": 0.00477,
+    "current_price": 0.004818,
+    "price": 0.004818,
     "max_reached_state": "tp1",
     "hit_price": 0.004843985174112628,
     "hit_at": "2026-09-11T02:50:00+00:00",
@@ -78691,8 +78825,8 @@
     },
     "volume_24h": 13181684.9514,
     "quote_volume": 13181684.9514,
-    "current_price": 0.00477,
-    "price": 0.00477,
+    "current_price": 0.004814,
+    "price": 0.004814,
     "state_replay_failures": 0,
     "max_reached_state": "tp1",
     "hit_price": 0.004786268434824844,
@@ -78938,8 +79072,8 @@
     "filtered_out": false,
     "trade_filter_reason": "",
     "high_quality": true,
-    "current_price": 70.14,
-    "price": 70.14,
+    "current_price": 70.19,
+    "price": 70.19,
     "max_reached_state": "tp1",
     "hit_price": 70.00853263870728,
     "hit_at": "2026-09-11T03:45:00+00:00",
@@ -79867,8 +80001,8 @@
     "trade_filter_reason": "",
     "high_quality": true,
     "state_replay_failures": 0,
-    "current_price": 70.14,
-    "price": 70.14,
+    "current_price": 70.19,
+    "price": 70.19,
     "max_reached_state": "tp1",
     "hit_price": 70.03547385860982,
     "hit_at": "2026-09-11T03:45:00+00:00",
@@ -82007,8 +82141,8 @@
     "high_quality": false,
     "volume_24h": 25750418.3288,
     "quote_volume": 25750418.3288,
-    "current_price": 196.42,
-    "price": 196.42,
+    "current_price": 196.44,
+    "price": 196.44,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 195.91061787264348,
@@ -83173,8 +83307,8 @@
     },
     "volume_24h": 273853451.42313,
     "quote_volume": 273853451.42313,
-    "current_price": 1371.4,
-    "price": 1371.4,
+    "current_price": 1371.67,
+    "price": 1371.67,
     "state_replay_failures": 0,
     "max_reached_state": "tp2",
     "hit_price": 1370.207893705831,
@@ -91816,8 +91950,8 @@
     "volume_24h": 328359700.911,
     "quote_volume": 328359700.911,
     "state_replay_failures": 0,
-    "current_price": 96.52,
-    "price": 96.52,
+    "current_price": 96.49,
+    "price": 96.49,
     "max_reached_state": "tp2",
     "hit_price": 96.94952942533735,
     "hit_at": "2026-09-11T09:00:00+00:00",
@@ -92662,8 +92796,8 @@
     "established_at": "2026-09-10T21:55:00+00:00",
     "id": "f7e23592-5beb-5ff8-b26a-c7825fd8972b",
     "signal_id": "f7e23592-5beb-5ff8-b26a-c7825fd8972b",
-    "status": "active",
-    "reached_state": "tp3",
+    "status": "closed",
+    "reached_state": "invalid",
     "detected_at": "2026-09-10T21:56:23.766756+00:00",
     "raw_signal": true,
     "trade_layer": "warning",
@@ -92678,10 +92812,11 @@
     "price": 100.63,
     "max_reached_state": "tp3",
     "hit_price": 103.11692561803335,
-    "hit_at": "2026-09-11T05:30:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0,
-    "active_sl_price": 108.06
+    "hit_at": "2026-09-12T00:06:16.034012+00:00",
+    "state_resolution": "market_unavailable",
+    "state_replay_failures": 1,
+    "active_sl_price": 108.06,
+    "invalid_reason": "symbol_missing_from_primary_market_sources"
   },
   {
     "symbol": "DOTUSDT",
@@ -93071,8 +93206,8 @@
     "established_at": "2026-09-10T21:50:00+00:00",
     "id": "cb8f757a-48ed-581e-9c7a-e4e71d911975",
     "signal_id": "cb8f757a-48ed-581e-9c7a-e4e71d911975",
-    "status": "active",
-    "reached_state": "tp3",
+    "status": "closed",
+    "reached_state": "invalid",
     "detected_at": "2026-09-10T21:51:31.254567+00:00",
     "raw_signal": true,
     "trade_layer": "warning",
@@ -93087,10 +93222,11 @@
     "price": 100.63,
     "max_reached_state": "tp3",
     "hit_price": 103.2363045117573,
-    "hit_at": "2026-09-11T05:30:00+00:00",
-    "state_resolution": "chronological_ohlc_stop_first",
-    "state_replay_failures": 0,
-    "active_sl_price": 108.3
+    "hit_at": "2026-09-12T00:06:16.034017+00:00",
+    "state_resolution": "market_unavailable",
+    "state_replay_failures": 1,
+    "active_sl_price": 108.3,
+    "invalid_reason": "symbol_missing_from_primary_market_sources"
   },
   {
     "symbol": "SAMSUNGUSDT",
