@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -695,14 +695,15 @@
     .signal-chip.pnl { font-family: var(--mono); }
     .position-level-stack {
       display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
     .position-board-level {
       position: relative;
-      min-height: 52px;
+      min-height: 54px;
       border: 1px solid rgba(91, 115, 166, .34);
       border-radius: 8px;
-      padding: 9px 34px 9px 12px;
+      padding: 10px 32px 9px 12px;
       background: rgba(67, 41, 76, .72);
     }
     .position-board-level.tp {
@@ -719,7 +720,7 @@
     .position-board-level b {
       display: block;
       color: #f5fbff;
-      font: 950 18px/1.1 var(--mono);
+      font: 950 16px/1.12 var(--mono);
       overflow-wrap: anywhere;
     }
     .position-board-level i {
@@ -739,8 +740,9 @@
       .position-symbol { font-size: 23px; }
       .position-time { font-size: 11px; }
       .signal-chip { min-height: 21px; padding: 3px 7px; font-size: 10px; }
-      .position-board-level { min-height: 50px; padding: 8px 34px 8px 11px; }
-      .position-board-level b { font-size: 18px; }
+      .position-level-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .position-board-level { min-height: 52px; padding: 9px 30px 8px 11px; }
+      .position-board-level b { font-size: 15px; }
     }
 
   </style>
@@ -5222,3 +5224,4 @@
   </script>
 </body>
 </html>
+
