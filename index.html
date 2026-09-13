@@ -696,43 +696,54 @@
     .position-level-stack {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
+      gap: 7px;
     }
     .position-board-level {
       position: relative;
-      min-height: 54px;
+      min-height: 48px;
       border: 1px solid rgba(91, 115, 166, .34);
       border-radius: 8px;
-      padding: 10px 32px 9px 12px;
-      background: rgba(67, 41, 76, .72);
+      padding: 9px 26px 8px 11px;
+      background: linear-gradient(180deg, rgba(82, 48, 91, .80), rgba(44, 31, 58, .72));
     }
     .position-board-level.tp {
-      background: rgba(15, 67, 72, .76);
-      border-color: rgba(0, 224, 164, .18);
+      background: linear-gradient(180deg, rgba(18, 84, 88, .82), rgba(12, 50, 59, .74));
+      border-color: rgba(0, 224, 164, .24);
+    }
+    .position-board-level.entry {
+      background: linear-gradient(180deg, rgba(29, 58, 100, .82), rgba(17, 34, 68, .74));
+      border-color: rgba(102, 167, 255, .24);
     }
     .position-board-level span {
       display: block;
       color: #ff6f98;
-      font: 950 11px/1 var(--mono);
-      margin-bottom: 7px;
+      font: 950 10px/1 var(--mono);
+      margin-bottom: 6px;
+      letter-spacing: .25px;
     }
     .position-board-level.tp span { color: var(--bull); }
+    .position-board-level.entry span { color: var(--info); }
     .position-board-level b {
       display: block;
       color: #f5fbff;
-      font: 950 16px/1.12 var(--mono);
+      font: 950 15px/1.08 var(--mono);
       overflow-wrap: anywhere;
     }
     .position-board-level i {
       position: absolute;
-      right: 12px;
+      right: 10px;
       top: 50%;
       transform: translateY(-50%);
-      color: #8391a8;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #8391a8;
+      box-shadow: 0 0 8px rgba(131,145,168,.36);
       font-style: normal;
-      font-size: 16px;
       opacity: .78;
     }
+    .position-board-level.tp i { background: var(--bull); box-shadow: 0 0 10px rgba(0,224,164,.52); }
+    .position-board-level.entry i { background: var(--info); box-shadow: 0 0 10px rgba(102,167,255,.45); }
     @media (max-width: 760px) {
       .open-position-feed { grid-template-columns: 1fr; gap: 11px; }
       .position-signal-card { padding: 11px; border-radius: 10px; }
@@ -740,9 +751,9 @@
       .position-symbol { font-size: 23px; }
       .position-time { font-size: 11px; }
       .signal-chip { min-height: 21px; padding: 3px 7px; font-size: 10px; }
-      .position-level-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-      .position-board-level { min-height: 52px; padding: 9px 30px 8px 11px; }
-      .position-board-level b { font-size: 15px; }
+      .position-level-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .position-board-level { min-height: 46px; padding: 8px 24px 7px 10px; }
+      .position-board-level b { font-size: 14px; }
     }
 
   </style>
@@ -2148,12 +2159,12 @@
             '<span class="signal-chip">' + reached + '</span>' +
           '</div>' +
           '<div class="position-level-stack">' +
-            '<div class="position-board-level"><span>R</span><b>' + fmt(rPct, 2) + '%</b><i>□</i></div>' +
-            '<div class="position-board-level"><span>SL</span><b>' + fmt(row.stop_loss, 6) + '</b><i>□</i></div>' +
-            '<div class="position-board-level tp"><span>TP1</span><b>' + fmt(row.take_profit_1, 6) + '</b><i>□</i></div>' +
-            '<div class="position-board-level tp"><span>TP2</span><b>' + fmt(row.take_profit_2, 6) + '</b><i>□</i></div>' +
-            '<div class="position-board-level tp"><span>TP3</span><b>' + fmt(row.take_profit_3, 6) + '</b><i>□</i></div>' +
-            '<div class="position-board-level tp"><span>FTP</span><b>' + fmt(row.take_profit_final, 6) + '</b><i>□</i></div>' +
+            '<div class="position-board-level entry"><span>RISK</span><b>' + fmt(rPct, 2) + '%</b><i></i></div>' +
+            '<div class="position-board-level"><span>SL</span><b>' + fmt(row.stop_loss, 6) + '</b><i></i></div>' +
+            '<div class="position-board-level tp"><span>TP1</span><b>' + fmt(row.take_profit_1, 6) + '</b><i></i></div>' +
+            '<div class="position-board-level tp"><span>TP2</span><b>' + fmt(row.take_profit_2, 6) + '</b><i></i></div>' +
+            '<div class="position-board-level tp"><span>TP3</span><b>' + fmt(row.take_profit_3, 6) + '</b><i></i></div>' +
+            '<div class="position-board-level tp"><span>FTP</span><b>' + fmt(row.take_profit_final, 6) + '</b><i></i></div>' +
           '</div>' +
         '</article>';
       }).join("") || '<div class="empty">目前沒有 OPEN 持倉。</div>';
@@ -5224,4 +5235,3 @@
   </script>
 </body>
 </html>
-
