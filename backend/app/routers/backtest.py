@@ -13,6 +13,8 @@ from ..models import BacktestRun, Signal
 from ..schemas import BacktestRequest, BacktestRunResponse, BacktestSummary, PageMeta, SignalPage, SignalResponse
 from ..security import Admin, User, require_csrf
 from ..stats import all_strategy_summaries, backtest_summary, filtered_signals
+from ..quant import QuantConfig, run_quant_v1
+from sentiment_scanner.bingx import BingxFuturesClient
 
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
@@ -77,3 +79,27 @@ async def run_backtest(payload: BacktestRequest, admin: Admin, session: Session)
     await session.commit()
     return BacktestRunResponse(run_id=run.id, status=run.status)
 
+
+
+@router.get("/quant-v1")
+async def quant_v1(
+    _user: User,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    limit: Annotated[int, Query(ge=250, le=1000)] = 1000,
+) -> dict:
+    """Run the first deterministic quant strategy on recent public futures candles."""
+    clean_symbol = symbol.upper().replace("/", "").replace("-", "")
+    if not clean_symbol.isalnum() or len(clean_symbol) > 24:
+        return {"detail": "Invalid symbol"}
+    allowed = {"5m", "15m", "1h", "4h", "1d"}
+    tf = timeframe.lower()
+    if tf not in allowed:
+        return {"detail": "Unsupported timeframe"}
+    with BingxFuturesClient(timeout=20.0) as client:
+        rows = client.klines(clean_symbol, interval=tf, limit=limit)
+    result = run_quant_v1(rows, QuantConfig())
+    result["symbol"] = clean_symbol
+    result["timeframe"] = tf
+    result["bars"] = len(rows)
+    return result
