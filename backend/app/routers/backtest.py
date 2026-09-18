@@ -96,8 +96,11 @@ async def quant_v1(
     tf = timeframe.lower()
     if tf not in allowed:
         return {"detail": "Unsupported timeframe"}
-    with BingxFuturesClient(timeout=20.0) as client:
+    client = BingxFuturesClient(timeout=20.0)
+    try:
         rows = client.klines(clean_symbol, interval=tf, limit=limit)
+    finally:
+        client.close()
     result = run_quant_v1(rows, QuantConfig())
     result["symbol"] = clean_symbol
     result["timeframe"] = tf
