@@ -11,6 +11,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import settings
 from .database import create_schema
+from .importer import import_legacy_history, import_market_file
+from .database import SessionFactory
 from .rate_limit import RateLimitMiddleware
 from .security_headers import SecurityHeadersMiddleware
 from .routers import auth, backtest, market, notifications, positions, signals, system
@@ -43,6 +45,17 @@ FRONTEND_FILES = {
 async def lifespan(_app: FastAPI):
     if settings.auto_create_schema:
         await create_schema()
+        # A fresh Zeabur container starts with an empty local SQLite database.
+        # Rehydrate the versioned signal history before serving requests so a
+        # deployment never makes the dashboard or position history appear empty.
+        async with SessionFactory() as session:
+            restored_signals = await import_legacy_history(session)
+            restored_markets = await import_market_file(session)
+        logger.info(
+            "Initial history restore completed: signals=%s markets=%s",
+            restored_signals,
+            restored_markets,
+        )
     yield
 
 
