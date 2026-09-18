@@ -582,6 +582,8 @@ def build_contract_radar(coinglass_rows: list[dict[str, object]], min_volume: fl
             continue
         score, bias, kind, mkt_label, reasons = score_contract_market(item)
         trigger = "oi_cross" if abs(oi_1h) >= 8 else "price_5m" if abs(price_5m) >= 3 else "price_15m" if abs(price_15m) >= 3 else "watch"
+        if trigger == "watch":
+            continue
         quality, quality_checks = contract_quality_score(item, trigger, score, min_volume)
         rows.append(
             {
@@ -692,7 +694,16 @@ def build_contract_radar_from_market_tickers(
             bias, kind = "short", "bear"
         else:
             bias, kind = "neutral", "neutral"
-        trigger = "price_5m" if change_5m is not None and abs(change_5m) >= 3 else "price_15m" if change_15m is not None and abs(change_15m) >= 3 else "price_24h" if abs(change) >= 3 else "funding" if abs(fr) >= 0.02 else "watch"
+        # 原始異常只由短週期價格或 1H OI 突變開啟；24H 漲幅、Funding
+        # 是評分因子，不可單獨把幣種偽裝成「異常警報」。
+        trigger = (
+            "oi_cross" if oi_1h is not None and abs(oi_1h) >= 8
+            else "price_5m" if change_5m is not None and abs(change_5m) >= 3
+            else "price_15m" if change_15m is not None and abs(change_15m) >= 3
+            else "watch"
+        )
+        if trigger == "watch":
+            continue
         temp_row = {
             "price_change_percent_5m": change_5m if change_5m is not None else 0,
             "price_change_percent_15m": change_15m if change_15m is not None else 0,
@@ -714,7 +725,7 @@ def build_contract_radar_from_market_tickers(
                 "bias": bias,
                 "kind": kind,
                 "trigger": trigger,
-                "market_label": "價格動能" if trigger == "price_24h" else "資金費率擁擠" if trigger == "funding" else "觀察",
+                "market_label": "OI 異常" if trigger == "oi_cross" else "價格急漲跌",
                 "price": price,
                 "trigger_price": short.get("last_completed_price")
                 if trigger in {"price_5m", "price_15m"}

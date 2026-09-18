@@ -461,6 +461,41 @@
     .section-head { margin:30px 0 14px; } .section-title,.watch-title { letter-spacing:-.03em; } .section-title { font-size:27px; } .watch-title { font-size:26px; }
     .watch-stat { padding:18px; background:linear-gradient(145deg,rgba(17,28,59,.86),rgba(9,14,29,.86)); } .watch-stat-value { font-size:27px; } .decision-grid { gap:14px; } .decision-panel { min-height:170px; }
     .signal-card,.watch-analysis-card { border-radius:16px; background:linear-gradient(145deg,rgba(18,27,58,.93),rgba(8,13,29,.94)); border-color:rgba(103,151,255,.2); } .signal-card { min-height:560px; } .watch-analysis-card { box-shadow:0 12px 32px rgba(0,0,0,.12); }
+    .anomaly-card { min-height:0; }
+    .anomaly-verdict { margin:14px 0 12px; padding:13px 14px; border:1px solid rgba(57,244,199,.26); border-radius:11px; background:rgba(5,22,19,.62); }
+    .anomaly-verdict.bear { border-color:rgba(255,95,147,.28); background:rgba(36,8,19,.58); }
+    .anomaly-verdict.warn { border-color:rgba(255,209,102,.28); background:rgba(38,28,7,.45); }
+    .anomaly-verdict-title { display:flex; justify-content:space-between; gap:10px; align-items:center; font-size:13px; font-weight:950; }
+    .anomaly-verdict-copy { margin-top:7px; color:#c8d9ed; font-size:12px; line-height:1.6; }
+    .anomaly-insight-list { display:grid; gap:8px; margin:12px 0; }
+    .anomaly-insight { display:grid; grid-template-columns:66px auto 1fr; align-items:center; gap:8px; font-size:12px; }
+    .anomaly-insight-label { color:var(--muted); font-weight:850; }
+    .anomaly-insight-copy { color:#e5f0fb; line-height:1.45; }
+    .insight-pill { min-width:48px; justify-content:center; padding:3px 6px; border-radius:999px; border:1px solid var(--line); font:800 10px var(--mono); text-align:center; }
+    .insight-pill.bull { color:var(--bull); border-color:rgba(57,244,199,.35); background:rgba(57,244,199,.1); }
+    .insight-pill.bear { color:var(--bear); border-color:rgba(255,95,147,.35); background:rgba(255,95,147,.1); }
+    .insight-pill.warn { color:var(--warn); border-color:rgba(255,209,102,.35); background:rgba(255,209,102,.1); }
+    .insight-pill.neutral { color:var(--muted); }
+    .anomaly-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0; }
+    .anomaly-summary { min-height:76px; padding:10px; border:1px solid var(--line); border-radius:9px; background:rgba(3,8,20,.55); }
+    .anomaly-summary span { display:block; color:var(--faint); font-size:10px; font-weight:800; }
+    .anomaly-summary b { display:block; margin-top:7px; color:#f2f7ff; font:900 15px var(--mono); }
+    .score-meter { display:flex; gap:3px; margin-top:8px; }
+    .score-meter i { flex:1; height:11px; border-radius:3px; background:rgba(255,209,102,.14); }
+    .score-meter i.on.bull { background:var(--bull); box-shadow:0 0 9px rgba(57,244,199,.35); }
+    .score-meter i.on.bear { background:var(--bear); box-shadow:0 0 9px rgba(255,95,147,.3); }
+    .score-meter i.on.warn { background:var(--warn); }
+    .anomaly-details { margin-top:12px; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:rgba(3,8,18,.47); }
+    .anomaly-details summary { padding:11px 12px; color:#e9f3ff; cursor:pointer; font-size:12px; font-weight:950; list-style:none; }
+    .anomaly-details summary::-webkit-details-marker { display:none; }
+    .anomaly-details summary::after { content:"＋"; float:right; color:var(--accent); font-size:16px; line-height:11px; }
+    .anomaly-details[open] summary::after { content:"−"; }
+    .score-detail { border-top:1px solid var(--line); padding:4px 12px 10px; }
+    .score-detail-row { display:grid; grid-template-columns:70px 1fr auto; gap:8px; align-items:start; padding:9px 0; border-bottom:1px solid rgba(255,255,255,.055); font-size:11px; line-height:1.45; }
+    .score-detail-row:last-child { border-bottom:0; }
+    .score-detail-row span { color:var(--muted); font-weight:850; }
+    .score-detail-row em { color:#c7d9ee; font-style:normal; }
+    .score-detail-row b { font:900 12px var(--mono); }
     .watch-analysis-card:hover,.signal-card:hover { transform:translateY(-4px); border-color:rgba(81,231,215,.58); box-shadow:0 20px 45px rgba(0,0,0,.25); } .side-badge { box-shadow:0 0 18px rgba(57,244,199,.14); }
     .btn { border-color:rgba(111,155,255,.23); background:rgba(18,29,61,.72); } .btn.primary { border-color:rgba(84,235,218,.58); background:linear-gradient(135deg,rgba(47,227,199,.2),rgba(95,106,255,.32)); color:#eafffb; }
     input,select { border-color:rgba(111,155,255,.22); background:rgba(5,10,26,.72); } .pill.accent { color:#bfc8ff; border-color:rgba(132,148,255,.46); background:rgba(108,119,255,.16); }
@@ -2656,6 +2691,58 @@
         </section>`;
       }).join("");
     }
+    function anomalyCardModel(row) {
+      const group = oiMarketGroup(row);
+      const bias = contractBias(row);
+      const side = bias === "long" ? 1 : bias === "short" ? -1 : 0;
+      const number = value => Number.isFinite(Number(value)) ? Number(value) : null;
+      const oi = number(row.oi_change_1h);
+      const cvd = number(row.cvd_ratio_1h);
+      const px1h = number(row.price_change_1h);
+      const px24h = number(row.price_change_24h);
+      const funding = number(row.funding_rate);
+      const ls = number(row.long_short_ratio_1h);
+      const longShare = ls && ls > 0 ? ls / (1 + ls) * 100 : null;
+      const btc = marketFor("BTCUSDT");
+      const btc24h = number(btc?.price_change_pct ?? btc?.change_24h);
+      const relative = px24h !== null && btc24h !== null ? px24h - btc24h : null;
+      const details = [];
+      let signedScore = 0;
+      const push = (name, value, score, note) => { details.push({name, value, score, note}); signedScore += score; };
+
+      if (oi !== null && cvd !== null && px1h !== null) {
+        const sameDirection = Math.sign(oi) === Math.sign(cvd) && Math.sign(cvd) === Math.sign(px1h);
+        const conflict = Math.sign(oi) !== Math.sign(cvd) || Math.sign(cvd) !== Math.sign(px1h);
+        const score = sameDirection ? Math.sign(px1h) * 40 : conflict ? Math.sign(cvd || px1h) * 12 : 0;
+        push("市場結構", group.label, score, sameDirection ? "OI、CVD 與 1H 價格同向共振" : "OI、CVD、價格存在分歧，降低方向信心");
+      } else {
+        push("市場結構", "資料待補", 0, "等待 OI / CVD / 1H 價格完整資料");
+      }
+      if (px1h !== null) push("動能 1H", signed(px1h), clamp(Math.round(px1h * 1.5), -8, 8), "短週期價格動能");
+      if (px24h !== null) push("動能 24H", signed(px24h), clamp(Math.round(px24h / 5), -4, 4), "日內趨勢延續度");
+      if (funding !== null) {
+        const overcrowded = Math.abs(funding) >= 0.03;
+        const score = overcrowded ? -Math.sign(funding) * 12 : 0;
+        push("資金費率", `${signed(funding, 4)}%`, score, overcrowded ? "資金費率偏擁擠，採反向風險扣分" : "費率位於正常區間，不作方向判斷");
+      } else push("資金費率", "待補", 0, "等待交易所資金費率");
+      if (ls !== null) {
+        const score = ls > 1.2 ? -4 : ls < 0.8 ? 4 : 0;
+        push("散戶多空", `${fmt(longShare, 1)}% 多`, score, ls > 1.2 ? "多方偏擁擠，採反向風險扣分" : ls < 0.8 ? "空方偏擁擠，採反向風險加分" : "多空比中性");
+      } else push("散戶多空", "待補", 0, "等待多空比資料");
+      if (relative !== null) push("相對強弱", `${signed(relative)} vs BTC`, clamp(Math.round(relative / 3), -7, 7), "24H 報酬扣除 BTC 24H 變化");
+
+      const total = clamp(Math.round(side ? signedScore * side : signedScore), -60, 60);
+      const confidence = clamp(Math.round(Math.abs(total) / 60 * 100), 0, 100);
+      const state = String(row.event_lifecycle_status || row.lifecycle_status || (bias === "neutral" ? "RADAR" : Number(row.quality_score || 0) >= 4 ? "CONFIRMED" : "RADAR"));
+      const stateLabel = {RADAR:"異動觀察", CONFIRMED:"方向確認", WEAKENING:"方向轉弱", INVALIDATED:"反轉確認", ARCHIVED:"已結束"}[state] || state;
+      const stateKind = state === "INVALIDATED" ? "bear" : state === "WEAKENING" || state === "RADAR" ? "warn" : bias === "short" ? "bear" : "bull";
+      const marketCopy = group.label === "觀察" ? "資料尚未形成一致結構" : `${group.label}；${oi !== null ? `OI 1H ${signed(oi)}` : "OI 待補"}${cvd !== null ? ` / CVD ${signed(cvd)}` : ""}`;
+      return {details, total, confidence, state, stateLabel, stateKind, longShare, relative, marketCopy, group};
+    }
+    function scoreMeter(score, kind) {
+      const active = Math.round(clamp(Math.abs(Number(score) || 0) / 60 * 10, 0, 10));
+      return `<div class="score-meter" aria-label="綜合評分 ${score}">${Array.from({length:10}, (_, index) => `<i class="${index < active ? `on ${kind}` : ""}"></i>`).join("")}</div>`;
+    }
     function contractCard(row) {
       const symbol = clean(row.symbol);
       const bias = contractBias(row);
@@ -2664,7 +2751,8 @@
       const radar = Number(row.radar_score ?? row.score) || 0;
       const quality = Number(row.quality_score || 0);
       const latest = latestSignalFor(symbol);
-      const group = oiMarketGroup(row);
+      const model = anomalyCardModel(row);
+      const group = model.group;
       const live = marketFor(symbol);
       const livePrice = Number(live?.price || row.price);
       const liveChange = Number.isFinite(Number(live?.price_change_pct)) ? Number(live.price_change_pct) : Number(row.price_change_24h);
@@ -2674,24 +2762,38 @@
         row.quality_checks && row.quality_checks.length ? `品質 ${row.quality_checks.join("/")}` : "",
         ...(row.reasons || [])
       ].filter(Boolean).join(" · ");
-      return `<article class="signal-card ${kind}" data-contract-symbol="${symbol}">
+      return `<article class="signal-card anomaly-card ${kind}" data-contract-symbol="${symbol}">
         <div class="signal-top">
           <div class="side-badge ${kind === "bull" ? "long" : "short"}">${kind === "bull" ? "多" : kind === "bear" ? "空" : "觀"}</div>
-          <div><div class="signal-symbol">${symbol}</div><div class="signal-time">${lastTimeText(state.lastContractAt)}</div><div class="signal-strategy ${kind === "bear" ? "bear" : ""}">合約異常雷達 · ${label}</div></div>
+          <div><div class="signal-symbol">${symbol}</div><div class="signal-time">${lastTimeText(state.lastContractAt)}</div><div class="signal-strategy ${model.stateKind === "bear" ? "bear" : ""}">合約異常雷達 · ${model.stateLabel}</div></div>
           <div class="signal-actions"><span class="score-badge bull">Q ${quality}/6</span><span class="score-badge ${kind}">R ${fmt(radar,0)}</span></div>
         </div>
-        <div class="pnl-box"><div class="metric-label">品質 / 雷達 / 分組</div><div class="pnl-value ${group.kind === "bear" ? "bear-text" : "bull-text"}">${quality}/6 · ${fmt(radar,0)} · ${group.label}</div></div>
-        ${contractAnalysisGraph(row)}
-        <div class="metric-grid">
+        <div class="anomaly-verdict ${model.stateKind}">
+          <div class="anomaly-verdict-title"><span>${model.stateLabel} · ${label}</span><span class="score-badge ${model.stateKind}">透明分數 ${signed(model.total, 0)}</span></div>
+          <div class="anomaly-verdict-copy">${model.marketCopy}</div>
+        </div>
+        <div class="anomaly-insight-list">
+          <div class="anomaly-insight"><span class="anomaly-insight-label">市場動能</span><span class="insight-pill ${group.kind}">${group.label}</span><span class="anomaly-insight-copy">${model.marketCopy}</span></div>
+          <div class="anomaly-insight"><span class="anomaly-insight-label">資金費率</span><span class="insight-pill neutral">${Number.isFinite(Number(row.funding_rate)) ? "正常" : "待補"}</span><span class="anomaly-insight-copy">${Number.isFinite(Number(row.funding_rate)) ? `${signed(row.funding_rate, 4)}%` : "尚未取得費率資料"}</span></div>
+          <div class="anomaly-insight"><span class="anomaly-insight-label">散戶情緒</span><span class="insight-pill ${model.longShare === null ? "neutral" : model.longShare >= 55 ? "bull" : model.longShare <= 45 ? "bear" : "warn"}">${model.longShare === null ? "待補" : model.longShare >= 55 ? "偏多" : model.longShare <= 45 ? "偏空" : "中性"}</span><span class="anomaly-insight-copy">${model.longShare === null ? "尚未取得多空比" : `多方 ${fmt(model.longShare, 1)}%`}</span></div>
+          <div class="anomaly-insight"><span class="anomaly-insight-label">相對強弱</span><span class="insight-pill ${model.relative === null ? "neutral" : model.relative >= 0 ? "bull" : "bear"}">${model.relative === null ? "待補" : model.relative >= 0 ? "強於 BTC" : "弱於 BTC"}</span><span class="anomaly-insight-copy">${model.relative === null ? "等待 BTC 24H 同步資料" : `${signed(model.relative)} vs BTC`}</span></div>
+        </div>
+        <div class="anomaly-summary-grid">
+          <div class="anomaly-summary"><span>24H 漲跌</span><b class="${numClass(row.price_change_24h)}">${contractMetric(row.price_change_24h, "待補")}</b></div>
+          <div class="anomaly-summary"><span>未平倉量</span><b>${Number.isFinite(Number(row.oi_usd)) ? `${fmt(Number(row.oi_usd) / 1e6, 1)}M` : "待補"}</b></div>
+          <div class="anomaly-summary"><span>綜合評分</span><b class="${model.stateKind}-text">${signed(model.total, 0)}</b>${scoreMeter(model.total, model.stateKind)}</div>
+        </div>
+        <details class="anomaly-details" onclick="event.stopPropagation()">
+          <summary>評分依據 · 可驗證規則 v1</summary>
+          <div class="score-detail">${model.details.map(item => `<div class="score-detail-row"><span>${item.name}</span><em>${item.note}<br><strong>${item.value}</strong></em><b class="${numClass(item.score)}">${signed(item.score, 0)} 分</b></div>`).join("")}</div>
+        </details>
+        <div class="metric-grid" style="margin-top:12px">
           <div class="metric-box"><div class="metric-label">最新價</div><div class="metric-value" data-contract-price="${symbol}">${fmt(livePrice, 6)}</div></div>
-          <div class="metric-box"><div class="metric-label">最新漲跌</div><div class="metric-value ${numClass(liveChange)}" data-contract-change="${symbol}">${signed(liveChange)}</div></div>
-          <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${contractMetric(row.oi_change_1h, "待 API")}</div></div>
-          <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${contractMetric(row.cvd_ratio_1h, "待 API")}</div></div>
-          <div class="metric-box"><div class="metric-label">散戶多空比</div><div class="metric-value">${ratioMetric(row.long_short_ratio_1h)}</div></div>
-          <div class="metric-box"><div class="metric-label">大戶帳戶比</div><div class="metric-value">${ratioMetric(row.top_account_long_short_ratio_1h)}</div></div>
-          <div class="metric-box"><div class="metric-label">大戶持倉比</div><div class="metric-value">${ratioMetric(row.top_position_long_short_ratio_1h)}</div></div>
-          <div class="metric-box tp"><div class="metric-label">價格 5M</div><div class="metric-value">${contractMetric(row.price_change_5m, "等待掃描")}</div></div>
-          <div class="metric-box tp"><div class="metric-label">價格 15M</div><div class="metric-value">${contractMetric(row.price_change_15m, "等待掃描")}</div></div>
+          <div class="metric-box"><div class="metric-label">價格 5M</div><div class="metric-value">${contractMetric(row.price_change_5m, "待補")}</div></div>
+          <div class="metric-box warn"><div class="metric-label">價格 15M</div><div class="metric-value">${contractMetric(row.price_change_15m, "待補")}</div></div>
+          <div class="metric-box warn"><div class="metric-label">OI 1H</div><div class="metric-value">${contractMetric(row.oi_change_1h, "待補")}</div></div>
+          <div class="metric-box warn"><div class="metric-label">CVD 1H</div><div class="metric-value">${contractMetric(row.cvd_ratio_1h, "待補")}</div></div>
+          <div class="metric-box"><div class="metric-label">清算 1H</div><div class="metric-value">${Number.isFinite(Number(row.long_liquidation_1h)) || Number.isFinite(Number(row.short_liquidation_1h)) ? `${fmt((Number(row.long_liquidation_1h) || 0) + (Number(row.short_liquidation_1h) || 0) / 1e3, 1)}K` : "待補"}</div></div>
         </div>
         <div class="stable-rule">${reason || "等待更多共振"}${latest ? ` · 最新訊號 ${strategyNameForSignal(latest)} ${shortTime(latest.triggered_at)}` : ""}</div>
       </article>`;
@@ -5118,10 +5220,10 @@
     function displayLimit(desktop = 120, mobile = 40) { return isMobileView() ? mobile : desktop; }
     function numClass(v) { return Number(v) > 0 ? "bull-text" : Number(v) < 0 ? "bear-text" : "muted"; }
     function clamp(value, min, max) { return Math.max(min, Math.min(max, Number(value) || 0)); }
-    function signed(v) {
+    function signed(v, decimals = 2) {
       const n = Number(v);
       if (!Number.isFinite(n)) return "-";
-      return `${n >= 0 ? "+" : ""}${fmt(n, 2)}%`;
+      return `${n >= 0 ? "+" : ""}${fmt(n, decimals)}%`;
     }
     function fmt(v, d) {
       const n = Number(v);
