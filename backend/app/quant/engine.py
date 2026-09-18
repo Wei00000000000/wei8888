@@ -99,6 +99,8 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
                 risk = abs(position["entry"] - position["sl"])
                 pnl_r = ((exit_price - position["entry"]) / risk) * (1 if side == "long" else -1)
                 position.update(exit_time=row.close_time, exit=exit_price, exit_reason="SL" if hit_sl else "TP3", pnl_r=pnl_r)
+                if hit_sl:
+                    position["sl_reason"] = _sl_reason(position)
                 trades.append(position)
                 position = None
             continue
@@ -155,6 +157,21 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
     return {"strategy": "quant-tpo-breakout-v1", "trades": trades, "summary": _summary(trades)}
 
 
+def _sl_reason(trade: dict) -> str:
+    reasons: list[str] = []
+    if float(trade.get("volume_ratio", 0.0)) < 1.35:
+        reasons.append("weak_volume")
+    side = trade.get("side")
+    cf, cs = trade.get("cvd_fast"), trade.get("cvd_slow")
+    if cf is not None and cs is not None and ((side == "long" and cf <= cs) or (side == "short" and cf >= cs)):
+        reasons.append("cvd_weak")
+    if float(trade.get("va_overlap", 0.0)) >= 0.50:
+        reasons.append("high_va_overlap")
+    if float(trade.get("mae_r", 0.0)) >= 0.9:
+        reasons.append("deep_adverse_excursion")
+    return ",".join(reasons) if reasons else "structure_failure"
+
+
 def _summary(trades: Sequence[dict]) -> dict:
     rs = [float(t.get("pnl_r", 0.0)) for t in trades]
     wins = [r for r in rs if r > 0]
@@ -166,10 +183,19 @@ def _summary(trades: Sequence[dict]) -> dict:
         equity += r
         peak = max(peak, equity)
         drawdown = max(drawdown, peak - equity)
+    sl_trades = [t for t in trades if t.get("exit_reason") == "SL"]
+    reason_counts: dict[str, int] = {}
+    for trade in sl_trades:
+        for reason in str(trade.get("sl_reason") or "structure_failure").split(","):
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    avg_mfe = sum(float(t.get("mfe_r", 0.0)) for t in trades) / len(trades) if trades else 0.0
+    avg_mae = sum(float(t.get("mae_r", 0.0)) for t in trades) / len(trades) if trades else 0.0
     return {
         "trades": len(rs), "wins": len(wins), "losses": len(losses),
         "win_rate_pct": round(len(wins)/len(rs)*100, 2) if rs else 0.0,
         "expectancy_r": round(sum(rs)/len(rs), 4) if rs else 0.0,
         "profit_factor": round(gross_win/gross_loss, 3) if gross_loss else (999.0 if gross_win else 0.0),
         "max_drawdown_r": round(drawdown, 3), "net_r": round(sum(rs), 3),
+        "avg_mfe_r": round(avg_mfe, 3), "avg_mae_r": round(avg_mae, 3),
+        "sl_count": len(sl_trades), "sl_reasons": reason_counts,
     }
