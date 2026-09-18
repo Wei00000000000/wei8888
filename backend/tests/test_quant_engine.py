@@ -11,3 +11,7 @@ def test_quant_v1_returns_metrics():
     assert result["strategy"] == "quant-tpo-breakout-v1"
     assert "expectancy_r" in result["summary"]
     assert "max_drawdown_r" in result["summary"]
+
+    assert "avg_mfe_r" in result["summary"]
+    assert "avg_mae_r" in result["summary"]
+    assert "sl_reasons" in result["summary"]
