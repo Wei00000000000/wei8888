@@ -2197,6 +2197,7 @@
         .filter(row => !query || clean(row.symbol).includes(query))
         .filter(row => !sideFilter || row.side === sideFilter)
         .sort((a, b) => positionTimeValue(b.entry_time) - positionTimeValue(a.entry_time));
+      state.positionCardRows = new Map(rows.map((row, index) => [String(row.id || `${clean(row.symbol)}-${row.entry_time || ""}-${index}`), row]));
       const longRows = rows.filter(row => row.side === "long");
       const shortRows = rows.filter(row => row.side === "short");
       const pnl = rows.reduce((sum, row) => sum + (Number(row.pnl_percent) || 0), 0);
@@ -2208,7 +2209,7 @@
         statCard("浮動盈虧", signed(pnl), "目前查詢合計"),
         statCard("平均盈虧", signed(avgPnl), "每筆平均")
       ].join("");
-      holder.innerHTML = rows.map(row => {
+      holder.innerHTML = rows.map((row, index) => {
         const isLong = row.side === "long";
         const sideText = isLong ? "多" : "空";
         const sideClass = isLong ? "long" : "short";
@@ -2216,7 +2217,8 @@
         const entry = Number(row.entry_price);
         const stop = Number(row.stop_loss);
         const rPct = Number.isFinite(entry) && Number.isFinite(stop) && entry > 0 ? Math.abs(entry - stop) / entry * 100 : 0;
-        return '<article class="position-signal-card ' + sideClass + '" data-position-id="' + cleanText(row.id) + '">' +
+        const positionKey = String(row.id || `${clean(row.symbol)}-${row.entry_time || ""}-${index}`);
+        return '<article class="position-signal-card ' + sideClass + '" data-position-key="' + cleanText(positionKey) + '">' +
           '<div class="position-card-top">' +
             '<div class="side-cube ' + sideClass + '">' + sideText + '</div>' +
             '<div class="position-identity"><div class="position-symbol">' + cleanText(clean(row.symbol)) + '</div><div class="position-time">' + shortTime(row.entry_time) + '</div></div>' +
@@ -2239,7 +2241,10 @@
           '<div class="position-expand-hint"><span>點開查看決策依據</span><b>分析 ›</b></div>' +
         '</article>';
       }).join("") || '<div class="empty">目前沒有 OPEN 持倉。</div>';
-      document.querySelectorAll("#positionList [data-position-id]").forEach(card => card.addEventListener("click", () => openPositionDetail(card.dataset.positionId)));
+      holder.onclick = event => {
+        const card = event.target.closest("[data-position-key]");
+        if (card && holder.contains(card)) openPositionDetail(card.dataset.positionKey);
+      };
     }
 
     function renderHarmonic() {
@@ -2317,7 +2322,7 @@
 
     async function openPositionDetail(positionId) {
       if (!positionId) return;
-      const fallback = [...(state.positions || []), ...buildStaticPositions()].find(row => String(row.id) === String(positionId));
+      const fallback = state.positionCardRows?.get(String(positionId)) || [...(state.positions || []), ...buildStaticPositions()].find(row => String(row.id) === String(positionId));
       let item = fallback;
       if (CLOUD_MODE) {
         try {
