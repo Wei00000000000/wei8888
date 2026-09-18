@@ -132,8 +132,10 @@ async def dashboard_market_rows(_user: User, session: Session) -> list[MarketRes
         live_rows = await fetch_live_tickers()
         if any(float(row.quote_volume_24h or 0) > 0 for row in live_rows):
             return live_rows
-    except Exception:
-        pass
+    except Exception as exc:
+        # Live market data is best-effort; preserve the database fallback while retaining diagnostic context.
+        import logging
+        logging.getLogger(__name__).warning("live ticker fallback: %s", exc)
     return await latest_market(_user, session, symbols=None, limit=500)
 
 
