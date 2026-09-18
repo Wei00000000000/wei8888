@@ -846,6 +846,7 @@
         <button data-view="positions">倉位歷史</button>
         <button data-view="review">交易檢討</button>
         <button data-view="harmonic">和諧訊號</button>
+        <button data-view="quant">量化分析</button>
       </nav>
       <div class="top-actions">
         <button class="round-btn" id="bellBtn" title="通知">🔔<span id="bellBadge" class="badge"></span></button>
@@ -1184,6 +1185,28 @@
       <div class="review-grid" id="notificationLogs"></div>
     </section>
 
+    <section id="quant" class="view">
+      <section class="radar-strip">
+        <div class="kicker">Quant Lab · V1</div>
+        <h2>量化策略分析</h2>
+        <div class="subline">TPO Value Area + EMA 趨勢 + Volume Acceptance + ATR 風控。此頁目前為研究/回測模式，不會送出真實交易訂單。</div>
+      </section>
+      <section class="backtest-panel">
+        <div class="backtest-head">
+          <div><div class="kicker">TPO Breakout V1</div><h2>即時歷史回測</h2><div class="subline">使用最近 250–1000 根合約 K 線測試固定規則，避免直接修改正式持倉。</div></div>
+          <div class="section-actions">
+            <input id="quantSymbol" value="BTCUSDT" aria-label="幣種">
+            <select id="quantTimeframe"><option value="5m">5M</option><option value="15m" selected>15M</option><option value="1h">1H</option><option value="4h">4H</option><option value="1d">1D</option></select>
+            <select id="quantLimit"><option value="500">500 bars</option><option value="750">750 bars</option><option value="1000" selected>1000 bars</option></select>
+            <button class="btn primary" id="quantRun">開始回測</button>
+          </div>
+        </div>
+        <div class="watch-stats" id="quantStats"></div>
+        <div class="section-head"><div><div class="kicker">Trades</div><h2 class="section-title">量化交易紀錄 <span id="quantTradeCount" class="section-count">(0)</span></h2></div><span class="pill accent" id="quantMeta">尚未執行</span></div>
+        <div class="table-wrap"><table><thead><tr><th>方向</th><th>Entry</th><th>SL</th><th>TP3</th><th>POC</th><th>VAH</th><th>VAL</th><th>Volume</th><th>結果</th><th>R</th></tr></thead><tbody id="quantRows"></tbody></table></div>
+      </section>
+    </section>
+
     <section id="harmonic" class="view">
       <section class="radar-strip">
         <div class="kicker">Harmonic Pattern Desk</div>
@@ -1328,6 +1351,7 @@
     document.querySelectorAll(".nav button").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
     $("scan").addEventListener("click", tickScan);
     $("backtest").addEventListener("click", () => runSignals("backtest"));
+    $("quantRun").addEventListener("click", runQuantV1);
     $("loadMarkets").addEventListener("click", loadMarkets);
     $("refreshWatch").addEventListener("click", loadMarkets);
     $("refreshSignals").addEventListener("click", () => runSignals("backtest"));
@@ -5252,6 +5276,57 @@
     function statCard(label, value, subline = "") {
       return `<div class="watch-stat"><div class="watch-stat-label">${cleanText(label)}</div><div class="watch-stat-value">${cleanText(value)}</div><div class="subline">${cleanText(subline)}</div></div>`;
     }
+
+    async function runQuantV1() {
+      const button = $("quantRun");
+      const symbol = String($("quantSymbol").value || "BTCUSDT").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const timeframe = $("quantTimeframe").value;
+      const limit = $("quantLimit").value;
+      button.disabled = true;
+      $("quantMeta").textContent = "計算中…";
+      try {
+        if (!CLOUD_MODE) throw new Error("量化回測需要雲端 API");
+        const response = await cloudFetch(`/backtest/quant-v1?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=${encodeURIComponent(limit)}`);
+        if (response.status === 401) {
+          clearCloudSession();
+          redirectToLogin();
+          return;
+        }
+        const data = await response.json();
+        if (!response.ok || data.detail) throw new Error(data.detail || "量化回測失敗");
+        renderQuantV1(data);
+      } catch (err) {
+        $("quantMeta").textContent = "失敗";
+        $("quantStats").innerHTML = statCard("錯誤", "—", err.message || String(err));
+        $("quantRows").innerHTML = "";
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function renderQuantV1(data) {
+      const s = data.summary || {};
+      $("quantMeta").textContent = `${data.symbol || "-"} · ${String(data.timeframe || "").toUpperCase()} · ${data.bars || 0} bars`;
+      $("quantStats").innerHTML = [
+        statCard("Trades", s.trades ?? 0, "已平倉樣本"),
+        statCard("Win Rate", `${Number(s.win_rate_pct || 0).toFixed(1)}%`, `${s.wins || 0}W / ${s.losses || 0}L`),
+        statCard("Profit Factor", Number(s.profit_factor || 0).toFixed(2), "Gross Win / Gross Loss"),
+        statCard("Expectancy", `${Number(s.expectancy_r || 0).toFixed(3)}R`, "每筆平均期望"),
+        statCard("Net R", `${Number(s.net_r || 0).toFixed(2)}R`, "累積 R"),
+        statCard("Max DD", `${Number(s.max_drawdown_r || 0).toFixed(2)}R`, "最大回撤")
+      ].join("");
+      const trades = [...(data.trades || [])].reverse();
+      $("quantTradeCount").textContent = `(${trades.length})`;
+      $("quantRows").innerHTML = trades.length ? trades.map(t => `<tr>
+        <td><span class="pill ${t.side === "long" ? "bull" : "bear"}">${cleanText(String(t.side || "").toUpperCase())}</span></td>
+        <td>${fmt(t.entry, 4)}</td><td>${fmt(t.sl, 4)}</td><td>${fmt(t.tp3, 4)}</td>
+        <td>${fmt(t.poc, 4)}</td><td>${fmt(t.vah, 4)}</td><td>${fmt(t.val, 4)}</td>
+        <td>${Number(t.volume_ratio || 0).toFixed(2)}×</td>
+        <td>${cleanText(t.exit_reason || "OPEN")}</td>
+        <td class="${Number(t.pnl_r || 0) >= 0 ? "bull-text" : "bear-text"}">${t.pnl_r == null ? "—" : Number(t.pnl_r).toFixed(2) + "R"}</td>
+      </tr>`).join("") : '<tr><td colspan="10" class="muted">目前條件下沒有已平倉交易。</td></tr>';
+    }
+
     function setView(view) {
       if (view === "stable" || view === "signals" || view === "contract" || view === "quality") view = "dashboard";
       state.currentView = view;
