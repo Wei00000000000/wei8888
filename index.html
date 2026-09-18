@@ -1203,7 +1203,7 @@
         </div>
         <div class="watch-stats" id="quantStats"></div>
         <div class="section-head"><div><div class="kicker">Trades</div><h2 class="section-title">量化交易紀錄 <span id="quantTradeCount" class="section-count">(0)</span></h2></div><span class="pill accent" id="quantMeta">尚未執行</span></div>
-        <div class="table-wrap"><table><thead><tr><th>方向</th><th>Entry</th><th>SL</th><th>TP3</th><th>POC</th><th>VAH</th><th>VAL</th><th>Volume</th><th>結果</th><th>R</th></tr></thead><tbody id="quantRows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>方向</th><th>Entry</th><th>SL</th><th>TP3</th><th>POC</th><th>VAH</th><th>VAL</th><th>Regime</th><th>CVD</th><th>Volume</th><th>MFE</th><th>MAE</th><th>結果</th><th>R</th></tr></thead><tbody id="quantRows"></tbody></table></div>
       </section>
     </section>
 
@@ -5320,11 +5320,10 @@
       $("quantRows").innerHTML = trades.length ? trades.map(t => `<tr>
         <td><span class="pill ${t.side === "long" ? "bull" : "bear"}">${cleanText(String(t.side || "").toUpperCase())}</span></td>
         <td>${fmt(t.entry, 4)}</td><td>${fmt(t.sl, 4)}</td><td>${fmt(t.tp3, 4)}</td>
-        <td>${fmt(t.poc, 4)}</td><td>${fmt(t.vah, 4)}</td><td>${fmt(t.val, 4)}</td>
-        <td>${Number(t.volume_ratio || 0).toFixed(2)}×</td>
+        <td>${fmt(t.poc, 4)}</td><td>${fmt(t.vah, 4)}</td><td>${fmt(t.val, 4)}</td>\n        <td>${cleanText(String(t.regime || "—").toUpperCase())}</td><td>${fmt(t.cvd, 2)}</td><td>${Number(t.volume_ratio || 0).toFixed(2)}×</td><td>${Number(t.mfe_r || 0).toFixed(2)}R</td><td>${Number(t.mae_r || 0).toFixed(2)}R</td>
         <td>${cleanText(t.exit_reason || "OPEN")}</td>
         <td class="${Number(t.pnl_r || 0) >= 0 ? "bull-text" : "bear-text"}">${t.pnl_r == null ? "—" : Number(t.pnl_r).toFixed(2) + "R"}</td>
-      </tr>`).join("") : '<tr><td colspan="10" class="muted">目前條件下沒有已平倉交易。</td></tr>';
+      </tr>`).join("") : '<tr><td colspan="14" class="muted">目前條件下沒有已平倉交易。</td></tr>';
     }
 
     function setView(view) {
