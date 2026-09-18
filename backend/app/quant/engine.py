@@ -5,6 +5,7 @@ from math import sqrt
 from typing import Sequence
 
 from sentiment_scanner.binance import Kline
+from .tpo import tpo_profile
 
 
 @dataclass(frozen=True)
@@ -88,8 +89,11 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
         if f is None or s is None or a is None or a <= 0:
             continue
         prior = rows[i-cfg.breakout_lookback:i]
-        vah = max(r.high for r in prior)
-        val = min(r.low for r in prior)
+        profile = tpo_profile(prior)
+        if profile is None:
+            continue
+        vah = profile.vah
+        val = profile.val
         avg_vol = sum(volumes[i-cfg.volume_period:i]) / cfg.volume_period
         volume_ok = row.volume > avg_vol * cfg.volume_multiplier
         slope_up = fast[i-1] is not None and f > fast[i-1]
@@ -110,7 +114,7 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
         position = {
             "side": side, "entry_time": row.close_time, "entry": entry, "sl": sl,
             "tp1": entry + direction*risk, "tp2": entry + direction*2*risk, "tp3": entry + direction*3*risk,
-            "vah": vah, "val": val, "ema50": f, "ema200": s, "atr": a,
+            "vah": vah, "val": val, "poc": profile.poc, "ema50": f, "ema200": s, "atr": a,
             "volume_ratio": row.volume / avg_vol if avg_vol else 0.0,
         }
 
