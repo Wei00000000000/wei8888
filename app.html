@@ -5313,7 +5313,7 @@
         statCard("Profit Factor", Number(s.profit_factor || 0).toFixed(2), "Gross Win / Gross Loss"),
         statCard("Expectancy", `${Number(s.expectancy_r || 0).toFixed(3)}R`, "每筆平均期望"),
         statCard("Net R", `${Number(s.net_r || 0).toFixed(2)}R`, "累積 R"),
-        statCard("Max DD", `${Number(s.max_drawdown_r || 0).toFixed(2)}R`, "最大回撤")
+        statCard("Max DD", `${Number(s.max_drawdown_r || 0).toFixed(2)}R`, "最大回撤"),\n        statCard("Avg MFE", `${Number(s.avg_mfe_r || 0).toFixed(2)}R`, "平均最大有利位移"),\n        statCard("Avg MAE", `${Number(s.avg_mae_r || 0).toFixed(2)}R`, "平均最大不利位移"),\n        statCard("SL", s.sl_count ?? 0, Object.entries(s.sl_reasons || {}).map(([k,v]) => `${k}: ${v}`).join(" · ") || "無停損樣本")
       ].join("");
       const trades = [...(data.trades || [])].reverse();
       $("quantTradeCount").textContent = `(${trades.length})`;
@@ -5321,7 +5321,7 @@
         <td><span class="pill ${t.side === "long" ? "bull" : "bear"}">${cleanText(String(t.side || "").toUpperCase())}</span></td>
         <td>${fmt(t.entry, 4)}</td><td>${fmt(t.sl, 4)}</td><td>${fmt(t.tp3, 4)}</td>
         <td>${fmt(t.poc, 4)}</td><td>${fmt(t.vah, 4)}</td><td>${fmt(t.val, 4)}</td>\n        <td>${cleanText(String(t.regime || "—").toUpperCase())}</td><td>${fmt(t.cvd, 2)}</td><td>${Number(t.volume_ratio || 0).toFixed(2)}×</td><td>${Number(t.mfe_r || 0).toFixed(2)}R</td><td>${Number(t.mae_r || 0).toFixed(2)}R</td>
-        <td>${cleanText(t.exit_reason || "OPEN")}</td>
+        <td title="${cleanText(t.sl_reason || "")}">${cleanText(t.exit_reason || "OPEN")}${t.sl_reason ? ` · ${cleanText(t.sl_reason)}` : ""}</td>
         <td class="${Number(t.pnl_r || 0) >= 0 ? "bull-text" : "bear-text"}">${t.pnl_r == null ? "—" : Number(t.pnl_r).toFixed(2) + "R"}</td>
       </tr>`).join("") : '<tr><td colspan="14" class="muted">目前條件下沒有已平倉交易。</td></tr>';
     }
