@@ -779,6 +779,27 @@
     }
     .position-board-level.tp i { background: var(--bull); box-shadow: 0 0 10px rgba(0,224,164,.52); }
     .position-board-level.entry i { background: var(--info); box-shadow: 0 0 10px rgba(102,167,255,.45); }
+    .position-signal-card { cursor: pointer; transition: transform .18s ease, border-color .18s ease; }
+    .position-signal-card:hover { transform: translateY(-3px); border-color: rgba(0,224,164,.55); }
+    .position-expand-hint { display:flex; justify-content:space-between; align-items:center; margin-top:9px; padding-top:8px; border-top:1px solid rgba(117,155,255,.16); color:#9bacc8; font-size:11px; font-weight:800; }
+    .position-expand-hint b { color:var(--accent); }
+    .position-inspector { width:min(760px,100%); max-height:88vh; overflow:auto; background:#071018; border:1px solid rgba(0,224,164,.3); border-radius:14px; }
+    .position-inspector-body { padding:16px; }
+    .position-insight-list { border:1px solid rgba(0,224,164,.3); border-radius:10px; overflow:hidden; background:rgba(7,32,22,.55); }
+    .position-insight { display:grid; grid-template-columns:72px auto 1fr; align-items:center; gap:9px; padding:10px 12px; border-bottom:1px solid rgba(0,224,164,.12); font-size:13px; }
+    .position-insight:last-child { border-bottom:0; }
+    .position-insight-label { color:#a9bad0; font-weight:800; }
+    .position-insight-copy { color:#e7f9f0; font-weight:700; }
+    .position-metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+    .position-metric { min-height:76px; padding:12px; border-radius:9px; background:rgba(35,28,11,.48); }
+    .position-metric span { display:block; color:#c8b38b; font-size:12px; }
+    .position-metric b { display:block; margin-top:7px; color:#edf6ff; font-size:18px; font-weight:900; }
+    .position-score-board { margin-top:14px; border-radius:10px; padding:14px; background:rgba(35,28,11,.5); }
+    .position-score-title { color:#edf6ff; font-weight:900; margin-bottom:7px; }
+    .position-score-row { display:grid; grid-template-columns:1fr auto; gap:12px; padding:8px 0; border-bottom:1px solid rgba(232,215,169,.17); font-size:13px; }
+    .position-score-row:last-child { border-bottom:0; }
+    .position-score-row span { color:#a9bad0; margin-left:6px; }
+    .position-score-row b { color:var(--bull); white-space:nowrap; }
     @media (max-width: 760px) {
       .open-position-feed { grid-template-columns: 1fr; gap: 11px; }
       .position-signal-card { padding: 11px; border-radius: 10px; }
@@ -789,6 +810,8 @@
       .position-level-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
       .position-board-level { min-height: 46px; padding: 8px 24px 7px 10px; }
       .position-board-level b { font-size: 14px; }
+      .position-insight { grid-template-columns:64px auto 1fr; gap:7px; padding:9px 10px; font-size:12px; }
+      .position-metrics { grid-template-columns:repeat(2,1fr); gap:8px; }
     }
 
   </style>
@@ -1211,6 +1234,16 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="positionInspectorModal">
+    <section class="position-inspector">
+      <div class="modal-head">
+        <div class="modal-title"><h2 id="positionInspectorSymbol">BTC</h2><span class="pill bull" id="positionInspectorSide">多單持倉</span></div>
+        <button class="close-btn" id="positionInspectorClose">×</button>
+      </div>
+      <div class="position-inspector-body" id="positionInspectorBody"></div>
+    </section>
+  </div>
+
   <script src="api-config.js"></script>
   <script>
     const $ = id => document.getElementById(id);
@@ -1369,6 +1402,8 @@
     $("modalClose").addEventListener("click", closeSymbolModal);
     $("modalDate").addEventListener("change", () => openSymbolModal($("modalSymbol").textContent));
     $("symbolModal").addEventListener("click", event => { if (event.target.id === "symbolModal") closeSymbolModal(); });
+    $("positionInspectorClose").addEventListener("click", closePositionInspector);
+    $("positionInspectorModal").addEventListener("click", event => { if (event.target.id === "positionInspectorModal") closePositionInspector(); });
     document.addEventListener("click", event => {
       if (!$("notifyPanel").contains(event.target) && !$("bellBtn").contains(event.target)) $("notifyPanel").classList.remove("open");
     });
@@ -2201,6 +2236,7 @@
             '<div class="position-board-level tp"><span>TP3</span><b>' + fmt(row.take_profit_3, 6) + '</b><i></i></div>' +
             '<div class="position-board-level tp"><span>FTP</span><b>' + fmt(row.take_profit_final, 6) + '</b><i></i></div>' +
           '</div>' +
+          '<div class="position-expand-hint"><span>點開查看決策依據</span><b>分析 ›</b></div>' +
         '</article>';
       }).join("") || '<div class="empty">目前沒有 OPEN 持倉。</div>';
       document.querySelectorAll("#positionList [data-position-id]").forEach(card => card.addEventListener("click", () => openPositionDetail(card.dataset.positionId)));
@@ -2280,39 +2316,80 @@
     }
 
     async function openPositionDetail(positionId) {
-      if (!CLOUD_MODE || !positionId) return;
-      try {
-        const response = await cloudFetch(`/positions/${encodeURIComponent(positionId)}`);
-        if (!response.ok) throw new Error("倉位明細讀取失敗");
-        const item = await response.json();
-        const events = (item.events || []).map(event => `${shortTime(event.event_time)} ${event.event_type} ${event.event_price ? fmt(event.event_price, 6) : ""} ${event.description || ""}`);
-        state.notificationLogs = [{
-          id: -1,
-          symbol: item.symbol,
-          side: item.side,
-          timeframe: item.timeframe,
-          message_type: "POSITION_DETAIL",
-          message_text: [
-            `${clean(item.symbol)} ${item.side.toUpperCase()} ${item.timeframe}`,
-            `狀態：${item.status}`,
-            `Entry：${fmt(item.entry_price, 6)} / SL：${fmt(item.stop_loss, 6)}`,
-            `TP：${fmt(item.take_profit_1, 6)} / ${fmt(item.take_profit_2, 6)} / ${fmt(item.take_profit_3, 6)} / ${fmt(item.take_profit_final, 6)}`,
-            `Exit：${fmt(item.exit_price, 6)} / PnL：${signed(item.pnl_percent)}`,
-            `進場原因：${item.entry_reason || "-"}`,
-            `出場原因：${item.exit_reason || "-"}`,
-            "",
-            "事件時間線：",
-            ...(events.length ? events : ["尚無事件"])
-          ].join("\n"),
-          sent_status: "detail",
-          created_at: new Date().toISOString(),
-          error_message: ""
-        }, ...(state.notificationLogs || [])];
-        renderNotificationLogs();
-        status(`已載入 ${clean(item.symbol)} 倉位明細`);
-      } catch (err) {
-        rememberError(err);
+      if (!positionId) return;
+      const fallback = [...(state.positions || []), ...buildStaticPositions()].find(row => String(row.id) === String(positionId));
+      let item = fallback;
+      if (CLOUD_MODE) {
+        try {
+          const response = await cloudFetch(`/positions/${encodeURIComponent(positionId)}`);
+          if (response.ok) item = {...(fallback || {}), ...(await response.json())};
+        } catch (err) { rememberError(err); }
       }
+      if (!item) { status("找不到此筆持倉資料", "warn"); return; }
+      renderPositionInspector(item);
+    }
+    function closePositionInspector() { $("positionInspectorModal").classList.remove("open"); }
+    function renderPositionInspector(row) {
+      const symbol = clean(row.symbol);
+      const isLong = row.side === "long";
+      const market = marketFor(symbol) || {};
+      const signal = latestOpenSignal(symbol) || latestSignalFor(symbol) || {};
+      const val = (...items) => {
+        for (const item of items) if (Number.isFinite(Number(item))) return Number(item);
+        return null;
+      };
+      const oi = val(signalMetric(signal, "oi_change_pct"), signalMetric(signal, "oi_change_1h"), market.oi_change_pct);
+      const cvd = val(signalMetric(signal, "cvd_ratio_1h"), signalMetric(signal, "cvd_change_pct"));
+      const price1h = val(signalMetric(signal, "price_change_1h"), market.price_change_pct);
+      const price24h = val(signalMetric(signal, "price_change_24h"), market.price_change_pct);
+      const funding = val(signalMetric(signal, "funding_rate"), signalMetric(signal, "funding_rate_1h"), market.funding_rate);
+      const ratio = val(signalMetric(signal, "long_short_ratio_1h"), signalMetric(signal, "long_short_ratio"));
+      const longShare = ratio && ratio > 0 ? ratio / (1 + ratio) * 100 : null;
+      const btc = marketFor("BTC") || marketFor("BTCUSDT") || {};
+      const relative = Number.isFinite(price24h) && Number.isFinite(Number(btc.price_change_pct)) ? price24h - Number(btc.price_change_pct) : null;
+      const direction = isLong ? 1 : -1;
+      const flowAligned = Number.isFinite(oi) && Number.isFinite(cvd) && Number.isFinite(price1h) && Math.sign(oi) === direction && Math.sign(cvd) === direction && Math.sign(price1h) === direction;
+      const flowScore = flowAligned ? 40 : Number.isFinite(cvd) && Math.sign(cvd) === direction ? 12 : 0;
+      const momentumScore = Number.isFinite(price1h) ? clamp(Math.round(price1h * 1.5 * direction), -8, 8) : 0;
+      const fundingScore = Number.isFinite(funding) && Math.abs(funding) >= .03 ? -Math.sign(funding) * direction * 12 : 0;
+      const crowdScore = ratio ? (ratio > 1.2 ? -4 : ratio < .8 ? 4 : 0) * direction : 0;
+      const relativeScore = Number.isFinite(relative) ? clamp(Math.round(relative / 3 * direction), -7, 7) : 0;
+      const total = clamp(flowScore + momentumScore + fundingScore + crowdScore + relativeScore, -60, 60);
+      const kind = total >= 10 ? "bull" : total <= -10 ? "bear" : "warn";
+      const entry = Number(row.entry_price);
+      const stop = Number(row.stop_loss);
+      const risk = Number.isFinite(entry) && Number.isFinite(stop) && entry > 0 ? Math.abs(entry - stop) / entry * 100 : 0;
+      const normalFunding = !Number.isFinite(funding) || Math.abs(funding) < .03;
+      const insight = (label, pill, pillKind, text) => `<div class="position-insight"><span class="position-insight-label">${label}</span><span class="insight-pill ${pillKind}">${pill}</span><span class="position-insight-copy">${text}</span></div>`;
+      const metric = (label, value, cls = "") => `<div class="position-metric"><span>${label}</span><b class="${cls}">${value}</b></div>`;
+      $("positionInspectorSymbol").textContent = symbol;
+      $("positionInspectorSide").textContent = isLong ? "多單持倉" : "空單持倉";
+      $("positionInspectorSide").className = `pill ${isLong ? "bull" : "bear"}`;
+      $("positionInspectorBody").innerHTML = `
+        <div class="position-insight-list">
+          ${insight("市場動能", flowAligned ? "方向一致" : "持續觀察", flowAligned ? "bull" : "warn", flowAligned ? `OI、CVD 與價格同向，${isLong ? "多方" : "空方"}結構延續` : `OI / CVD / 價格尚未完全同向，避免追價`) }
+          ${insight("資金費率", normalFunding ? "正常" : "擁擠", normalFunding ? "warn" : "bear", Number.isFinite(funding) ? `${signed(funding, 4)}% · ${normalFunding ? "不作方向判斷" : "留意反向擠壓"}` : "尚未取得費率資料")}
+          ${insight("散戶情緒", longShare === null ? "待補" : longShare >= 55 ? "偏多" : longShare <= 45 ? "偏空" : "中性", longShare === null ? "warn" : longShare >= 55 ? "bull" : longShare <= 45 ? "bear" : "warn", longShare === null ? "尚未取得多空比" : `多方 ${fmt(longShare, 1)}%`) }
+          ${insight("相對強弱", relative === null ? "待補" : relative >= 0 ? "強於 BTC" : "弱於 BTC", relative === null ? "warn" : relative >= 0 ? "bull" : "bear", relative === null ? "等待 BTC 24H 同步資料" : `相對 BTC ${signed(relative)}，${relative >= 0 ? "幣種維持相對強勢" : "走勢弱於 BTC"}`)}
+        </div>
+        <div class="position-metrics">
+          ${metric("24H 漲跌", Number.isFinite(price24h) ? signed(price24h) : "待補", numClass(price24h))}
+          ${metric("資金費率", Number.isFinite(funding) ? `${signed(funding, 4)}%` : "待補")}
+          ${metric("未平倉量", Number.isFinite(Number(market.oi_value_usdt)) ? `${compact(market.oi_value_usdt)} USDT` : "待補")}
+          ${metric("目前價格", Number.isFinite(Number(market.price)) ? fmt(market.price, 6) : fmt(row.entry_price, 6), "accent-text")}
+          ${metric("OI 變化", Number.isFinite(oi) ? signed(oi) : "待補", numClass(oi))}
+          ${metric("風險距離", `${fmt(risk, 2)}%`, risk <= 2 ? "bull-text" : "warn-text")}
+        </div>
+        <div class="position-score-board">
+          <div class="position-score-title">評分依據 <span class="score-badge ${kind}">綜合 ${signed(total, 0)}</span></div>
+          ${scoreMeter(total, kind)}
+          <div class="position-score-row"><div><strong>市場結構</strong><span>${flowAligned ? "主動成交與槓桿同向" : "資料未完全共振"}</span></div><b>${signed(flowScore, 0)} 分</b></div>
+          <div class="position-score-row"><div><strong>動能 1H</strong><span>${Number.isFinite(price1h) ? signed(price1h) : "待補"}</span></div><b>${signed(momentumScore, 0)} 分</b></div>
+          <div class="position-score-row"><div><strong>資金費率</strong><span>${normalFunding ? "費率正常" : "擁擠風險"}</span></div><b>${signed(fundingScore, 0)} 分</b></div>
+          <div class="position-score-row"><div><strong>散戶多空</strong><span>${longShare === null ? "待補" : `多方 ${fmt(longShare, 1)}%`}</span></div><b>${signed(crowdScore, 0)} 分</b></div>
+          <div class="position-score-row"><div><strong>相對強弱</strong><span>${relative === null ? "待補" : `${signed(relative)} vs BTC`}</span></div><b>${signed(relativeScore, 0)} 分</b></div>
+        </div>`;
+      $("positionInspectorModal").classList.add("open");
     }
     function renderDecisionDashboard() {
       if (!$("decisionMarketStats")) return;
