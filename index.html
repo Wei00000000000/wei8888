@@ -2169,12 +2169,9 @@
 
     function renderAll() {
       renderStats();
-      renderDecisionDashboard();
-      renderSectorFlows();
-      renderVolumeAnomalies();
-      renderCurrentView();
       renderNotifications();
       renderHealth();
+      renderCurrentView();
     }
     function renderFastMarketViews() {
       renderStats();
@@ -2185,6 +2182,7 @@
     }
     function renderCurrentView() {
       if (state.currentView === "dashboard") {
+        renderDecisionDashboard();
         renderSectorFlows();
         renderVolumeAnomalies();
         renderWatchDashboard();
@@ -2348,17 +2346,24 @@
       if (!positionId) return;
       const fallback = state.positionCardRows?.get(String(positionId)) || [...(state.positions || []), ...buildStaticPositions()].find(row => String(row.id) === String(positionId));
       let item = fallback;
+      let coinHistory = [];
       if (CLOUD_MODE) {
         try {
           const response = await cloudFetch(`/positions/${encodeURIComponent(positionId)}`);
           if (response.ok) item = {...(fallback || {}), ...(await response.json())};
+          const symbol = clean((item || fallback || {}).symbol);
+          if (symbol) {
+            const historyResponse = await cloudFetch(`/positions/history?symbol=${encodeURIComponent(symbol)}&limit=100`);
+            if (historyResponse.ok) coinHistory = (await historyResponse.json()).rows || [];
+          }
         } catch (err) { rememberError(err); }
       }
       if (!item) { status("找不到此筆持倉資料", "warn"); return; }
-      renderPositionInspector(item);
+      if (!CLOUD_MODE) coinHistory = buildStaticPositions().filter(row => clean(row.symbol) === clean(item.symbol));
+      renderPositionInspector(item, coinHistory);
     }
     function closePositionInspector() { $("positionInspectorModal").classList.remove("open"); }
-    function renderPositionInspector(row) {
+    function renderPositionInspector(row, coinHistory = []) {
       const symbol = clean(row.symbol);
       const isLong = row.side === "long";
       const market = marketFor(symbol) || {};
@@ -2389,6 +2394,14 @@
       const stop = Number(row.stop_loss);
       const risk = Number.isFinite(entry) && Number.isFinite(stop) && entry > 0 ? Math.abs(entry - stop) / entry * 100 : 0;
       const normalFunding = !Number.isFinite(funding) || Math.abs(funding) < .03;
+      const slPlan = risk < .8
+        ? "SL 距離偏緊，容易被正常波動掃出；下次以結構低／高點外加 1 ATR 作為最小緩衝。"
+        : risk > 3.5
+          ? "SL 距離偏寬，單筆風險較高；應降低倉位，或等待回踩／反彈後再進場以縮短風險。"
+          : "SL 距離在可控範圍；進場前確認 OI、CVD 與價格同向，失去共振時減碼或提前退出。";
+      const relatedRows = [...coinHistory]
+        .sort((a, b) => positionTimeValue(b.entry_time) - positionTimeValue(a.entry_time))
+        .slice(0, 100);
       const insight = (label, pill, pillKind, text) => `<div class="position-insight"><span class="position-insight-label">${label}</span><span class="insight-pill ${pillKind}">${pill}</span><span class="position-insight-copy">${text}</span></div>`;
       const metric = (label, value, cls = "") => `<div class="position-metric"><span>${label}</span><b class="${cls}">${value}</b></div>`;
       $("positionInspectorSymbol").textContent = symbol;
@@ -2417,6 +2430,14 @@
           <div class="position-score-row"><div><strong>資金費率</strong><span>${normalFunding ? "費率正常" : "擁擠風險"}</span></div><b>${signed(fundingScore, 0)} 分</b></div>
           <div class="position-score-row"><div><strong>散戶多空</strong><span>${longShare === null ? "待補" : `多方 ${fmt(longShare, 1)}%`}</span></div><b>${signed(crowdScore, 0)} 分</b></div>
           <div class="position-score-row"><div><strong>相對強弱</strong><span>${relative === null ? "待補" : `${signed(relative)} vs BTC`}</span></div><b>${signed(relativeScore, 0)} 分</b></div>
+        </div>
+        <div class="position-score-board">
+          <div class="position-score-title">SL 進出場優化 <span class="score-badge ${risk <= 2 ? "bull" : "warn"}">風險距離 ${fmt(risk, 2)}%</span></div>
+          <div class="position-score-row"><div><strong>下一次進場規則</strong><span>${slPlan}</span></div></div>
+        </div>
+        <div class="position-score-board">
+          <div class="position-score-title">${cleanText(symbol)} 全部持倉紀錄 <span class="score-badge warn">${relatedRows.length} 筆</span></div>
+          <div class="table-wrap"><table><thead><tr><th>狀態</th><th>方向</th><th>週期</th><th>Entry</th><th>SL</th><th>PnL</th><th>進場時間</th></tr></thead><tbody>${relatedRows.map(item => `<tr><td>${cleanText(item.status || "-")}</td><td class="${item.side === "long" ? "bull-text" : "bear-text"}">${item.side === "long" ? "多" : "空"}</td><td>${cleanText(item.timeframe || "-")}</td><td>${fmt(item.entry_price, 6)}</td><td>${fmt(item.stop_loss, 6)}</td><td class="${numClass(item.pnl_percent)}">${signed(item.pnl_percent)}</td><td>${shortTime(item.entry_time)}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">尚無可顯示的持倉紀錄。</td></tr>'}</tbody></table></div>
         </div>`;
       $("positionInspectorModal").classList.add("open");
     }
