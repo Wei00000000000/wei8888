@@ -18,6 +18,10 @@ class QuantConfig:
     acceptance_bars: int = 2
     stop_atr: float = 0.5
     risk_fraction: float = 0.005
+    cvd_fast: int = 5
+    cvd_slow: int = 20
+    regime_lookback: int = 20
+    balance_overlap: float = 0.50
 
 
 def _ema(values: Sequence[float], period: int) -> list[float | None]:
@@ -66,6 +70,16 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
     fast = _ema(closes, cfg.ema_fast)
     slow = _ema(closes, cfg.ema_slow)
     atrs = _atr(rows, cfg.atr_period)
+    # Candle-direction volume delta proxy. This is deterministic from OHLCV; it can
+    # later be replaced by exchange taker-buy/sell delta without changing the signal API.
+    deltas = [r.volume if r.close > r.open else (-r.volume if r.close < r.open else 0.0) for r in rows]
+    cvd: list[float] = []
+    running = 0.0
+    for delta in deltas:
+        running += delta
+        cvd.append(running)
+    cvd_fast = _ema(cvd, cfg.cvd_fast)
+    cvd_slow = _ema(cvd, cfg.cvd_slow)
     trades: list[dict] = []
     position: dict | None = None
 
@@ -73,6 +87,11 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
         row = rows[i]
         if position:
             side = position["side"]
+            live_risk = abs(position["entry"] - position["sl"]) or 1e-12
+            favorable = (row.high - position["entry"]) / live_risk if side == "long" else (position["entry"] - row.low) / live_risk
+            adverse = (position["entry"] - row.low) / live_risk if side == "long" else (row.high - position["entry"]) / live_risk
+            position["mfe_r"] = max(float(position.get("mfe_r", 0.0)), favorable)
+            position["mae_r"] = max(float(position.get("mae_r", 0.0)), adverse)
             hit_sl = row.low <= position["sl"] if side == "long" else row.high >= position["sl"]
             hit_tp = row.high >= position["tp3"] if side == "long" else row.low <= position["tp3"]
             if hit_sl or hit_tp:
@@ -95,14 +114,27 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
         val = profile.val
         avg_vol = sum(volumes[i-cfg.volume_period:i]) / cfg.volume_period
         volume_ok = row.volume > avg_vol * cfg.volume_multiplier
+        cf, cs = cvd_fast[i], cvd_slow[i]
+        cvd_up = cf is not None and cs is not None and cf > cs and cvd_fast[i-1] is not None and cf > cvd_fast[i-1]
+        cvd_down = cf is not None and cs is not None and cf < cs and cvd_fast[i-1] is not None and cf < cvd_fast[i-1]
+        older = rows[max(0, i-cfg.breakout_lookback*2):i-cfg.breakout_lookback]
+        older_profile = tpo_profile(older) if len(older) >= 5 else None
+        overlap = 0.0
+        poc_shift = 0.0
+        if older_profile is not None:
+            overlap_width = max(0.0, min(vah, older_profile.vah) - max(val, older_profile.val))
+            base_width = max(1e-12, min(vah-val, older_profile.vah-older_profile.val))
+            overlap = overlap_width / base_width
+            poc_shift = profile.poc - older_profile.poc
+        regime = "balance" if overlap >= cfg.balance_overlap and abs(poc_shift) <= a * 0.25 else "trend"
         slope_up = fast[i-1] is not None and f > fast[i-1]
         slope_down = fast[i-1] is not None and f < fast[i-1]
         accepted_long = all(rows[j].close > max(r.high for r in rows[j-cfg.breakout_lookback:j]) for j in range(i-cfg.acceptance_bars+1, i+1))
         accepted_short = all(rows[j].close < min(r.low for r in rows[j-cfg.breakout_lookback:j]) for j in range(i-cfg.acceptance_bars+1, i+1))
         side = None
-        if row.close > vah and f > s and slope_up and volume_ok and accepted_long:
+        if regime == "trend" and row.close > vah and f > s and slope_up and volume_ok and cvd_up and accepted_long:
             side = "long"
-        elif row.close < val and f < s and slope_down and volume_ok and accepted_short:
+        elif regime == "trend" and row.close < val and f < s and slope_down and volume_ok and cvd_down and accepted_short:
             side = "short"
         if not side:
             continue
@@ -115,6 +147,9 @@ def run_quant_v1(rows: Sequence[Kline], config: QuantConfig | None = None) -> di
             "tp1": entry + direction*risk, "tp2": entry + direction*2*risk, "tp3": entry + direction*3*risk,
             "vah": vah, "val": val, "poc": profile.poc, "ema50": f, "ema200": s, "atr": a,
             "volume_ratio": row.volume / avg_vol if avg_vol else 0.0,
+            "cvd": cvd[i], "cvd_fast": cf, "cvd_slow": cs, "regime": regime,
+            "va_overlap": overlap, "poc_shift": poc_shift,
+            "mfe_r": 0.0, "mae_r": 0.0,
         }
 
     return {"strategy": "quant-tpo-breakout-v1", "trades": trades, "summary": _summary(trades)}
