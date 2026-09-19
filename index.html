@@ -1186,24 +1186,39 @@
     </section>
 
     <section id="quant" class="view">
+      <style>
+        .quant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}.quant-chart{min-height:280px;padding:14px}.quant-chart svg{width:100%;height:220px;overflow:visible}.quant-chart-line{fill:none;stroke:currentColor;stroke-width:2}.quant-chart-area{opacity:.12}.quant-axis{stroke:rgba(255,255,255,.12);stroke-width:1}.quant-dot{opacity:.65}.quant-heat{display:grid;gap:3px;overflow:auto}.quant-heat-row{display:flex;gap:3px}.quant-cell{min-width:54px;padding:8px 5px;border:1px solid var(--line);border-radius:4px;text-align:center;font:700 10px var(--mono)}.quant-cell.good{background:rgba(0,224,164,.18)}.quant-cell.bad{background:rgba(255,85,119,.16)}.quant-cell.neutral{background:rgba(255,255,255,.04)}.quant-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.quant-note{font-size:11px;color:var(--muted);margin-top:8px}.quant-table-scroll{max-height:520px;overflow:auto}@media(max-width:900px){.quant-grid{grid-template-columns:1fr}}
+      </style>
       <section class="radar-strip">
-        <div class="kicker">Quant Lab · V1</div>
-        <h2>量化策略分析</h2>
-        <div class="subline">TPO Value Area + EMA 趨勢 + Volume Acceptance + ATR 風控。此頁目前為研究/回測模式，不會送出真實交易訂單。</div>
+        <div class="kicker">Quant Research Lab · V2</div>
+        <h2>全市場量化研究</h2>
+        <div class="subline">單幣深度研究 + 全幣種橫截面掃描。包含 Alpha proxy、Equity、Drawdown、Sharpe/Sortino/Calmar、MFE/MAE、參數穩健性與 Walk-forward OOS。</div>
       </section>
       <section class="backtest-panel">
         <div class="backtest-head">
-          <div><div class="kicker">TPO Breakout V1</div><h2>即時歷史回測</h2><div class="subline">使用最近 250–1000 根合約 K 線測試固定規則，避免直接修改正式持倉。</div></div>
+          <div><div class="kicker">Research Controls</div><h2>Quant V2</h2><div class="subline">最佳化使用樣本內/樣本外分離；全幣掃描預設依 24h 成交額挑選 80 個 USDT 永續合約。</div></div>
           <div class="section-actions">
             <input id="quantSymbol" value="BTCUSDT" aria-label="幣種">
             <select id="quantTimeframe"><option value="5m">5M</option><option value="15m" selected>15M</option><option value="1h">1H</option><option value="4h">4H</option><option value="1d">1D</option></select>
             <select id="quantLimit"><option value="500">500 bars</option><option value="750">750 bars</option><option value="1000" selected>1000 bars</option></select>
-            <button class="btn primary" id="quantRun">開始回測</button>
+            <button class="btn primary" id="quantRun">單幣研究</button>
+            <button class="btn" id="quantUniverseRun">全幣掃描</button>
           </div>
         </div>
         <div class="watch-stats" id="quantStats"></div>
-        <div class="section-head"><div><div class="kicker">Trades</div><h2 class="section-title">量化交易紀錄 <span id="quantTradeCount" class="section-count">(0)</span></h2></div><span class="pill accent" id="quantMeta">尚未執行</span></div>
-        <div class="table-wrap"><table><thead><tr><th>方向</th><th>Entry</th><th>SL</th><th>TP3</th><th>POC</th><th>VAH</th><th>VAL</th><th>Regime</th><th>CVD</th><th>Volume</th><th>MFE</th><th>MAE</th><th>結果</th><th>R</th></tr></thead><tbody id="quantRows"></tbody></table></div>
+        <div class="quant-grid">
+          <div class="panel quant-chart"><div class="kicker">Equity Curve</div><h3>累積 R</h3><div id="quantEquityChart" class="muted">執行單幣研究後顯示</div></div>
+          <div class="panel quant-chart"><div class="kicker">Drawdown</div><h3>水下曲線</h3><div id="quantDdChart" class="muted">執行單幣研究後顯示</div></div>
+          <div class="panel quant-chart"><div class="kicker">MFE vs MAE</div><h3>交易位移分布</h3><div id="quantExcursionChart" class="muted">執行單幣研究後顯示</div></div>
+          <div class="panel quant-chart"><div class="kicker">Parameter Stability</div><h3>SL × Volume Heatmap</h3><div id="quantHeatmap" class="muted">最佳化完成後顯示</div></div>
+        </div>
+        <div class="section-head"><div><div class="kicker">Walk-forward</div><h2 class="section-title">IS / OOS 穩健性</h2></div><span class="pill accent" id="quantMeta">尚未執行</span></div>
+        <div class="table-wrap"><table><thead><tr><th>Fold</th><th>SL ATR</th><th>Volume</th><th>Acceptance</th><th>IS Expectancy</th><th>OOS Expectancy</th><th>OOS Sharpe</th><th>OOS DD</th></tr></thead><tbody id="quantWalkRows"><tr><td colspan="8" class="muted">尚無資料</td></tr></tbody></table></div>
+        <div class="section-head"><div><div class="kicker">Universe</div><h2 class="section-title">全幣種研究排行榜 <span id="quantTradeCount" class="section-count">(0)</span></h2><div class="subline">可依 Alpha、Expectancy、Sharpe、回撤與樣本數判讀，不以單一指標宣稱「最佳」。</div></div></div>
+        <div class="table-wrap quant-table-scroll"><table><thead><tr><th>幣種</th><th>Trades</th><th>Win%</th><th>PF</th><th>Expectancy</th><th>Sharpe</th><th>Sortino</th><th>Calmar</th><th>Net R</th><th>Max DD</th><th>Alpha*</th><th>Buy&Hold</th></tr></thead><tbody id="quantUniverseRows"><tr><td colspan="12" class="muted">按「全幣掃描」開始。</td></tr></tbody></table></div>
+        <div class="quant-note">* Alpha 為策略逐筆交易報酬相對同期間 Buy & Hold 的簡化 proxy，不是多因子迴歸 alpha。</div>
+        <div class="section-head"><div><div class="kicker">Trades</div><h2 class="section-title">單幣交易紀錄</h2></div></div>
+        <div class="table-wrap"><table><thead><tr><th>方向</th><th>Entry</th><th>SL</th><th>TP3</th><th>POC</th><th>VAH</th><th>VAL</th><th>Regime</th><th>CVD Proxy</th><th>Volume</th><th>MFE</th><th>MAE</th><th>結果</th><th>R</th></tr></thead><tbody id="quantRows"></tbody></table></div>
       </section>
     </section>
 
@@ -1351,7 +1366,7 @@
     document.querySelectorAll(".nav button").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
     $("scan").addEventListener("click", tickScan);
     $("backtest").addEventListener("click", () => runSignals("backtest"));
-    $("quantRun").addEventListener("click", runQuantV1);
+    $("quantRun").addEventListener("click", runQuantV2);\n    $("quantUniverseRun").addEventListener("click", runQuantUniverse);
     $("loadMarkets").addEventListener("click", loadMarkets);
     $("refreshWatch").addEventListener("click", loadMarkets);
     $("refreshSignals").addEventListener("click", () => runSignals("backtest"));
@@ -5296,6 +5311,61 @@
     }
     function statCard(label, value, subline = "") {
       return `<div class="watch-stat"><div class="watch-stat-label">${cleanText(label)}</div><div class="watch-stat-value">${cleanText(value)}</div><div class="subline">${cleanText(subline)}</div></div>`;
+    }
+
+    function quantSvgLine(points, key, negative=false) {
+      if (!points || !points.length) return '<div class="muted">沒有足夠交易樣本</div>';
+      const vals=points.map(x=>Number(x[key]||0)), min=Math.min(...vals,0), max=Math.max(...vals,0), span=(max-min)||1;
+      const coords=vals.map((v,i)=>[i/(Math.max(1,vals.length-1))*100, 94-(v-min)/span*84]);
+      const d=coords.map((p,i)=>(i?'L':'M')+p[0].toFixed(2)+','+p[1].toFixed(2)).join(' ');
+      return '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><line class="quant-axis" x1="0" y1="94" x2="100" y2="94"/><path class="quant-chart-line" d="'+d+'"/></svg><div class="subline">Min '+min.toFixed(2)+'R · Max '+max.toFixed(2)+'R</div>';
+    }
+    function quantScatter(rows) {
+      if(!rows||!rows.length)return '<div class="muted">沒有足夠交易樣本</div>';
+      const mx=Math.max(1,...rows.map(x=>Number(x.mfe_r||0))), my=Math.max(1,...rows.map(x=>Number(x.mae_r||0)));
+      const dots=rows.map(x=>'<circle class="quant-dot" cx="'+(Number(x.mfe_r||0)/mx*92+4).toFixed(1)+'" cy="'+(94-Number(x.mae_r||0)/my*88).toFixed(1)+'" r="1.5"/>').join('');
+      return '<svg viewBox="0 0 100 100"><line class="quant-axis" x1="4" y1="94" x2="98" y2="94"/><line class="quant-axis" x1="4" y1="4" x2="4" y2="94"/>'+dots+'</svg><div class="subline">X=MFE · Y=MAE（R）</div>';
+    }
+    function renderQuantHeatmap(rows) {
+      const el=$("quantHeatmap"); if(!rows||!rows.length){el.innerHTML='<div class="muted">無最佳化資料</div>';return}
+      const acc=2, data=rows.filter(x=>Number(x.acceptance_bars)===acc), stops=[...new Set(data.map(x=>x.stop_atr))], vols=[...new Set(data.map(x=>x.volume_multiplier))];
+      el.innerHTML='<div class="subline">Acceptance = 2 · 數字為 Expectancy R</div><div class="quant-heat">'+stops.map(s=>'<div class="quant-heat-row"><div class="quant-cell neutral">SL '+s+'</div>'+vols.map(v=>{const x=data.find(r=>r.stop_atr===s&&r.volume_multiplier===v),e=Number(x?.expectancy_r||0);return '<div class="quant-cell '+(e>0?'good':e<0?'bad':'neutral')+'" title="Vol '+v+'× · '+Number(x?.trades||0)+' trades">'+e.toFixed(2)+'</div>'}).join('')+'</div>').join('')+'</div><div class="subline">欄序 Volume: '+vols.map(v=>v+'×').join(' · ')+'</div>';
+    }
+    async function runQuantV2() {
+      const button=$("quantRun"), symbol=String($("quantSymbol").value||"BTCUSDT").toUpperCase().replace(/[^A-Z0-9]/g,""), timeframe=$("quantTimeframe").value, limit=$("quantLimit").value;
+      button.disabled=true; $("quantMeta").textContent="Research + optimization…";
+      try{
+        const response=await cloudFetch('/backtest/quant-v2/research?symbol='+encodeURIComponent(symbol)+'&timeframe='+encodeURIComponent(timeframe)+'&limit='+encodeURIComponent(limit)+'&optimize=true');
+        if(response.status===401){clearCloudSession();redirectToLogin();return}
+        const data=await response.json(); if(!response.ok||data.detail)throw new Error(data.detail||"Quant V2 失敗");
+        renderQuantV1(data);
+        const m=data.risk_metrics||{}, b=data.benchmark||{}, s=data.summary||{};
+        $("quantStats").innerHTML=[
+          statCard("Trades",s.trades??0,"已平倉樣本"),statCard("Expectancy",Number(s.expectancy_r||0).toFixed(3)+"R","每筆平均"),
+          statCard("Sharpe*",Number(m.sharpe_r||0).toFixed(2),"trade-R based"),statCard("Sortino*",Number(m.sortino_r||0).toFixed(2),"downside adjusted"),
+          statCard("Calmar*",Number(m.calmar_r||0).toFixed(2),"Net R / Max DD"),statCard("Max DD",Number(s.max_drawdown_r||0).toFixed(2)+"R","最大回撤"),
+          statCard("Alpha proxy",(Number(b.alpha_trade_pct||0)>=0?"+":"")+Number(b.alpha_trade_pct||0).toFixed(2)+"%","vs Buy & Hold"),
+          statCard("Buy & Hold",(Number(b.buy_hold_pct||0)>=0?"+":"")+Number(b.buy_hold_pct||0).toFixed(2)+"%","同一 K 線區間")
+        ].join("");
+        $("quantEquityChart").innerHTML=quantSvgLine(data.equity_curve,"equity_r");
+        $("quantDdChart").innerHTML=quantSvgLine(data.equity_curve,"drawdown_r",true);
+        $("quantExcursionChart").innerHTML=quantScatter(data.mfe_mae);
+        renderQuantHeatmap(data.parameter_sweep);
+        const wf=data.walk_forward||[];
+        $("quantWalkRows").innerHTML=wf.length?wf.map(x=>'<tr><td>'+x.fold+'</td><td>'+x.params.stop_atr+'</td><td>'+x.params.volume_multiplier+'×</td><td>'+x.params.acceptance_bars+'</td><td>'+Number(x.is_metrics.expectancy_r||0).toFixed(3)+'R</td><td>'+Number(x.oos_metrics.expectancy_r||0).toFixed(3)+'R</td><td>'+Number(x.oos_metrics.sharpe_r||0).toFixed(2)+'</td><td>'+Number(x.oos_metrics.max_drawdown_r||0).toFixed(2)+'R</td></tr>').join(""):'<tr><td colspan="8" class="muted">樣本不足</td></tr>';
+        $("quantMeta").textContent=(data.symbol||symbol)+" · "+String(data.timeframe||timeframe).toUpperCase()+" · V2";
+      }catch(err){$("quantMeta").textContent="失敗 · "+(err.message||err)}finally{button.disabled=false}
+    }
+    async function runQuantUniverse(){
+      const btn=$("quantUniverseRun"),tf=$("quantTimeframe").value,limit=Math.max(400,Number($("quantLimit").value||750));btn.disabled=true;btn.textContent="掃描中…";
+      try{
+        const r=await cloudFetch('/backtest/quant-v2/universe?timeframe='+encodeURIComponent(tf)+'&limit='+limit+'&max_symbols=80');
+        if(r.status===401){clearCloudSession();redirectToLogin();return}
+        const d=await r.json();if(!r.ok||d.detail)throw new Error(d.detail||"全幣掃描失敗");
+        const rows=d.rows||[];$("quantTradeCount").textContent="("+rows.length+")";
+        $("quantUniverseRows").innerHTML=rows.length?rows.map(x=>'<tr><td><strong>'+cleanText(x.symbol)+'</strong></td><td>'+x.trades+'</td><td>'+Number(x.win_rate_pct||0).toFixed(1)+'%</td><td>'+Number(x.profit_factor||0).toFixed(2)+'</td><td>'+Number(x.expectancy_r||0).toFixed(3)+'R</td><td>'+Number(x.sharpe_r||0).toFixed(2)+'</td><td>'+Number(x.sortino_r||0).toFixed(2)+'</td><td>'+Number(x.calmar_r||0).toFixed(2)+'</td><td>'+Number(x.net_r||0).toFixed(2)+'R</td><td>'+Number(x.max_drawdown_r||0).toFixed(2)+'R</td><td class="'+(Number(x.alpha_trade_pct||0)>=0?"bull-text":"bear-text")+'">'+Number(x.alpha_trade_pct||0).toFixed(2)+'%</td><td>'+Number(x.buy_hold_pct||0).toFixed(2)+'%</td></tr>').join(""):'<tr><td colspan="12">沒有可用結果</td></tr>';
+        status('Quant V2 完成 '+d.successful+'/'+d.symbols+' 個幣種');
+      }catch(err){$("quantUniverseRows").innerHTML='<tr><td colspan="12" class="bear-text">'+cleanText(err.message||String(err))+'</td></tr>'}finally{btn.disabled=false;btn.textContent="全幣掃描"}
     }
 
     async function runQuantV1() {
