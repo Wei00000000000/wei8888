@@ -15,6 +15,8 @@ from ..security import Admin, User, require_csrf
 from ..stats import all_strategy_summaries, backtest_summary, filtered_signals
 from ..quant import QuantConfig, run_quant_v1
 from ..quant.research import research, parameter_sweep, walk_forward
+from ..quant.agent import autonomous_research
+from ..quant.universe_agent import universe_research
 from sentiment_scanner.bingx import BingxFuturesClient
 
 
@@ -183,3 +185,61 @@ async def quant_v2_universe(
     valid.sort(key=lambda x: (x.get("expectancy_r", 0), x.get("sharpe_r", 0)), reverse=True)
     return {"strategy": "quant-v2-research", "timeframe": tf, "symbols": len(universe),
             "successful": len(valid), "rows": valid, "errors": [x for x in universe if "error" in x]}
+
+
+@router.get("/quant-v3/agent")
+async def quant_v3_agent(
+    _user: User,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    limit: Annotated[int, Query(ge=500, le=1000)] = 1000,
+) -> dict:
+    """Run one bounded autonomous diagnosis -> hypothesis -> OOS experiment cycle."""
+    clean_symbol = symbol.upper().replace("/", "").replace("-", "")
+    if not clean_symbol.isalnum() or len(clean_symbol) > 24:
+        return {"detail": "Invalid symbol"}
+    tf = timeframe.lower()
+    if tf not in {"5m", "15m", "1h", "4h", "1d"}:
+        return {"detail": "Unsupported timeframe"}
+    client = BingxFuturesClient(timeout=20.0)
+    try:
+        rows = client.klines(clean_symbol, interval=tf, limit=limit)
+    finally:
+        client.close()
+    result = autonomous_research(rows)
+    result["symbol"], result["timeframe"], result["bars"] = clean_symbol, tf, len(rows)
+    return result
+
+
+@router.get("/quant-v4/universe-agent")
+async def quant_v4_universe_agent(
+    _user: User,
+    timeframe: str = "15m",
+    limit: Annotated[int, Query(ge=500, le=1000)] = 1000,
+    max_symbols: Annotated[int, Query(ge=5, le=120)] = 30,
+    min_quote_volume: float = 0.0,
+) -> dict:
+    """Run autonomous research across a liquid USDT perpetual universe."""
+    tf = timeframe.lower()
+    if tf not in {"5m", "15m", "1h", "4h", "1d"}:
+        return {"detail": "Unsupported timeframe"}
+    client = BingxFuturesClient(timeout=20.0)
+    datasets = {}
+    errors = []
+    try:
+        symbols = client.symbols_by_volume(limit=max_symbols, min_quote_volume=min_quote_volume)
+        for symbol in symbols:
+            try:
+                rows = client.klines(symbol, interval=tf, limit=limit)
+                if len(rows) >= 500:
+                    datasets[symbol] = rows
+                else:
+                    errors.append({"symbol": symbol, "error": "insufficient_history", "bars": len(rows)})
+            except Exception as exc:
+                errors.append({"symbol": symbol, "error": str(exc)[:160]})
+    finally:
+        client.close()
+    result = universe_research(datasets)
+    result["timeframe"], result["bars_per_symbol"] = tf, limit
+    result["data_errors"] = errors
+    return result
