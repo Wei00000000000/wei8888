@@ -139,30 +139,40 @@ async def quant_v2_research(
 @router.get("/quant-v2/universe")
 async def quant_v2_universe(
     _user: User,
-    symbols: str = "BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,BNBUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,SUIUSDT",
+    symbols: str = "",
     timeframe: str = "15m",
     limit: Annotated[int, Query(ge=400, le=1000)] = 750,
+    max_symbols: Annotated[int, Query(ge=10, le=200)] = 80,
 ) -> dict:
+    """Cross-sectional research over a liquid USDT perpetual universe.
+
+    When symbols is empty the universe is discovered from BingX and ranked by
+    24h quote volume. max_symbols bounds request cost; explicit symbols are
+    still supported for reproducible research.
+    """
     tf = timeframe.lower()
     if tf not in {"5m", "15m", "1h", "4h", "1d"}:
         return {"detail": "Unsupported timeframe"}
     universe = []
     client = BingxFuturesClient(timeout=20.0)
     try:
-        for raw in symbols.split(",")[:50]:
-            symbol = raw.strip().upper().replace("/", "").replace("-", "")
+        requested = [x.strip() for x in symbols.split(",") if x.strip()]
+        symbol_list = requested[:max_symbols] if requested else client.symbols_by_volume(limit=max_symbols)
+        for raw in symbol_list:
+            symbol = raw.upper().replace("/", "").replace("-", "")
             if not symbol.isalnum() or len(symbol) > 24:
                 continue
             try:
                 rows = client.klines(symbol, interval=tf, limit=limit)
                 result = research(rows)
-                s, m = result.get("summary", {}), result.get("risk_metrics", {})
+                s, m, b = result.get("summary", {}), result.get("risk_metrics", {}), result.get("benchmark", {})
                 universe.append({
                     "symbol": symbol, "bars": len(rows), "trades": s.get("trades", 0),
                     "win_rate_pct": s.get("win_rate_pct", 0), "profit_factor": s.get("profit_factor", 0),
                     "expectancy_r": s.get("expectancy_r", 0), "net_r": s.get("net_r", 0),
                     "max_drawdown_r": s.get("max_drawdown_r", 0), "sharpe_r": m.get("sharpe_r", 0),
                     "sortino_r": m.get("sortino_r", 0), "calmar_r": m.get("calmar_r", 0),
+                    "alpha_trade_pct": b.get("alpha_trade_pct", 0), "buy_hold_pct": b.get("buy_hold_pct", 0),
                     "avg_mfe_r": s.get("avg_mfe_r", 0), "avg_mae_r": s.get("avg_mae_r", 0),
                 })
             except Exception as exc:
