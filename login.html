@@ -31,7 +31,7 @@
     </div>
     <form id="loginForm">
       <label for="password">存取密碼</label>
-      <input id="password" type="password" autocomplete="current-password" autofocus>
+      <input id="password" type="password" autocomplete="current-password" minlength="8" required autofocus>
       <button id="loginBtn" type="submit">登入</button>
       <div id="error" class="error"></div>
     </form>
@@ -40,35 +40,53 @@
   <script src="api-config.js"></script>
   <script>
     const API_BASE = String(window.WEI_API_BASE || "").replace(/\/+$/, "");
+    const BUILD_VERSION = "20260919-login-2";
     const form = document.getElementById("loginForm");
     const btn = document.getElementById("loginBtn");
     const error = document.getElementById("error");
     form.addEventListener("submit", async event => {
       event.preventDefault();
       error.textContent = "";
+      const password = document.getElementById("password").value;
+      if (!password) {
+        error.textContent = "請輸入密碼。";
+        return;
+      }
       if (!API_BASE) {
         error.textContent = "API 尚未設定。";
         return;
       }
       btn.disabled = true;
+      btn.textContent = "驗證中…";
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 15000);
       try {
         const response = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           credentials: "include",
-          body: JSON.stringify({password: document.getElementById("password").value})
+          body: JSON.stringify({password}),
+          signal: controller.signal
         });
-        const data = await response.json();
+        const raw = await response.text();
+        let data = {};
+        try { data = raw ? JSON.parse(raw) : {}; } catch (_) { data = {detail: raw}; }
         if (!response.ok) throw new Error(data.detail || "登入失敗");
         sessionStorage.setItem("wei_cloud_access_token", data.access_token || "");
         sessionStorage.setItem("wei_csrf_token", data.csrf_token || "");
         const next = new URLSearchParams(location.search).get("next") || "";
         const target = next && !next.includes("://") ? decodeURIComponent(next) : "app.html";
-        location.href = target.startsWith("/") ? target : target || "app.html";
+        const appTarget = target.startsWith("/") ? target : target || "app.html";
+        const separator = appTarget.includes("?") ? "&" : "?";
+        // Force a fresh app shell after deployment so a previously cached broken
+        // script can never make a successful login look like it did nothing.
+        location.replace(`${appTarget}${separator}v=${BUILD_VERSION}`);
       } catch (err) {
-        error.textContent = err.message || "登入失敗";
+        error.textContent = err.name === "AbortError" ? "連線逾時，請再試一次。" : (err.message || "登入失敗");
       } finally {
+        window.clearTimeout(timeout);
         btn.disabled = false;
+        btn.textContent = "登入";
       }
     });
   </script>
