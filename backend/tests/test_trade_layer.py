@@ -6,13 +6,15 @@ from scripts.update_seed_signals import classify_high_quality, classify_trade_la
 
 
 class TradeLayerScoreTest(unittest.TestCase):
-    def test_top_level_oi_percentile_can_promote_official_trade(self) -> None:
+    def test_a_grade_confirmed_signal_can_promote_official_trade(self) -> None:
         row = {
             "entry_price": 100,
             "sl_price": 98,
             "oi_percentile": 92,
             "setup_id": "oi_15m_long_buildup",
             "volume_24h": 10_000_000,
+            "signal_type": "reversal_bullish",
+            "taker_buy_ratio": 0.60,
         }
 
         self.assertEqual(trade_score(row), 92)
@@ -25,6 +27,8 @@ class TradeLayerScoreTest(unittest.TestCase):
             "setup_id": "coinglass_contract_short_price_24h",
             "volume_24h": 10_000_000,
             "snapshot_data": {"radar_score": -88},
+            "signal_type": "reversal_bearish",
+            "taker_buy_ratio": 0.40,
         }
 
         self.assertEqual(trade_score(row), 88)
@@ -41,6 +45,38 @@ class TradeLayerScoreTest(unittest.TestCase):
         layer, reasons = classify_trade_layer(row)
         self.assertEqual(layer, "warning")
         self.assertIn("score_below_60_warning_only", reasons)
+
+    def test_cvd_divergence_is_warning_even_when_other_fields_are_strong(self) -> None:
+        row = {
+            "entry_price": 100,
+            "sl_price": 98,
+            "oi_percentile": 92,
+            "setup_id": "cvd_5m_bullish_divergence",
+            "timeframe": "5M",
+            "volume_24h": 10_000_000,
+            "signal_type": "reversal_bullish",
+            "taker_buy_ratio": 0.60,
+            "mtf_15m_confluence": True,
+        }
+        layer, reasons = classify_trade_layer(row)
+        self.assertEqual(layer, "warning")
+        self.assertIn("cvd_divergence_warning_only_requires_15m_structure", reasons)
+
+    def test_chasing_or_unconfirmed_taker_stays_warning(self) -> None:
+        row = {
+            "entry_price": 100,
+            "sl_price": 98,
+            "oi_percentile": 92,
+            "setup_id": "oi_15m_long_buildup",
+            "volume_24h": 10_000_000,
+            "signal_type": "reversal_bullish",
+            "taker_buy_ratio": 0.51,
+            "price_change_pct": 2.2,
+        }
+        layer, reasons = classify_trade_layer(row)
+        self.assertEqual(layer, "warning")
+        self.assertIn("taker_not_directionally_confirmed", reasons)
+        self.assertIn("chasing_price_move_over_2_pct", reasons)
 
     def test_missing_volume_remains_warning(self) -> None:
         row = {
