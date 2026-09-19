@@ -1187,24 +1187,27 @@
 
     <section id="quant" class="view">
       <style>
-        .quant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}.quant-chart{min-height:280px;padding:14px}.quant-chart svg{width:100%;height:220px;overflow:visible}.quant-chart-line{fill:none;stroke:currentColor;stroke-width:2}.quant-chart-area{opacity:.12}.quant-axis{stroke:rgba(255,255,255,.12);stroke-width:1}.quant-dot{opacity:.65}.quant-heat{display:grid;gap:3px;overflow:auto}.quant-heat-row{display:flex;gap:3px}.quant-cell{min-width:54px;padding:8px 5px;border:1px solid var(--line);border-radius:4px;text-align:center;font:700 10px var(--mono)}.quant-cell.good{background:rgba(0,224,164,.18)}.quant-cell.bad{background:rgba(255,85,119,.16)}.quant-cell.neutral{background:rgba(255,255,255,.04)}.quant-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.quant-note{font-size:11px;color:var(--muted);margin-top:8px}.quant-table-scroll{max-height:520px;overflow:auto}@media(max-width:900px){.quant-grid{grid-template-columns:1fr}}
+        .quant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}.quant-chart{min-height:280px;padding:14px}.quant-chart svg{width:100%;height:220px;overflow:visible}.quant-chart-line{fill:none;stroke:currentColor;stroke-width:2}.quant-chart-area{opacity:.12}.quant-axis{stroke:rgba(255,255,255,.12);stroke-width:1}.quant-dot{opacity:.65}.quant-heat{display:grid;gap:3px;overflow:auto}.quant-heat-row{display:flex;gap:3px}.quant-cell{min-width:54px;padding:8px 5px;border:1px solid var(--line);border-radius:4px;text-align:center;font:700 10px var(--mono)}.quant-cell.good{background:rgba(0,224,164,.18)}.quant-cell.bad{background:rgba(255,85,119,.16)}.quant-cell.neutral{background:rgba(255,255,255,.04)}.quant-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.quant-note{font-size:11px;color:var(--muted);margin-top:8px}.quant-table-scroll{max-height:520px;overflow:auto}.research-box{padding:14px;margin-top:14px;border:1px solid rgba(0,224,164,.3);border-radius:10px;background:rgba(0,224,164,.045)}.research-box ul{margin:10px 0 0;padding-left:18px}.research-box li{margin:6px 0}.research-candidate{font:700 12px var(--mono);word-break:break-word}@media(max-width:900px){.quant-grid{grid-template-columns:1fr}}
       </style>
       <section class="radar-strip">
-        <div class="kicker">Quant Research Lab · V2</div>
-        <h2>全市場量化研究</h2>
-        <div class="subline">單幣深度研究 + 全幣種橫截面掃描。包含 Alpha proxy、Equity、Drawdown、Sharpe/Sortino/Calmar、MFE/MAE、參數穩健性與 Walk-forward OOS。</div>
+        <div class="kicker">Quant Research Lab · V4</div>
+        <h2>全市場自主研究</h2>
+        <div class="subline">AI 以同一組策略跨幣種診斷、提出 Challenger、進行逐幣 OOS 驗證；僅產生升級候選，不會自動改動正式策略。</div>
       </section>
       <section class="backtest-panel">
         <div class="backtest-head">
-          <div><div class="kicker">Research Controls</div><h2>Quant V2</h2><div class="subline">最佳化使用樣本內/樣本外分離；全幣掃描預設依 24h 成交額挑選 80 個 USDT 永續合約。</div></div>
+          <div><div class="kicker">Research Controls</div><h2>Quant V4</h2><div class="subline">V2 保留單幣與橫截面研究；V4 使用共用參數做全幣種 Autonomous Research，防止逐幣曲線擬合。</div></div>
           <div class="section-actions">
             <input id="quantSymbol" value="BTCUSDT" aria-label="幣種">
             <select id="quantTimeframe"><option value="5m">5M</option><option value="15m" selected>15M</option><option value="1h">1H</option><option value="4h">4H</option><option value="1d">1D</option></select>
             <select id="quantLimit"><option value="500">500 bars</option><option value="750">750 bars</option><option value="1000" selected>1000 bars</option></select>
             <button class="btn primary" id="quantRun">單幣研究</button>
             <button class="btn" id="quantUniverseRun">全幣掃描</button>
+            <select id="quantV4Symbols" aria-label="V4 掃描幣數"><option value="10">V4 10 幣</option><option value="20" selected>V4 20 幣</option><option value="30">V4 30 幣</option></select>
+            <button class="btn primary" id="quantV4Run">啟動 AI 自主研究</button>
           </div>
         </div>
+        <div class="research-box" id="quantV4Center"><div class="kicker">AI Research Center · V4</div><h3>等待啟動自主研究</h3><div class="subline">執行後會顯示跨幣種診斷、通過穩健性門檻的 Challenger 與是否存在 promotion candidate。</div></div>
         <div class="watch-stats" id="quantStats"></div>
         <div class="quant-grid">
           <div class="panel quant-chart"><div class="kicker">Equity Curve</div><h3>累積 R</h3><div id="quantEquityChart" class="muted">執行單幣研究後顯示</div></div>
@@ -5368,6 +5371,26 @@
         status('Quant V2 完成 '+d.successful+'/'+d.symbols+' 個幣種');
       }catch(err){$("quantUniverseRows").innerHTML='<tr><td colspan="12" class="bear-text">'+cleanText(err.message||String(err))+'</td></tr>'}finally{btn.disabled=false;btn.textContent="全幣掃描"}
     }
+    function renderQuantV4(d){
+      const center=$("quantV4Center"), candidate=d.promotion_candidate, findings=(d.market_findings||[]).slice(0,6), guards=d.guardrails||[];
+      const findingHtml=findings.length?'<ul>'+findings.map(x=>'<li>'+cleanText(x.finding)+' <span class="pill">'+Number(x.symbols||0)+' 幣</span></li>').join('')+'</ul>':'<div class="subline">尚未得到跨幣種共同診斷。</div>';
+      const candidateHtml=candidate?'<div class="research-candidate bull-text">候選升級：SL ATR '+Number(candidate.config?.stop_atr||0).toFixed(2)+' · Volume '+Number(candidate.config?.volume_multiplier||0).toFixed(2)+'× · OOS '+Number(candidate.mean_oos_expectancy_r||0).toFixed(3)+'R · Gate '+Number(candidate.gate_rate||0).toFixed(0)+'%</div>':'<div class="subline">本輪沒有通過 promotion gate 的候選；正式策略維持不變。</div>';
+      center.innerHTML='<div class="kicker">AI Research Center · V4</div><h3>'+cleanText(d.decision||'keep_champion')+'</h3><div class="subline">測試 '+Number(d.symbols_tested||0)+' / '+Number(d.symbols_requested||0)+' 個幣種 · '+cleanText(d.timeframe||'')+' · 正式策略：未修改</div>'+candidateHtml+'<div class="kicker" style="margin-top:14px">跨幣種發現</div>'+findingHtml+'<div class="quant-note">'+guards.map(cleanText).join(' · ')+'</div>';
+    }
+    async function runQuantV4(){
+      const btn=$("quantV4Run"), tf=$("quantTimeframe").value, limit=Math.max(500,Number($("quantLimit").value||1000)), maxSymbols=Number($("quantV4Symbols").value||20);
+      btn.disabled=true; btn.textContent="AI 研究中…"; $("quantMeta").textContent="V4 Autonomous Research…";
+      try{
+        const r=await cloudFetch('/backtest/quant-v4/universe-agent?timeframe='+encodeURIComponent(tf)+'&limit='+limit+'&max_symbols='+maxSymbols);
+        if(r.status===401){clearCloudSession();redirectToLogin();return}
+        const d=await r.json(); if(!r.ok||d.detail)throw new Error(d.detail||'V4 自主研究失敗');
+        renderQuantV4(d); $("quantMeta").textContent='V4 · '+Number(d.symbols_tested||0)+' 幣 · '+(d.decision==='universe_candidate_ready_for_review'?'候選可供審查':'維持 Champion');
+        status('Quant V4 完成 '+Number(d.symbols_tested||0)+' 個幣種研究');
+      }catch(err){$("quantV4Center").innerHTML='<div class="kicker">AI Research Center · V4</div><h3 class="bear-text">研究失敗</h3><div class="subline">'+cleanText(err.message||String(err))+'</div>'; $("quantMeta").textContent='V4 失敗'}finally{btn.disabled=false;btn.textContent='啟動 AI 自主研究'}
+    }
+    $("quantRun").addEventListener("click", runQuantV2);
+    $("quantUniverseRun").addEventListener("click", runQuantUniverse);
+    $("quantV4Run").addEventListener("click", runQuantV4);
 
     async function runQuantV1() {
       const button = $("quantRun");
