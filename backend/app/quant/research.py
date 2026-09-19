@@ -43,6 +43,22 @@ def _curve(trades: Sequence[dict]) -> list[dict]:
     return out
 
 
+def _benchmark(rows: Sequence[Kline], trades: Sequence[dict]) -> dict:
+    if not rows:
+        return {"buy_hold_pct": 0.0, "strategy_trade_pct": 0.0, "alpha_trade_pct": 0.0}
+    buy_hold = (rows[-1].close / rows[0].close - 1.0) * 100 if rows[0].close else 0.0
+    strategy_pct = 0.0
+    for t in trades:
+        entry = float(t.get("entry") or 0)
+        exit_ = float(t.get("exit") or entry)
+        if entry:
+            raw = (exit_ / entry - 1.0) * 100
+            strategy_pct += raw if t.get("side") == "long" else -raw
+    return {"buy_hold_pct": round(buy_hold, 3), "strategy_trade_pct": round(strategy_pct, 3),
+            "alpha_trade_pct": round(strategy_pct-buy_hold, 3),
+            "note": "Trade-return alpha proxy versus buy-and-hold; not factor-regression alpha."}
+
+
 def research(rows: Sequence[Kline], config: QuantConfig | None = None) -> dict:
     cfg = config or QuantConfig()
     base = run_quant_v1(rows, cfg)
@@ -54,6 +70,8 @@ def research(rows: Sequence[Kline], config: QuantConfig | None = None) -> dict:
         **base,
         "risk_metrics": _metrics(trades),
         "equity_curve": _curve(trades),
+        "benchmark": _benchmark(rows, trades),
+        "mfe_mae": [{"mfe_r": round(float(t.get("mfe_r",0)),3), "mae_r": round(float(t.get("mae_r",0)),3), "pnl_r": round(float(t.get("pnl_r",0)),3), "side": t.get("side")} for t in trades],
         "segments": {"long": _metrics(long_t), "short": _metrics(short_t), "trend": _metrics(trend_t)},
         "config": asdict(cfg),
     }
