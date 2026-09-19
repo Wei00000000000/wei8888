@@ -1,7 +1,9 @@
-const CACHE_NAME = "wei-strategy-v29";
+const CACHE_NAME = "wei-strategy-v30";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./app.html",
+  "./login.html",
   "./api-config.js",
   "./manifest.webmanifest",
   "./icon.svg",
