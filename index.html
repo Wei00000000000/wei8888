@@ -1366,7 +1366,8 @@
     document.querySelectorAll(".nav button").forEach(btn => btn.addEventListener("click", () => setView(btn.dataset.view)));
     $("scan").addEventListener("click", tickScan);
     $("backtest").addEventListener("click", () => runSignals("backtest"));
-    $("quantRun").addEventListener("click", runQuantV2);\n    $("quantUniverseRun").addEventListener("click", runQuantUniverse);
+    $("quantRun").addEventListener("click", runQuantV2);
+    $("quantUniverseRun").addEventListener("click", runQuantUniverse);
     $("loadMarkets").addEventListener("click", loadMarkets);
     $("refreshWatch").addEventListener("click", loadMarkets);
     $("refreshSignals").addEventListener("click", () => runSignals("backtest"));
